@@ -9,7 +9,8 @@
 ## 0. 범위와 전제
 
 - **하드웨어 부재**: 안전 MCU·실차 CAN 게이트웨이 아직 없음 → 메인 PC(Ubuntu 22.04)가 [8.1 연산보드 계층](can_status_parameters_full.md#81-권장-2계층-아키텍처)을 **단독으로** 구현하는 첫 마일스톤.
-- **PREEMPT_RT 설치 진행 중.**
+- **RT 커널 확정·설치·부팅 검증 완료 (2026-09-12)**: Ubuntu 22.04.5 LTS + `6.8.1-1059-realtime` (Ubuntu Pro `linux-realtime-hwe-22.04`). 격리 코어 튜닝 적용 후 재측정·장시간 측정이 남음 → §5.A.
+- **CAN 어댑터는 이미 장착됨**: PEAK PCAN-PCIe FD 2채널(`can0`/`can1`, 커널 내장 드라이버 `peak_pciefd`). 실차 연결 전이라 개발은 계속 `vcan0` SIL로 진행.
 - **개발 방식 = SIL(Software-in-the-Loop)**: 실물 CAN 대신 `vcan0` 가상 인터페이스 + 기록된 rosbag 재생으로 검증. 대회 DBC·실차 미수령.
 - **대회 미수령 항목**: CAN ID 배치, 정수값→의미 매핑표(`enable`/`state`/`error*`/`gear`/`drive_mode`) — 확정 전까지 TODO로 명시하며 진행.
 
@@ -19,12 +20,12 @@
 
 ```mermaid
 flowchart TB
-  subgraph A["[A] RT 커널 기반 (PREEMPT_RT) — 진행중"]
-    K["Ubuntu 22.04 + PREEMPT_RT<br/>isolcpus · mlockall · SCHED_FIFO"]
+  subgraph A["[A] RT 커널 기반 (PREEMPT_RT) — 커널 확정, 튜닝·실측 진행중"]
+    K["Ubuntu 22.04.5 + 6.8.1-1059-realtime<br/>isolcpus · mlockall · SCHED_FIFO"]
   end
   subgraph B["[B] CAN 인터페이스 — 예정"]
     VCAN["vcan0 (SIL: rosbag 재생 주입)"]
-    RCAN["실 CAN 어댑터 (HW 확보 후)"]
+    RCAN["실 CAN 어댑터: PEAK PCAN-PCIe FD 2ch<br/>(장착됨 · can0/can1, 실차 연결 전)"]
   end
   subgraph C["[C] ROS2 브리지 · 디코더 — 예정"]
     DEC["CanRawMsgs → Status* 디코더<br/>alive_count E2E 체크"]
@@ -52,7 +53,7 @@ flowchart TB
 
 | ID | 카테고리 | 책임 범위 | 상태 | 상세 섹션 |
 |---|---|---|---|---|
-| A | RT 커널 기반 | PREEMPT_RT 설치·튜닝(`isolcpus`/`mlockall`/`SCHED_FIFO`), `cyclictest` 측정 | 🟡 진행중 | §5.A (추후 작성) |
+| A | RT 커널 기반 | PREEMPT_RT 설치·튜닝(`isolcpus`/`mlockall`/`SCHED_FIFO`), `cyclictest` 측정 | 🟡 진행중 (커널 확정·튜닝 전 실측 완료, 튜닝 후 재측정 남음) | §5.A |
 | B | CAN 인터페이스 | 어댑터/SocketCAN, `vcan0` SIL 환경, rosbag→CAN 주입 | ⚪ 예정 | §5.B (추후 작성) |
 | C | ROS2 브리지·디코더 | `CanRawMsgs`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | ⚪ 예정 | §5.C (추후 작성) |
 | D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | ⚪ 예정 | §5.D (추후 작성) |
@@ -184,12 +185,47 @@ flowchart LR
 - `mlockall(MCL_CURRENT|MCL_FUTURE)`로 페이지폴트(=디스크 I/O=수 ms 지연) 원천 차단
 - `cyclictest`로 반드시 실측 — "커널 깔았다"가 완료가 아니라 "쟀더니 목표치 이내였다"가 완료
 
+**커널 결정 (2026-09-12 확정)**
+
+| 항목 | 값 |
+|---|---|
+| OS | **Ubuntu 22.04.5 LTS (jammy)** — 24.04 아님. ROS2 Humble 유지, Jazzy 이전 불필요 |
+| RT 커널 | **`6.8.1-1059-realtime`** (`uname -v`: `#60~22.04.1-Ubuntu SMP PREEMPT_RT`) |
+| 패키지 | `linux-realtime-hwe-22.04` = `6.8.1-1059.60~22.04.1`, 출처 `esm.ubuntu.com/realtime jammy` (Ubuntu Pro) |
+| 비RT 커널 | `6.8.0-138-generic` (HWE) — 기본 부팅·롤백용으로 유지 |
+| 하드웨어 | i7-12700 (P코어 8개 = CPU 0–15 하이퍼스레드, E코어 4개 = CPU 16–19), 62 GB, RTX A5000, PEAK PCAN-PCIe FD 2ch, WiFi = USB 동글 RTL8822BU |
+
+선정 경위 — "왜 이 커널인가"를 다시 파헤치지 않도록 남긴다.
+- **기존 RT 커널 `5.15.0-1114-realtime`은 폐기.** WiFi 동글 드라이버 `rtw88_8822bu`가 Linux 6.2부터 들어가서 5.15에는 코드가 없고(펌웨어·rfkill 문제 아님), NVIDIA 470 DKMS가 PREEMPT_RT 커널 빌드를 거부해 GPU도 쓸 수 없었다. (인수인계 문서의 "5.11-rt / 6.11"은 실제 장비와 달랐다 — 실측 결과는 5.15-rt / 6.8 generic.)
+- **"같은 OS면 드라이버도 같이 해결된다"는 가설은 기각.** userspace(펌웨어 파일, NetworkManager)는 공유되지만 드라이버 본체는 커널 버전별 별도 코드다. 해결책은 "무선이 되는 커널 세대에서 RT를 구성하는 것".
+- **6.12 LTS 자체 빌드(메인라인 PREEMPT_RT) 대신 6.8.1-rt를 택한 이유**: 무선이 되던 6.8 generic과 같은 기반이고, 배포판이 빌드·보안패치를 제공하며, 22.04에서 바로 설치된다(24.04 업그레이드 불필요). 대회 일정 리스크 최소화가 최신성보다 우선. 6.12 계열 이관은 대회 후 재검토하며, 아래 측정표가 비교 기준이 된다.
+- **블루투스는 해당 없음**: 이 PC에는 BT 하드웨어 자체가 없다(6.8 generic에서도 `/sys/class/bluetooth` 없음). 필요하면 USB BT 동글 구매 — `btusb`는 모든 커널에 내장.
+
+**이행 호환성 판정 (2026-09-12, 6.8.1-1059-realtime 실부팅 기준)**
+
+| 항목 | 결과 | 비고 |
+|---|---|---|
+| WiFi (RTL8822BU, `rtw88_8822bu`) | ✅ 연결 | generic에서도 `firmware failed to leave lps state` 반복(절전 버그) → 주행 중 무선 비활성 권고 |
+| CAN (`peak_pciefd`) | ✅ `can0`/`can1` | 커널 내장 드라이버, out-of-tree 없음 |
+| GPU (RTX A5000, NVIDIA 470.256.02-server) | ⚠️ 동작 — 조건부 | NVIDIA는 PREEMPT_RT **공식 미지원**. DKMS에 `IGNORE_PREEMPT_RT_PRESENCE=1` 우회 빌드(`/etc/dkms/framework.conf`). GPU 83% 부하에서 커널 경고 0건. 커널 업데이트 때마다 재빌드 확인 필요 |
+| 유선 NIC(e1000e·ixgbe·igc·atlantic), LTE 모뎀 | ✅ | 커널 내장 |
+| Secure Boot / 루트 FS | 비활성 / ext4 | 서명·부팅 문제 없음 |
+| 하드웨어 지연 (`hwlatdetect`, 20 µs 기준) | ✅ 0건 (2회) | BIOS SMI 원인 없음 → 소프트웨어 튜닝이 유효 |
+| Bluetooth | 해당 없음 | 하드웨어 없음 |
+
+**부팅 구성·롤백 경로**
+- GRUB 메뉴를 매 부팅 **10초 표시**, 서브메뉴 없이 커널 나열, **아무것도 안 누르면 `6.8.0-138-generic`**. 무한 대기는 차량에서 무인 재부팅 시 멈추면 안 되므로 쓰지 않는다. (드롭인 `/etc/default/grub.d/99z-a1-bsw-safe-default.cfg`)
+- 메뉴 항목: generic(기본) / `6.8.1-1059-realtime` / **`A1-BSW: … + RT 튜닝`**(`/etc/grub.d/11_a1_bsw_rt_tuned`, id `a1-bsw-rt-tuned`) / `5.15.0-1114-realtime`(구, 정리 예정)
+- 튜닝 항목으로 1회만 부팅: `sudo grub-reboot a1-bsw-rt-tuned && sudo reboot` — 부팅이 멈추면 전원 재시작만으로 generic 복귀
+- 이행·측정 스크립트: 메인 PC `~/a1_rt_migration/a1_rt.sh` (`pin`/`install`/`verify`/`hwlat`/`tune`/`bench`/`soak`/`rollback`), 모든 출력은 `~/a1_rt_migration/logs/`
+
 **검증 방법**
 - `uname -a`에 `PREEMPT_RT` 표기 확인, `cat /sys/kernel/realtime` → `1`
-- `cyclictest -p 99 -m -N -i 1000 -l 100000` 등으로 **무부하 상태 + 부하 상태(카메라/LiDAR 처리 흉내로 CPU/메모리 스트레스)** 양쪽에서 최댓값 비교
+- `cyclictest -p 99 -m -i 1000 -l 100000` 등으로 **무부하 + CPU 부하 + CPU+GPU 부하** 세 조건에서 최댓값 비교 (GPU 부하 조건은 2026-09-12 추가 — NVIDIA 비공개 드라이버가 RT 지연의 주요 위험원이므로)
+- `hwlatdetect --duration=60 --threshold=20`으로 BIOS/SMI 하드웨어 지연 배제
 - §3 V-model "시스템 요구사항 ↔ 시스템 시험" 행과 직결
 
-**완료 기준**: PREEMPT_RT 부팅 확인 + 무부하/부하 상태 `cyclictest` 최댓값을 기록하고 §7(can_status_parameters_full.md) 데드라인과 대조해 여유가 있음을 확인.
+**완료 기준**: PREEMPT_RT 부팅 확인 + 무부하/부하 상태 `cyclictest` 최댓값을 기록하고 §7(can_status_parameters_full.md) 데드라인과 대조해 여유가 있음을 확인. **짧은 측정(수십~100초)은 드문 스파이크를 놓치므로, 격리 코어 튜닝 상태에서 CPU+GPU 부하 30분 이상 장시간 측정까지 통과해야 완료로 본다** (2026-09-12 추가).
 
 **cyclictest 실측 절차 (2026-09-11 수정: before/after 비교 생략, PREEMPT_RT 설치 후 절대 기준(§7 예산) 통과 여부만 확인)**
 
@@ -212,24 +248,74 @@ sudo cyclictest
 ```
 
 **Step 3 — 실제로 판단에 쓸 측정** (8코어, 약 100초)
+
+> ⚠️ **2026-09-12 수정: `-N` 제거.** `-N`(ns 출력)을 쓰면 값과 히스토그램 단위가 ns가 되어 `-h 400`이 0–400 **ns**만 추적한다(거의 모든 샘플이 범위 초과). µs 단위로 재야 `-h 400` = 0–400 µs가 된다.
+
 ```bash
-sudo cyclictest -p 99 -m -N -i 1000 -l 100000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_$(date +%Y%m%d).log
+sudo cyclictest -p 99 -m -i 1000 -l 100000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_$(date +%Y%m%d).log
 tail -n 20 ~/cyclictest_rt_floor_*.log
+# 격리 코어(예: 8-15)에서 잴 때: -t 8 -a8-15  (-a 의 인자는 붙여 써야 함 — 선택 인자)
 ```
 
 **Step 4 — 부하 상태에서도 확인** (카메라/LiDAR 처리 흉내)
 ```bash
 sudo apt install -y stress-ng
 sudo stress-ng --cpu 8 --io 4 --vm 2 --vm-bytes 1G --timeout 70s &
-sudo cyclictest -p 99 -m -N -i 1000 -l 60000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_load_$(date +%Y%m%d).log
+sleep 3
+sudo cyclictest -p 99 -m -i 1000 -l 60000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_load_$(date +%Y%m%d).log
 ```
+
+**Step 5 — CPU + GPU 부하** (2026-09-12 추가 — 인지 파이프라인 흉내. CUDA 툴킷이 없어 OpenGL 벤치마크로 GPU 부하)
+```bash
+sudo apt install -y glmark2
+glmark2 --off-screen --run-forever -s 3840x2160 &      # 데스크톱 세션에서 일반 사용자로 실행
+sudo stress-ng --cpu 8 --io 4 --vm 2 --vm-bytes 1G --timeout 70s &
+sleep 5
+sudo cyclictest -p 99 -m -i 1000 -l 60000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_gpu_$(date +%Y%m%d).log
+```
+Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash ~/a1_rt_migration/a1_rt.sh bench` (약 5분, 격리 코어가 있으면 자동으로 그 코어에서 측정). 장시간 측정은 `sudo bash ~/a1_rt_migration/a1_rt.sh soak 30`.
 
 - 판단 기준은 각 스레드의 `Max`(최악 지연) — `Avg` 아님. 사고는 꼬리(tail)에서 남.
 - 8개 스레드 중 **가장 큰 Max**가 "이 컴퓨터+이 커널이 보장하는 실시간성의 바닥선".
 
-| 상태 | 무부하 Max | 부하상태 Max | 측정일 | 커널 |
-|---|---|---|---|---|
-| RT 커널 (§7 목표: 수십~100µs 급) | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
+**측정 결과 (§7 목표: 최악 지연 수십~100 µs 급)**
+
+| 구분 | 무부하 Max | CPU 부하 Max | CPU+GPU 부하 Max | 측정 CPU | 측정일시 | 커널 |
+|---|---|---|---|---|---|---|
+| RT, 튜닝 전 — 1차 | 116 µs (CPU 6) | **882 µs (CPU 6, 1회)** | 미측정 | 0–7 | 2026-09-12 15:18 | `6.8.1-1059-realtime` |
+| RT, 튜닝 전 — 2차 | 65 µs (CPU 6) | 23 µs | 20 µs (GPU 83%) | 0–7 | 2026-09-12 16:01 | `6.8.1-1059-realtime` |
+| RT + 격리 튜닝 | _TBD_ | _TBD_ | _TBD_ | 8–15 | _TBD_ | `6.8.1-1059-realtime` |
+| 장시간 30분+ (CPU+GPU) | — | — | _TBD_ | 8–15 | _TBD_ | `6.8.1-1059-realtime` |
+
+- 평균(Avg)은 모든 조건에서 1–5 µs. 판단은 항상 Max 기준.
+- `hwlatdetect`(20 µs 기준) 2회 모두 초과 0건 → 하드웨어·BIOS 요인 배제.
+- 측정 중 커널 경고(`BUG:`/`scheduling while atomic`/`Call Trace`/NVRM 오류) 0건 — NVIDIA×RT 충돌 징후 없음.
+
+**판정 (2026-09-12): 조건부 통과.** 2차 측정은 세 조건 모두 100 µs 이하로 목표를 만족한다. 다만 1차의 **882 µs 스파이크 1회**가 미해명 상태다:
+- WiFi 오류 로그와 시각 불일치(스파이크 15:20:34 전후, WiFi 오류 15:21:40), CPU 6에는 WiFi(CPU 9)·GPU(CPU 13)·NVMe 등 주요 장치 IRQ 없음, 측정 직전 apt 설치는 측정 시작 전(15:18:17) 종료, `hwlatdetect` 0건 → 알려진 후보는 모두 배제됨.
+- 2차 60초 측정에서 재현되지 않음. 10 ms 제어 주기 기준 882 µs는 주기의 9%로 데드라인 위반은 아니지만, §7 목표선은 넘는다.
+- → **장시간 측정(soak 30분+)에서 재발하지 않는 것을 확인하기 전까지 "통과"로 확정하지 않는다.**
+
+**튜닝 파라미터 (A-1/A-2) — `A1-BSW: … + RT 튜닝` 부팅 항목**
+
+| 파라미터 | 의도 |
+|---|---|
+| `isolcpus=managed_irq,domain,8-15` | 물리 P코어 4–7(하이퍼스레드 양쪽)을 RT 전용으로 격리 |
+| `nohz_full=8-15` `rcu_nocbs=8-15` `rcu_nocb_poll` | 격리 코어의 주기 타이머·RCU 콜백 제거 |
+| `irqaffinity=0-7,16-19` | 인터럽트를 격리 코어 밖(나머지 P코어 + E코어)으로 |
+| `intel_idle.max_cstate=1` `processor.max_cstate=1` | 깊은 절전 복귀 지연 제거 (유휴 전력·발열 증가는 감수) |
+| `nmi_watchdog=0` `nosoftlockup` `skew_tick=1` | 주기적 감시·틱 동시성에서 오는 지터 감소 |
+
+> ⚠️ **격리 코어에는 명시적으로 배치한 태스크만 실행된다.** ROS2 제어 노드를 `taskset -c 8-15` + `chrt -f`로 띄우지 않으면 격리 코어는 그냥 놀게 되고 지연 개선 효과도 없다(A-3). 가장 결정적인 구성이 필요하면 물리 코어당 한 스레드만 사용(예: 8·10·12·14)하고 형제 스레드는 비워 둔다.
+
+**남은 작업 (Phase A 잔여)**
+1. 튜닝 항목으로 부팅 → `cat /proc/cmdline`, `cat /sys/devices/system/cpu/isolated`(= `8-15`) 확인 (A-1), 격리 코어에 IRQ가 없는지 확인 (A-2)
+2. 튜닝 상태에서 `bench` → 위 표 3행 기입
+3. `soak 30` 이상(가능하면 대회 전 야간 장시간 1회) → 표 4행, 882 µs 재발 여부 확정
+4. A-3: 제어 노드를 격리 코어에 `taskset`+`chrt -f`로 띄우는 실행 스크립트 또는 systemd 유닛
+5. A-4: `mlockall(MCL_CURRENT|MCL_FUTURE)` 적용 확인용 테스트 프로그램
+6. 운영 규칙: 주행 중 WiFi/BT 비활성(`rfkill block all`), 대회 기간 커널·NVIDIA 드라이버 동결(`apt-mark hold`) — RT용 NVIDIA 모듈은 우회 빌드라 업데이트 때 깨질 수 있음
+7. `5.15.0-1114-realtime` 패키지 정리(메뉴 혼동·오선택 방지) — 튜닝 측정 완료 후 별도 승인
 
 ---
 
