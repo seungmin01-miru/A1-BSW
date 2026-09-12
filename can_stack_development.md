@@ -23,8 +23,8 @@ flowchart TB
   subgraph A["[A] RT 커널 기반 (PREEMPT_RT) — 실측 완료(조건부), A-3/A-4 남음"]
     K["Ubuntu 22.04.5 + 6.8.1-1059-realtime<br/>isolcpus=8-15 · 최악 0.47 ms/30분<br/>mlockall · SCHED_FIFO (A-3/A-4 예정)"]
   end
-  subgraph B["[B] CAN 인터페이스 — 예정"]
-    VCAN["vcan0 (SIL: rosbag 재생 주입)"]
+  subgraph B["[B] CAN 인터페이스 — vcan0 SIL 가동 (2026-09-12)"]
+    VCAN["vcan0 (SIL) · sil/vcan/eait_tx.py<br/>DBC 기반 0x712 10 ms 송신 ✅"]
     RCAN["실 CAN 어댑터: PEAK PCAN-PCIe FD 2ch<br/>(장착됨 · can0/can1, 실차 연결 전)"]
   end
   subgraph C["[C] ROS2 브리지 · 디코더 — 예정"]
@@ -54,7 +54,7 @@ flowchart TB
 | ID | 카테고리 | 책임 범위 | 상태 | 상세 섹션 |
 |---|---|---|---|---|
 | A | RT 커널 기반 | PREEMPT_RT 설치·튜닝(`isolcpus`/`mlockall`/`SCHED_FIFO`), `cyclictest` 측정 | 🟡 조건부 완료 (커널·격리 튜닝·30분 실측 완료. 남음: 예산 재정의 결정, generic 비교, A-3/A-4) | §5.A |
-| B | CAN 인터페이스 | 어댑터/SocketCAN, `vcan0` SIL 환경, rosbag→CAN 주입 | ⚪ 예정 | §5.B (추후 작성) |
+| B | CAN 인터페이스 | 어댑터/SocketCAN, `vcan0` SIL 환경, rosbag→CAN 주입 | 🟡 진행중 (vcan0 영속화·왕복·DBC 기반 0x712 주기 송신·디코드 완료. 남음: ROS2 raw 퍼블리시=Phase C, 실 can0 전환) | §5.B |
 | C | ROS2 브리지·디코더 | `CanRawMsgs`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | ⚪ 예정 | §5.C (추후 작성) |
 | D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | ⚪ 예정 | §5.D (추후 작성) |
 | E | 검증/테스트 (V-model) | 좌/우 대응 검증 계획, 고장주입 시험 | 🟢 초안 완료 | §3 |
@@ -374,6 +374,9 @@ sudo modprobe vcan
 sudo ip link add dev vcan0 type vcan
 sudo ip link set up vcan0
 ```
+**→ 스크립트화·영속화 완료 (2026-09-12, B-1)**: `sil/vcan/vcan_up.sh` (멱등). `sudo bash sil/vcan/vcan_up.sh --install` 이
+systemd oneshot 유닛 `vcan0.service` 를 설치·활성화해 부팅마다 자동 생성한다. 이 PC는 NetworkManager 환경(systemd-networkd 비활성)이라
+`.netdev` 방식 대신 유닛을 택했다. 왕복 확인은 `bash sil/vcan/roundtrip_check.sh` (B-2, 자동 ✅/❌ 판정) — 2026-09-12 ✅.
 
 **왜 지금 쓰는가 (HW 부재 단계)**
 1. CAN 어댑터·실차 없이 ROS2↔CAN 브리지, 디코더 노드, E2E(`alive_count`) 체크, 헬스 슈퍼바이저를 개발·테스트 가능 (SIL, Software-in-the-Loop)
@@ -386,9 +389,9 @@ sudo ip link set up vcan0
 - 에러 프레임·버스-오프(bus-off)·전기적 결함(단선, 노이즈) 시뮬레이션 안 됨 → 이런 고장은 애플리케이션 레이어에서 소프트웨어적으로만 흉내 가능
 - 여러 노드 간 ID 기반 우선순위 경쟁이 실제로 일어나지 않음 (모든 프레임이 즉시 전달됨)
 
-**~~현재 막힌 지점~~ → 2026-09-11 해소**: `merged_0.mcap` 원본은 여전히 미보유지만, **실제 대회/차량 DBC를 확보함** — `can_protocol/00. CAN 프로토콜/EAIT_CAN(AVANTE_CN7).dbc` (+ 동일 폴더의 PDF 비트맵 스펙, PPTX 운용 매뉴얼). 합성 프레임 단계를 건너뛰고 바로 실제 프로토콜로 vcan0 개발 가능.
+**~~현재 막힌 지점~~ → 2026-09-11 해소**: `merged_0.mcap` 원본은 여전히 미보유지만, **실제 대회/차량 DBC를 확보함** — 저장소 `DBC/EAIT_CAN(AVANTE_CN7).dbc` (2026-09-12 반입; PDF 비트맵 스펙·PPTX 운용 매뉴얼은 `can_protocol/00. CAN 프로토콜/` 팀 폴더). 합성 프레임 단계를 건너뛰고 바로 실제 프로토콜로 vcan0 개발 가능.
 
-**완료 기준**: `vcan0` 기동 + `candump vcan0`/`cansend vcan0` 왕복 확인 + (아래 DBC 기반) 재생 스크립트로 `/interface/can/read/raw` 퍼블리시 확인.
+**완료 기준**: `vcan0` 기동 ✅ + `candump vcan0`/`cansend vcan0` 왕복 확인 ✅ + DBC 기반 재생 스크립트가 vcan0 에 스펙 주기로 송신 ✅ (2026-09-12) + `/interface/can/read/raw` 퍼블리시 확인 (Phase C 브리지 노드 — 미완).
 
 ---
 
@@ -416,25 +419,46 @@ sudo ip link set up vcan0
 5. 고아 신호에 **레이더**(`RAD_ObjRelSpd`/`Dist`/`LatPos`/`State`) 존재 — 기존 문서엔 카메라·LiDAR만 언급, 실제 장착 여부 확인 필요
 6. `KIAPI_1~6`(0x124~0x129) 용도 불명 — 대회 게이트웨이/조직위 예약 가능성
 
-**vcan0 실전 스크립트 (cantools + python-can, 합성 데이터 아닌 실제 프로토콜)**
+**vcan0 실전 도구 — `sil/vcan/` (2026-09-12 구현·실측 완료, cantools 44 + python-can 4.6)**
+
+| 파일 | 역할 | 보드 |
+|---|---|---|
+| `vcan_up.sh` | vcan0 생성·기동(멱등), `--install` 로 부팅 자동 생성 유닛 설치 | B-1 |
+| `roundtrip_check.sh` | cansend→candump 왕복 자동 판정 | B-2 |
+| `eait_tx.py` | DBC 메시지 1종을 스펙 주기로 송신. 사인파/상수, `--range LO HI`(물리 범위), `--set 신호=값`(신호별 고정), 카운터(`*Cnt`) 자동 롤오버, enum 기본 0. 종료 시 송신 주기 편차 통계 | B-3/B-4/B-5/B-6 |
+| `eait_rx.py` | 수신 프레임 디코드 + 메시지별 Hz·주기 편차·카운터 건너뜀(프레임 손실) 집계 | B-4 검증, E2E 전신 |
+
 ```bash
-pip install --user cantools python-can
+python3 -m pip install --user cantools python-can          # 설치됨
+python3 sil/vcan/eait_tx.py --range 0 60                    # 0x712 EAIT_INFO_SPD, 10 ms, 0~60 kph 사인파
+python3 sil/vcan/eait_rx.py --msg EAIT_INFO_SPD             # 다른 터미널: 디코드 + 100 Hz 확인
+python3 sil/vcan/eait_tx.py --msg EAIT_Control_01 --pattern const --value 0 --set EPS_En=1 --set ACC_En=1 --set EPS_Speed=150
 ```
-```python
-import cantools, can, time
+- python-can 4.x 에서는 `bustype=` 대신 `interface=` 를 쓴다(구 예제의 `bustype`는 폐기 예정 인자).
+- **실측 (2026-09-12, 실제 DBC, vcan0)**: 0x712 송신 1001프레임/10초 = **100.0 Hz**, 카운터 건너뜀 0, 4개 휠속 물리값 디코드 일치. 0x156 인코딩 바이트 검증 `01 96 01 00 00 00 00 <Aliv_Cnt>` (EPS_En=1, EPS_Speed=150, ACC_En=1).
+- **실행 위치별 주기 정밀도** (실제 운용 조건인 격리 코어에서 검증):
 
-db = cantools.database.load_file("can_protocol/00. CAN 프로토콜/EAIT_CAN(AVANTE_CN7).dbc")
-bus = can.interface.Bus(channel="vcan0", bustype="socketcan")
+  | 조건 | 송신 주기 편차 평균/최대 | 수신 주기 최대 |
+  |---|---|---|
+  | 비격리 코어, 일반 우선순위 | 61 / 88 µs | 10.19 ms |
+  | 격리 코어(8/10), 일반 우선순위 | 57 / 63 µs | 10.04 ms |
+  | 격리 코어 + 타이머 여유 1 µs (`--cpu 8`) | **17 / 27 µs** | 10.04 ms |
+  | 격리 코어 + SCHED_FIFO 80 (`sudo chrt -f 80 sudo -u ailab …`, 2026-09-12) | **5 / 9 µs** | (송신만 측정) |
 
-msg_def = db.get_message_by_name("EAIT_INFO_SPD")   # 0x712 — 가장 단순, 걷기골격 1번 타겟
-data = msg_def.encode({"WHEEL_SPD_FL": 12.3, "WHEEL_SPD_FR": 12.1, "WHEEL_SPD_RL": 12.0, "WHEEL_SPD_RR": 12.2})
-frame = can.Message(arbitration_id=msg_def.frame_id, data=data, is_extended_id=False)
+  **결론: 격리 코어 + 타이머 여유 제거 + SCHED_FIFO 조합으로 Python 송신기도 주기 편차 최대 9 µs.** 이것이 Phase C 노드의 실행 조건(레시피)이다. 일반 우선순위 태스크의 기본 타이머 여유(50 µs)가 편차의 대부분이었다. `eait_tx.py` 가 `--cpu`(격리 배치)·`--rt`(SCHED_FIFO+mlockall)·타이머 여유 1 µs 를 적용한다 — **A-3/A-4 의 최소 구현**이며 Phase C 노드에 같은 방식을 적용한다. RT 우선순위: 이 PC는 다른 작업이 같은 계정으로 돌아 **계정에 rtprio 를 영구 부여하지 않는다**(2026-09-12 결정). 측정은 `sudo chrt -f 80 sudo -u ailab python3 …` 로 우선순위만 상속시켜 실행(설정 변경 없음). 운용 단계에서는 대회 스택 전용 계정 + systemd 서비스에만 `rtprio`/`memlock` 을 주는 구조를 권장 — A-3 설계 항목.
+- **걷기골격 진행**: §6 순서 2(vcan0)·3(0x712 최소 재생) 완료 → 다음은 4(Phase C: `/interface/can/read/raw` 브리지 + `EAIT_INFO_SPD` 디코더 노드).
 
-while True:
-    bus.send(frame)
-    time.sleep(0.01)   # 10ms, 스펙과 동일
-```
-받는 쪽에서 `db.decode_message(0x712, data)`로 역디코딩해 물리값이 나오면 검증 완료.
+**DBC 실제 내용 확인 결과 (2026-09-12, `cantools` 로 파싱 — 보드 Phase 0-2~0-7 답변)**
+
+| 보드 | 확인 결과 |
+|---|---|
+| 0-2 신호 매핑 | 12개 메시지·3노드(EAIT/USER/KIAPI). **0x712 신호 순서는 FR, FL, RR, RL**(문서 표기 FL/FR/RL/RR 과 다름), 각 16bit LE unsigned, **scale 0.03125 kph**, 범위 0~511.97 |
+| 0-3 코멘트(CM_) | **0x157 이 0x156 에 종속된다는 코멘트는 DBC 에 없음** → PDF 근거만. 있는 코멘트: `EPS_Speed` "Default 150", `AEB_decel_value` "0x54→0.84 G **but 0x00→1.0 G**"(비선형 특례!), `Override_Status` "발생 시 1초간 1", `BRK_CYLINDER` "maybe %", `Aliv_Cnt` 코멘트는 EUC-KR 인코딩 깨짐(내용 추정: 샘플마다 1 증가) |
+| 0-4 속성(BA_) | **주기·타임아웃 속성(`GenMsgCycleTime` 등) 전혀 없음** → 주기 10/20 ms 와 타임아웃 1000 ms 는 PDF 출처. 코드에서는 `eait_tx.py` 의 `SPEC_PERIOD_MS` 표로 관리 |
+| 0-5 VAL_(enum) | `Turn_Signal` {1:Hazard, **2:Turn_left, 4:Turn_right**} — 불일치 #1 의 DBC 쪽 값 확정. `EPS/ACC_Control_Status` 는 0~4 외에 **7:Override(ACC), 8:BRK_Override, 9:EPS_Override** 도 정의(문서의 "그외:error" 수정 필요; DBC 에 `BRK_Overrdie` 오타). `G_SEL_DISP` P=0,R=7,N=6,D=5 확인 |
+| 0-6 KIAPI | `0x124~0x129 KIAPI_1~6` 은 **BO_ 로 존재하지만 신호 0개**, 송신노드 KIAPI → 대회 측 질의 큐 등록 |
+| 0-7 0x157 명령 스펙 | `EPS_Cmd` bit0+16, ×0.1 deg, [-500\|500] / `ACC_Cmd` **bit24+16**, ×0.01, offset −10.23 m/s², [-3\|1] (바이트 2, 5~7 미사용) |
+| 기타 | 0x156 카운터 신호명은 **`Aliv_Cnt`(DBC 오타)** — 코드는 DBC 이름을 그대로 써야 함(0x710/0x711 은 `EPS_Alive_Cnt`/`ACC_Alive_Cnt`). 고아 신호 19개(`RAD_*` 레이더 4종, `Gear_Sel`, `ACC_Override_Ignore`, 크루즈 버튼 등) — 불일치 #4·#5 재확인 |
 
 ---
 
