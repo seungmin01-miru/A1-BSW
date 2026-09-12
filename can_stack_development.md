@@ -254,7 +254,13 @@ sudo cyclictest
 ```bash
 sudo cyclictest -p 99 -m -i 1000 -l 100000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_$(date +%Y%m%d).log
 tail -n 20 ~/cyclictest_rt_floor_*.log
-# 격리 코어(예: 8-15)에서 잴 때: -t 8 -a8-15  (-a 의 인자는 붙여 써야 함 — 선택 인자)
+```
+
+> ⚠️ **격리 코어(`isolcpus`)에서 잴 때는 반드시 `taskset`으로 감싼다** (2026-09-12 실측 중 발견). `isolcpus`가 켜지면 새 프로세스의 허용 CPU가 격리 코어 밖(`0-7,16-19`)으로 제한되고, cyclictest는 `-a` 목록을 그 허용 범위 안에서만 해석해 `FATAL: No allowable cpus to run on`으로 즉시 죽는다. `-a`의 인자는 붙여 쓴다(선택 인자).
+
+```bash
+# 격리 코어 8-15 측정: 허용 범위를 전체 CPU로 넓히고, 관리(main) 스레드는 하우스키핑 코어에
+sudo taskset -c 0-19 cyclictest -p 99 -m -i 1000 -l 100000 -t 8 -a8-15 --mainaffinity=0-7,16-19 -q -h 400
 ```
 
 **Step 4 — 부하 상태에서도 확인** (카메라/LiDAR 처리 흉내)
@@ -306,11 +312,13 @@ Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash ~/a1_rt_migra
 | `intel_idle.max_cstate=1` `processor.max_cstate=1` | 깊은 절전 복귀 지연 제거 (유휴 전력·발열 증가는 감수) |
 | `nmi_watchdog=0` `nosoftlockup` `skew_tick=1` | 주기적 감시·틱 동시성에서 오는 지터 감소 |
 
-> ⚠️ **격리 코어에는 명시적으로 배치한 태스크만 실행된다.** ROS2 제어 노드를 `taskset -c 8-15` + `chrt -f`로 띄우지 않으면 격리 코어는 그냥 놀게 되고 지연 개선 효과도 없다(A-3). 가장 결정적인 구성이 필요하면 물리 코어당 한 스레드만 사용(예: 8·10·12·14)하고 형제 스레드는 비워 둔다.
+> ⚠️ **격리 코어에는 명시적으로 배치한 태스크만 실행된다.** ROS2 제어 노드를 `taskset -c 8-15` + `chrt -f`로 띄우지 않으면 격리 코어는 그냥 놀게 되고 지연 개선 효과도 없다(A-3). 위 cyclictest 실패와 같은 이유다 — 격리 코어 밖에서 시작한 프로세스는 `taskset`/`sched_setaffinity`로 옮겨야만 격리 코어를 쓴다. 가장 결정적인 구성이 필요하면 물리 코어당 한 스레드만 사용(예: 8·10·12·14)하고 형제 스레드는 비워 둔다.
+>
+> **격리 코어에 남는 인터럽트 (A-2 확인 결과)**: NVMe 디스크의 CPU별 큐 8개(`nvme0q5`~`q12`, IRQ 163~170)가 CPU 8~15에 하나씩 배정돼 있다. 커널이 관리하는 인터럽트라 사용자가 옮길 수 없지만, **그 CPU에서 디스크 I/O를 할 때만 발생**하므로 튜닝 부팅 후 발생 0회였다. → **격리 코어의 RT 태스크는 디스크 I/O를 하지 않는다** (로그는 하우스키핑 스레드로 넘겨 기록).
 
 **남은 작업 (Phase A 잔여)**
-1. 튜닝 항목으로 부팅 → `cat /proc/cmdline`, `cat /sys/devices/system/cpu/isolated`(= `8-15`) 확인 (A-1), 격리 코어에 IRQ가 없는지 확인 (A-2)
-2. 튜닝 상태에서 `bench` → 위 표 3행 기입
+1. ✅ 튜닝 항목 부팅 확인 (2026-09-12 16:36) — `/proc/cmdline`에 튜닝 파라미터 반영, `isolated` = `nohz_full` = `8-15` (A-1). 격리 코어의 장치 인터럽트는 NVMe CPU별 큐뿐이며 발생 0회 (A-2)
+2. 튜닝 상태에서 `bench` → 위 표 3행 기입 (첫 시도는 위 `taskset` 문제로 측정 실패 → 스크립트 수정 완료, 재측정 필요)
 3. `soak 30` 이상(가능하면 대회 전 야간 장시간 1회) → 표 4행, 882 µs 재발 여부 확정
 4. A-3: 제어 노드를 격리 코어에 `taskset`+`chrt -f`로 띄우는 실행 스크립트 또는 systemd 유닛
 5. A-4: `mlockall(MCL_CURRENT|MCL_FUTURE)` 적용 확인용 테스트 프로그램
