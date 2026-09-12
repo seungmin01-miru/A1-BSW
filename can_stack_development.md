@@ -217,7 +217,7 @@ flowchart LR
 - GRUB 메뉴를 매 부팅 **10초 표시**, 서브메뉴 없이 커널 나열, **아무것도 안 누르면 `6.8.0-138-generic`**. 무한 대기는 차량에서 무인 재부팅 시 멈추면 안 되므로 쓰지 않는다. (드롭인 `/etc/default/grub.d/99z-a1-bsw-safe-default.cfg`)
 - 메뉴 항목: generic(기본) / `6.8.1-1059-realtime` / **`A1-BSW: … + RT 튜닝`**(`/etc/grub.d/11_a1_bsw_rt_tuned`, id `a1-bsw-rt-tuned`) / `5.15.0-1114-realtime`(구, 정리 예정)
 - 튜닝 항목으로 1회만 부팅: `sudo grub-reboot a1-bsw-rt-tuned && sudo reboot` — 부팅이 멈추면 전원 재시작만으로 generic 복귀
-- 이행·측정 스크립트: 메인 PC `~/a1_rt_migration/a1_rt.sh` (`pin`/`install`/`verify`/`hwlat`/`tune`/`bench`/`soak`/`rollback`), 모든 출력은 `~/a1_rt_migration/logs/`
+- 이행·측정 스크립트: 메인 PC `tools/rt/a1_rt.sh` (`pin`/`install`/`verify`/`hwlat`/`tune`/`bench`/`soak`/`rollback`), 모든 출력은 `tools/rt/logs/` (git 추적 제외; 2026-09-12 핵심 로그는 `measurements/2026-09-12_rt/`)
 
 **검증 방법**
 - `uname -a`에 `PREEMPT_RT` 표기 확인, `cat /sys/kernel/realtime` → `1`
@@ -282,7 +282,7 @@ sudo stress-ng --cpu 8 --io 4 --vm 2 --vm-bytes 1G --timeout 70s &
 sleep 5
 sudo cyclictest -p 99 -m -i 1000 -l 60000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_gpu_$(date +%Y%m%d).log
 ```
-Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash ~/a1_rt_migration/a1_rt.sh bench` (약 5분, 격리 코어가 있으면 자동으로 그 코어에서 측정). 장시간 측정은 `sudo bash ~/a1_rt_migration/a1_rt.sh soak 30`.
+Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash tools/rt/a1_rt.sh bench` (약 5분, 격리 코어가 있으면 자동으로 그 코어에서 측정). 장시간 측정은 `sudo bash tools/rt/a1_rt.sh soak 30`.
 
 - 판단 기준은 각 스레드의 `Max`(최악 지연) — `Avg` 아님. 사고는 꼬리(tail)에서 남.
 - 8개 스레드 중 **가장 큰 Max**가 "이 컴퓨터+이 커널이 보장하는 실시간성의 바닥선".
@@ -352,8 +352,8 @@ Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash ~/a1_rt_migra
 1. ✅ 튜닝 항목 부팅 확인 (2026-09-12 16:36) — `/proc/cmdline`에 튜닝 파라미터 반영, `isolated` = `nohz_full` = `8-15` (A-1). 격리 코어의 장치 인터럽트는 NVMe CPU별 큐뿐이며 발생 0회 (A-2)
 2. ✅ `soak 30` 2회 완료 (2026-09-12) — 정식 2차: 최악 467 µs, 99.9995 % 50 µs 이내 (위 판정 참조)
 3. **남은 측정·결정 (Phase B와 병행 가능, Phase B 착수를 막지 않음)**
-   - 비교 측정: `A1-BSW: … 저지연 튜닝(preempt=full)` 항목(generic)으로 부팅 → `sudo bash ~/a1_rt_migration/a1_rt.sh soak 30` — RT 커널이 실제로 이득인지 확인 (첫 시도는 스크립트가 비RT 커널을 거부해 실패 → 수정 완료)
-   - 원인 포착: RT 튜닝 부팅에서 `sudo bash ~/a1_rt_migration/a1_rt.sh trace 30 300` — 0.4 ms 사건 순간의 인터럽트·IPI·태스크 기록
+   - 비교 측정: `A1-BSW: … 저지연 튜닝(preempt=full)` 항목(generic)으로 부팅 → `sudo bash tools/rt/a1_rt.sh soak 30` — RT 커널이 실제로 이득인지 확인 (첫 시도는 스크립트가 비RT 커널을 거부해 실패 → 수정 완료)
+   - 원인 포착: RT 튜닝 부팅에서 `sudo bash tools/rt/a1_rt.sh trace 30 300` — 0.4 ms 사건 순간의 인터럽트·IPI·태스크 기록
    - **팀 결정**: §7 실시간 예산을 "최악 1 ms, 99.99 % 100 µs"로 재정의할지 / 100 µs급 필수 루프를 MCU로 이관할지
 4. A-3: 제어 노드를 격리 코어에 `taskset`+`chrt -f`로 띄우는 실행 스크립트 또는 systemd 유닛
 5. A-4: `mlockall(MCL_CURRENT|MCL_FUTURE)` 적용 확인용 테스트 프로그램
