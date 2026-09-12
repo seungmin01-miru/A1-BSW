@@ -207,7 +207,7 @@ flowchart LR
 |---|---|---|
 | WiFi (RTL8822BU, `rtw88_8822bu`) | ✅ 연결 | generic에서도 `firmware failed to leave lps state` 반복(절전 버그) → 주행 중 무선 비활성 권고 |
 | CAN (`peak_pciefd`) | ✅ `can0`/`can1` | 커널 내장 드라이버, out-of-tree 없음 |
-| GPU (RTX A5000, NVIDIA 470.256.02-server) | ⚠️ 동작 — 조건부 | NVIDIA는 PREEMPT_RT **공식 미지원**. DKMS에 `IGNORE_PREEMPT_RT_PRESENCE=1` 우회 빌드(`/etc/dkms/framework.conf`). GPU 83% 부하에서 커널 경고 0건. 커널 업데이트 때마다 재빌드 확인 필요 |
+| GPU (RTX A5000, NVIDIA 470.256.02-server) | 🔴 동작하나 **커널 BUG 발생** | NVIDIA는 PREEMPT_RT **공식 미지원**. DKMS에 `IGNORE_PREEMPT_RT_PRESENCE=1` 우회 빌드(`/etc/dkms/framework.conf`). 60초 GPU 83% 부하에서는 경고 0건이었으나, **30분 부하 측정 중 `BUG: scheduling while atomic: irq/219-s-nvidia` 4회**(2026-09-12 17:00, 아래 참조) |
 | 유선 NIC(e1000e·ixgbe·igc·atlantic), LTE 모뎀 | ✅ | 커널 내장 |
 | Secure Boot / 루트 FS | 비활성 / ext4 | 서명·부팅 문제 없음 |
 | 하드웨어 지연 (`hwlatdetect`, 20 µs 기준) | ✅ 0건 (2회) | BIOS SMI 원인 없음 → 소프트웨어 튜닝이 유효 |
@@ -274,7 +274,10 @@ sudo cyclictest -p 99 -m -i 1000 -l 60000 -t 8 -a -q -h 400 > ~/cyclictest_rt_fl
 **Step 5 — CPU + GPU 부하** (2026-09-12 추가 — 인지 파이프라인 흉내. CUDA 툴킷이 없어 OpenGL 벤치마크로 GPU 부하)
 ```bash
 sudo apt install -y glmark2
-glmark2 --off-screen --run-forever -s 3840x2160 &      # 데스크톱 세션에서 일반 사용자로 실행
+glmark2 --off-screen --run-forever -s 3840x2160 -b refract &   # 데스크톱 세션에서 일반 사용자로 실행
+# ⚠️ -b refract 필수: 기본 장면 순환의 terrain 장면은 NVIDIA 470 이 셰이더를 컴파일하지 못해
+#    (error C0502: syntax error at token "highp") glmark2 가 segfault 한다 — RT 커널과 무관한 도구 문제.
+#    refract 한 장면 반복 시 GPU 사용률 ~87%, 안정적 (2026-09-12 확인)
 sudo stress-ng --cpu 8 --io 4 --vm 2 --vm-bytes 1G --timeout 70s &
 sleep 5
 sudo cyclictest -p 99 -m -i 1000 -l 60000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_gpu_$(date +%Y%m%d).log
@@ -290,17 +293,35 @@ Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash ~/a1_rt_migra
 |---|---|---|---|---|---|---|
 | RT, 튜닝 전 — 1차 | 116 µs (CPU 6) | **882 µs (CPU 6, 1회)** | 미측정 | 0–7 | 2026-09-12 15:18 | `6.8.1-1059-realtime` |
 | RT, 튜닝 전 — 2차 | 65 µs (CPU 6) | 23 µs | 20 µs (GPU 83%) | 0–7 | 2026-09-12 16:01 | `6.8.1-1059-realtime` |
-| RT + 격리 튜닝 | _TBD_ | _TBD_ | _TBD_ | 8–15 | _TBD_ | `6.8.1-1059-realtime` |
-| 장시간 30분+ (CPU+GPU) | — | — | _TBD_ | 8–15 | _TBD_ | `6.8.1-1059-realtime` |
+| RT + 격리 튜닝 (5분 bench) | _TBD_ | _TBD_ | _TBD_ | 8–15 | 측정 재실행 필요 | `6.8.1-1059-realtime` |
+| **RT + 격리 튜닝, 30분 부하** | — | **839 µs** | (GPU는 3.5분 뒤 중단) | 8–15 | 2026-09-12 16:52–17:23 | `6.8.1-1059-realtime` |
 
 - 평균(Avg)은 모든 조건에서 1–5 µs. 판단은 항상 Max 기준.
 - `hwlatdetect`(20 µs 기준) 2회 모두 초과 0건 → 하드웨어·BIOS 요인 배제.
 - 측정 중 커널 경고(`BUG:`/`scheduling while atomic`/`Call Trace`/NVRM 오류) 0건 — NVIDIA×RT 충돌 징후 없음.
 
-**판정 (2026-09-12): 조건부 통과.** 2차 측정은 세 조건 모두 100 µs 이하로 목표를 만족한다. 다만 1차의 **882 µs 스파이크 1회**가 미해명 상태다:
+**판정 (2026-09-12, 30분 측정 후): 현 구성으로는 목표 미달 🔴**
+- 격리 튜닝을 적용한 상태에서 **30분 부하 측정 결과 최악 839 µs, 400 µs 초과 93회, 100–400 µs 221회**(평균은 4 µs). 스파이크는 격리된 8개 코어 **전부**에서 났다(스레드별 최악 338~839 µs). §7 목표(수십~100 µs)를 크게 벗어난다.
+- 짧은 측정(60~100초)에서 20~65 µs가 나온 것은 **측정 시간이 짧아 스파이크를 놓친 것**이다. 약 20초에 한 번꼴로 발생하므로 1분 측정으로는 안 잡힌다.
+- 원인 조사 (2026-09-12):
+  - 격리 코어에 **장치 인터럽트는 0건** — NVMe CPU별 큐도 발생 0회 (A-2 정상).
+  - 격리 코어가 받은 것은 **CPU 간 호출 인터럽트(IPI) 112,128회**. IPI는 다른 CPU가 "모든 CPU에서 지금 실행하라"고 보내는 것이라 `isolcpus`로 막을 수 없다.
+  - 발생원 분리 측정: **부하 프로그램(stress-ng CPU·메모리·디스크)은 0회/초**, **GPU 활동 중에는 5회/초**. → GPU(NVIDIA 드라이버)가 유력 후보.
+  - 같은 구간에 NVIDIA `scheduling while atomic` BUG 10회.
+  - `hwlatdetect` 60초 2회 0건 → BIOS/SMI 요인은 (완전 배제는 아니나) 후보에서 밀림.
+- **다음 조치**: ① `a1_rt.sh trace` 로 스파이크 순간의 인터럽트·IPI·태스크를 잡아 원인 확정, ② `a1_rt.sh tune generic` 으로 만든 **generic 커널 + 같은 격리 + `preempt=full`** 조합에서 동일 30분 측정을 하여 비교. IPI가 원인이면 커널 종류와 무관하게 남으므로, 그 경우 **실시간 예산(§7) 자체를 재검토**하거나 안전 임계 루프를 MCU로 이관하는 설계 변경이 필요하다.
+
+**참고 — 1차(튜닝 전)의 882 µs 스파이크 1회 조사:**
 - WiFi 오류 로그와 시각 불일치(스파이크 15:20:34 전후, WiFi 오류 15:21:40), CPU 6에는 WiFi(CPU 9)·GPU(CPU 13)·NVMe 등 주요 장치 IRQ 없음, 측정 직전 apt 설치는 측정 시작 전(15:18:17) 종료, `hwlatdetect` 0건 → 알려진 후보는 모두 배제됨.
 - 2차 60초 측정에서 재현되지 않음. 10 ms 제어 주기 기준 882 µs는 주기의 9%로 데드라인 위반은 아니지만, §7 목표선은 넘는다.
 - → **장시간 측정(soak 30분+)에서 재발하지 않는 것을 확인하기 전까지 "통과"로 확정하지 않는다.**
+
+**🔴 NVIDIA × PREEMPT_RT 커널 BUG (2026-09-12 17:00:03 / 17:00:09, 튜닝 부팅 30분 부하 측정 중)**
+- 메시지: `BUG: scheduling while atomic: irq/219-s-nvidi` (CPU 3 — 하우스키핑 코어), 2쌍 4회. 시스템은 계속 동작.
+- 경로: `nvidia_isr_kthread_bh` → `rm_isr_bh` → `nv_post_event` → `kmalloc` → `___slab_alloc` → `rt_spin_lock` → `schedule_rtlock`. NVIDIA 드라이버가 선점을 막은 상태에서 메모리를 할당하는데, PREEMPT_RT에서는 할당기의 잠금이 **잠들 수 있는 잠금**이라 "잠들면 안 되는 곳에서 잠듦" BUG가 난다. NVIDIA가 RT를 지원하지 않는 이유가 바로 이것.
+- 튜닝 전 RT 부팅 2회(60초 GPU 부하 포함)에서는 0회. 할당기가 느린 경로(잠금 필요)로 빠질 때만 드러나는 잠재 결함으로, 장시간 메모리 부하에서 확률적으로 나타나는 것으로 판단.
+- 촉발 요인: 당시 GPU 부하 도구는 이미 종료된 상태 → **데스크톱 화면 처리 같은 일상 GPU 활동만으로도 발생**.
+- 의미: 격리 코어 밖에서 났지만 커널 수준 잠금 규칙 위반이라 **드물게 지연 스파이크·멈춤으로 번질 수 있다**. 대회 차량용으로는 그대로 수용하기 어려움 → 대안 검토 필요 (아래 "남은 작업").
 
 **튜닝 파라미터 (A-1/A-2) — `A1-BSW: … + RT 튜닝` 부팅 항목**
 
@@ -318,8 +339,11 @@ Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash ~/a1_rt_migra
 
 **남은 작업 (Phase A 잔여)**
 1. ✅ 튜닝 항목 부팅 확인 (2026-09-12 16:36) — `/proc/cmdline`에 튜닝 파라미터 반영, `isolated` = `nohz_full` = `8-15` (A-1). 격리 코어의 장치 인터럽트는 NVMe CPU별 큐뿐이며 발생 0회 (A-2)
-2. 튜닝 상태에서 `bench` → 위 표 3행 기입 (첫 시도는 위 `taskset` 문제로 측정 실패 → 스크립트 수정 완료, 재측정 필요)
-3. `soak 30` 이상(가능하면 대회 전 야간 장시간 1회) → 표 4행, 882 µs 재발 여부 확정
+2. ✅ `soak 30` 완료 (2026-09-12) — **목표 미달(839 µs)**, 위 판정 참조
+3. **원인 규명·대안 결정 (최우선)**
+   - `sudo bash ~/a1_rt_migration/a1_rt.sh trace 5 300` — 300 µs 초과 순간의 인터럽트·IPI·태스크를 ftrace로 포착
+   - `sudo bash ~/a1_rt_migration/a1_rt.sh tune generic` → `A1-BSW: … + 저지연 튜닝(preempt=full)` 항목으로 부팅 → 같은 `soak 30` 비교 (NVIDIA가 공식 지원하는 조합)
+   - 결과에 따라: NVIDIA 교체(최신 브랜치) / 실시간 예산 재검토 / 안전 임계 루프의 MCU 이관 중 선택
 4. A-3: 제어 노드를 격리 코어에 `taskset`+`chrt -f`로 띄우는 실행 스크립트 또는 systemd 유닛
 5. A-4: `mlockall(MCL_CURRENT|MCL_FUTURE)` 적용 확인용 테스트 프로그램
 6. 운영 규칙: 주행 중 WiFi/BT 비활성(`rfkill block all`), 대회 기간 커널·NVIDIA 드라이버 동결(`apt-mark hold`) — RT용 NVIDIA 모듈은 우회 빌드라 업데이트 때 깨질 수 있음
