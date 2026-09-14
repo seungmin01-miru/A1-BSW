@@ -483,6 +483,20 @@ run_soak() {   # $1 분, $2 출력 경로 접두, $3 요약 라벨
       u=\$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -1)
       pgrep -x glmark2 >/dev/null && a=1 || a=0
       echo \"\$(date +%T) \$u \$a\" >> '$gpulog'; sleep 10; done"
+  # 열·클럭 기록(4-4): 10초마다 패키지 온도, GPU 온도, 격리 코어 클럭(최소/최대), 스로틀 카운터.
+  # 1-2 에서 스파이크가 '패키지 단위 깨어남 지연' 으로 보였으므로 주파수 전이·온도와의 상관을 보려는 것.
+  local thermlog="$out.thermal" iso_cpus; iso_cpus=$(cpulist_expand "$(tr -d '[:space:]' < /sys/devices/system/cpu/isolated)")
+  [[ -n "$iso_cpus" ]] || iso_cpus="0 1 2 3 4 5 6 7"
+  echo "time pkg_C gpu_C iso_mhz_min iso_mhz_max throttle_core throttle_pkg" > "$thermlog"
+  start_load bash -c "sleep 5; while :; do
+      pk=\$(( \$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0) / 1000 ))
+      g=\$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -1)
+      mn=999999; mx=0
+      for c in $iso_cpus; do f=\$(cat /sys/devices/system/cpu/cpu\$c/cpufreq/scaling_cur_freq 2>/dev/null || echo 0)
+        (( f < mn )) && mn=\$f; (( f > mx )) && mx=\$f; done
+      tc=\$(cat /sys/devices/system/cpu/cpu${iso_cpus%% *}/thermal_throttle/core_throttle_count 2>/dev/null || echo -)
+      tp=\$(cat /sys/devices/system/cpu/cpu${iso_cpus%% *}/thermal_throttle/package_throttle_count 2>/dev/null || echo -)
+      echo \"\$(date +%T) \$pk \${g:--} \$((mn/1000)) \$((mx/1000)) \$tc \$tp\" >> '$thermlog'; sleep 10; done"
   start_watchdog
   sleep 5
   echo "   측정 시작 $(date '+%T') — 종료 예정 $(date -d "+$secs seconds" '+%T') (중단: Ctrl+C)"
@@ -506,6 +520,11 @@ run_soak() {   # $1 분, $2 출력 경로 접두, $3 요약 라벨
     else
       warn "GPU 사용률 기록 없음 — GPU 부하 확인 불가"
     fi
+  fi
+  if [[ -s $thermlog ]] && (( $(wc -l < "$thermlog") > 1 )); then
+    awk 'NR>1 { n++; if (n==1||$2>pmx) pmx=$2; if (n==1||$2<pmn) pmn=$2; if ($3!="-" && $3>gmx) gmx=$3
+               if (n==1||$4<fmn) fmn=$4; if ($5>fmx) fmx=$5; tc=$6; tp=$7 }
+         END { printf "  🌡  패키지 %d~%d°C, GPU 최대 %d°C, 격리 코어 클럭 %d~%d MHz, 스로틀 core=%s pkg=%s (%d회 기록)\n", pmn, pmx, gmx, fmn, fmx, tc, tp, n }' "$thermlog"
   fi
   echo "-- 측정 중 커널 경고"
   journalctl -k --since "@$start" --no-pager -o short-monotonic 2>/dev/null \
