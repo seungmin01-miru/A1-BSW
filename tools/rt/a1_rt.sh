@@ -12,6 +12,8 @@
 #                                   격리 코어가 있으면 그 코어에서 측정, 없으면 CPU 0-7(튜닝 전 바닥값)
 #   sudo bash a1_rt.sh soak [분] 8) 장시간(기본 30분) 부하 측정 — 드문 스파이크 확인, 대회 전 필수
 #   sudo bash a1_rt.sh trace [분] [µs] 9) 지연 원인 추적 — 임계 초과 순간의 인터럽트·IPI·태스크 기록
+#   sudo bash a1_rt.sh drive          10) 주행 프로필 — 콜드 부팅 직후 실행: 부하 10분 → 대기 5분 → 부하 10분 (실제 10분 주행 ×2 재현)
+#                                        3회 반복해 콜드 시동 과도 상태를 포함한 값을 얻는다. 요약: drive-report
 #   sudo bash a1_rt.sh arm       (선택) 원격(SSH)용 — 다음 1회 부팅만 6.8-rt로 예약
 #   sudo bash a1_rt.sh rollback  *) 6.8-rt 패키지·DKMS 설정 제거 (메뉴·generic 기본값은 유지)
 #
@@ -39,7 +41,7 @@ NV_MAKELOG=/var/lib/dkms/nvidia-srv/470.256.02/build/make.log
 GL_LOAD=(glmark2 --off-screen --run-forever -s 3840x2160 -b refract)
 
 cmd=${1:-}
-case "$cmd" in pin|install|arm|verify|hwlat|tune|bench|soak|trace|rollback) ;; *) sed -n '2,18p' "$0"; exit 1 ;; esac
+case "$cmd" in pin|install|arm|verify|hwlat|tune|bench|soak|trace|drive|drive-report|rollback) ;; *) sed -n '2,20p' "$0"; exit 1 ;; esac
 
 ts=$(date +%Y%m%d_%H%M%S)
 mkdir -p "$BASE/logs"
@@ -451,11 +453,16 @@ cmd_soak() {
   [[ "$(cat /sys/kernel/realtime 2>/dev/null)" == 1 ]] || warn "RT 커널이 아님 ($(uname -r), $(grep -oE 'preempt=[a-z]+' /proc/cmdline || echo 'preempt 기본')) — 비교 측정용"
   command -v cyclictest >/dev/null || die "rt-tests 없음 — bench 를 먼저 한 번 실행"
   echo "   부팅 파라미터: $(cat /proc/cmdline)"
+  run_soak "$mins" "$BASE/logs/soak_$ts" "${mins}분 부하"
+  echo "== [soak] 끝 — 원본: $BASE/logs/soak_$ts.log =="
+}
 
+# 부하(GPU+CPU·메모리·I/O) 아래 cyclictest 를 <분> 동안 돌려 <출력접두>.log / .gpu_util 에 남기고 요약을 찍는다.
+run_soak() {   # $1 분, $2 출력 경로 접두, $3 요약 라벨
+  local mins=$1 out=$2 label=$3
   local CT CT_BASE; build_ct
   local base=$CT_BASE
-
-  local out="$BASE/logs/soak_$ts" start; start=$(date +%s)
+  local start; start=$(date +%s)
   local secs=$((mins * 60)) disp xauth gpu_on=0 gpulog="$out.gpu_util"
   BG_PIDS=()
   trap kill_load EXIT
@@ -484,8 +491,8 @@ cmd_soak() {
   trap - EXIT INT TERM HUP
 
   echo
-  echo "== 결과 (${mins}분 부하 상태) =="
-  ct_summary "${mins}분 부하" "$out.log" "$base"
+  echo "== 결과 ($label) =="
+  ct_summary "$label" "$out.log" "$base"
   if ((gpu_on)); then
     local n avg min max dead
     if [[ -s $gpulog ]] && read -r n avg min max dead < <(awk '
@@ -503,7 +510,6 @@ cmd_soak() {
   echo "-- 측정 중 커널 경고"
   journalctl -k --since "@$start" --no-pager -o short-monotonic 2>/dev/null \
     | grep -iE 'BUG:|scheduling while atomic|Call Trace|WARNING:|Xid|NVRM.*(error|fail)|rcu.*stall' || ok "없음"
-  echo "== [soak] 끝 — 원본: $out.log =="
 }
 
 # 지연 원인 추적 — cyclictest 가 임계값을 넘는 지연을 만나면 그 순간 ftrace 를 멈춰
@@ -551,14 +557,27 @@ cmd_trace() {
   sleep 5
 
   echo "   측정 시작 $(date '+%T') — ${thr}µs 초과가 나오면 그 지점에서 추적 정지"
-  "${CT[@]}" -b "$thr" -D "${mins}m" > "$out.log" 2>&1 || true
+  # cyclictest -b 는 /sys/kernel/debug/tracing/tracing_on 에 0 을 쓴다(구 경로). 이 PC 는 debugfs 아래에
+  # tracing 이 따로 마운트돼 있지 않아 새 경로($TRACEFS)와 어긋날 수 있으므로, 구 경로가 없으면 연결해 준다.
+  if [[ ! -e /sys/kernel/debug/tracing/tracing_on ]]; then
+    mkdir -p /sys/kernel/debug/tracing 2>/dev/null && mount -t tracefs nodev /sys/kernel/debug/tracing 2>/dev/null \
+      && ok "cyclictest 용 구 경로(/sys/kernel/debug/tracing) 연결" || warn "구 경로 연결 실패 — cyclictest 가 추적을 못 멈출 수 있음"
+  fi
+  "${CT[@]}" -b "$thr" --tracemark -D "${mins}m" > "$out.log" 2>&1 || true
   kill_load
   trap - EXIT INT TERM HUP
 
   echo
-  if [[ "$(cat "$TRACEFS/tracing_on")" == 0 ]]; then
-    tail -300 "$TRACEFS/trace" > "$out.ftrace"
-    ok "임계 초과 발생 → 그 직전 기록 저장: $out.ftrace"
+  local brk; brk=$(sed -nE 's/^# Break value: ([0-9]+).*/\1/p' "$out.log")
+  local on_new on_old; on_new=$(cat "$TRACEFS/tracing_on" 2>/dev/null); on_old=$(cat /sys/kernel/debug/tracing/tracing_on 2>/dev/null)
+  if [[ -n "$brk" ]]; then
+    ok "cyclictest 가 ${brk}µs 에서 정지 (Break value) — tracing_on: 신경로=${on_new:-?} 구경로=${on_old:-?}"
+  fi
+  if [[ "$on_new" == 0 || "$on_old" == 0 || -n "$brk" ]]; then
+    tail -600 "$TRACEFS/trace" > "$out.ftrace"
+    [[ -s "$out.ftrace" ]] && ok "임계 초과 발생 → 그 직전 기록 저장: $out.ftrace" \
+                           || warn "임계 초과는 있었으나 추적 버퍼가 비어 있음 (경로 불일치로 정지 신호가 안 닿았을 가능성)"
+    echo "   분석: python3 $(dirname "$0")/trace_analyze.py $out.ftrace"
     echo "-- 지연 직전 기록 (마지막 25줄)"; tail -25 "$out.ftrace" | sed 's/^/     /'
     echo "-- 직전 기록에서 많이 나온 항목"
     grep -oE '(irq_handler_entry: irq=[0-9]+ name=[^ ]+|ipi_entry: \([^)]*\)|softirq_entry: vec=[0-9]+ \[action=[A-Z_]+\])' "$out.ftrace" \
@@ -566,12 +585,56 @@ cmd_trace() {
   else
     warn "${mins}분 동안 ${thr}µs 초과가 없어 추적이 발동하지 않음"
   fi
-  trace_events_set 0; : > "$TRACEFS/trace"; echo 1 > "$TRACEFS/tracing_on"
+  trace_events_set 0; : > "$TRACEFS/trace"; echo 1 > "$TRACEFS/tracing_on"; echo 1 > /sys/kernel/debug/tracing/tracing_on 2>/dev/null || true
   ct_summary "${mins}분(추적 중)" "$out.log" "$CT_BASE"
   local nbug
   nbug=$(journalctl -k --since "@$start" --no-pager 2>/dev/null | grep -c 'scheduling while atomic') || nbug=0
   echo "  측정 중 NVIDIA 'scheduling while atomic' 발생: ${nbug}회"
   echo "== [trace] 끝 =="
+}
+
+# 주행 프로필 — 1차·2차 주행(각 ~10분)을 재현. 콜드 부팅 직후 실행해야 의미가 있다(시동 과도 상태 포함).
+#   sudo bash a1_rt.sh drive            # 부팅 후 경과 시간이 15분을 넘으면 경고
+# 결과는 logs/drive_<시각>/ 에 run1(부하 10분), idle(대기 5분), run2(부하 10분) 로 남고, drive-report 가 3회분을 표로 모은다.
+cmd_drive() {
+  need_root
+  local up; up=$(cut -d. -f1 /proc/uptime)
+  echo "== [drive] 주행 프로필 — $(uname -r), 부팅 후 $((up/60))분 =="
+  ((up <= 900)) || warn "부팅 후 $((up/60))분 경과 — 콜드 시동 과도 상태가 빠진다. 재부팅 직후 실행 권장"
+  [[ -n "$(tr -d '[:space:]' < /sys/devices/system/cpu/isolated)" ]] || warn "격리 코어 없음 — 튜닝 부팅이 아님"
+  command -v cyclictest >/dev/null || die "rt-tests 없음 — bench 를 먼저 한 번 실행"
+  local dir="$BASE/logs/drive_$ts"; mkdir -p "$dir"
+  echo "   결과 폴더: $dir"
+  echo "-- [1/3] 1차 주행 (부하 10분)"
+  run_soak 10 "$dir/run1" "1차 주행 10분"
+  echo "-- [2/3] 그리드 대기 (무부하 5분, cyclictest 만)"
+  local CT CT_BASE; build_ct
+  "${CT[@]}" -D 5m > "$dir/idle.log" 2>&1 || warn "대기 구간 cyclictest 실패"
+  ct_summary "대기 5분" "$dir/idle.log" "$CT_BASE"
+  echo "-- [3/3] 2차 주행 (부하 10분)"
+  run_soak 10 "$dir/run2" "2차 주행 10분"
+  echo; echo "== [drive] 요약 =="
+  ct_summary "1차 주행 10분" "$dir/run1.log" "$CT_BASE"
+  ct_summary "대기 5분" "$dir/idle.log" "$CT_BASE"
+  ct_summary "2차 주행 10분" "$dir/run2.log" "$CT_BASE"
+  echo "== [drive] 끝 — 3회 모으기: bash $0 drive-report =="
+}
+
+cmd_drive_report() {
+  local d n=0
+  printf "%-22s %-14s %-16s %-14s %s\n" "실행(부팅 후 시작)" "1차 최악 µs" "대기 최악 µs" "2차 최악 µs" "400µs 초과(1차/대기/2차)"
+  for d in "$BASE"/logs/drive_*/; do
+    [[ -f "$d/run1.log" ]] || continue; n=$((n+1))
+    local m1 mi m2 o1 oi o2
+    m1=$(awk '/^# Max Latencies:/{m=0; for(i=4;i<=NF;i++) if($i+0>m) m=$i+0; print m}' "$d/run1.log")
+    mi=$(awk '/^# Max Latencies:/{m=0; for(i=4;i<=NF;i++) if($i+0>m) m=$i+0; print m}' "$d/idle.log" 2>/dev/null || echo "-")
+    m2=$(awk '/^# Max Latencies:/{m=0; for(i=4;i<=NF;i++) if($i+0>m) m=$i+0; print m}' "$d/run2.log")
+    o1=$(awk '/^# Histogram Overflows:/{s=0; for(i=4;i<=NF;i++) s+=$i; print s}' "$d/run1.log")
+    oi=$(awk '/^# Histogram Overflows:/{s=0; for(i=4;i<=NF;i++) s+=$i; print s}' "$d/idle.log" 2>/dev/null || echo "-")
+    o2=$(awk '/^# Histogram Overflows:/{s=0; for(i=4;i<=NF;i++) s+=$i; print s}' "$d/run2.log")
+    printf "%-22s %-14s %-16s %-14s %s\n" "$(basename "$d" | sed 's/drive_//')" "$m1" "$mi" "$m2" "$o1 / $oi / $o2"
+  done
+  ((n)) || echo "  (drive 결과 없음)"
 }
 
 cmd_rollback() {
@@ -597,4 +660,4 @@ cmd_rollback() {
   echo "== [rollback] 완료. 메뉴·generic 기본값은 유지 (해제: sudo rm $GRUB_DROPIN && sudo update-grub) =="
 }
 
-"cmd_$cmd" "$@"
+"cmd_${cmd//-/_}" "$@"
