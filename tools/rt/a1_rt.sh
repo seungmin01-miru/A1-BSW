@@ -8,6 +8,8 @@
 #        bash a1_rt.sh verify    4) RT로 부팅한 상태에서 실행 — 커널/GPU/WiFi/CAN/커널경고 점검
 #   sudo bash a1_rt.sh hwlat     5) 하드웨어 지연(BIOS SMI) 점검만 60초 — 재부팅 불필요
 #   sudo bash a1_rt.sh tune      6) "RT + 튜닝"(isolcpus 등) 부팅 항목을 메뉴에 추가 — 기본 부팅은 안 바꿈
+#                                   tune generic = generic+격리+preempt=full 대조군, tune rt-poll = RT 튜닝 + 전원관리 전부 차단(1-6b)
+#        bash a1_rt.sh freq [status|performance|powersave]  전원관리 상태 보기 / 주파수 governor 전환(재부팅 불필요, 재부팅 시 원복)
 #   sudo bash a1_rt.sh bench     7) §5.A cyclictest 실측 — 무부하 / CPU부하 / CPU+GPU부하 + 하드웨어 지연 (약 5분)
 #                                   격리 코어가 있으면 그 코어에서 측정, 없으면 CPU 0-7(튜닝 전 바닥값)
 #   sudo bash a1_rt.sh soak [분] 8) 장시간(기본 30분) 부하 측정 — 드문 스파이크 확인, 대회 전 필수
@@ -17,7 +19,7 @@
 #   sudo bash a1_rt.sh arm       (선택) 원격(SSH)용 — 다음 1회 부팅만 6.8-rt로 예약
 #   sudo bash a1_rt.sh rollback  *) 6.8-rt 패키지·DKMS 설정 제거 (메뉴·generic 기본값은 유지)
 #
-# 모든 출력은 tools/rt/logs/<명령>_<시각>.log 에 남는다 (git 추적 제외).
+# 화면 출력은 tools/rt/logs/<명령>_<시각>.run.log 에, soak/trace 의 cyclictest 결과는 <명령>_<시각>.log 에 남는다 (git 추적 제외).
 
 set -euo pipefail
 
@@ -28,11 +30,22 @@ GRUB_CFG=/boot/grub/grub.cfg
 GRUB_DROPIN=/etc/default/grub.d/99z-a1-bsw-safe-default.cfg
 GRUB_TUNED=/etc/grub.d/11_a1_bsw_rt_tuned
 GRUB_TUNED_GEN=/etc/grub.d/12_a1_bsw_generic_tuned
+GRUB_TUNED_POLL=/etc/grub.d/13_a1_bsw_rt_poll
+GRUB_TUNED_NOHWP=/etc/grub.d/14_a1_bsw_rt_nohwp
+GRUB_TUNED_IDLEPOLL=/etc/grub.d/15_a1_bsw_rt_idlepoll
 TRACEFS=${TRACEFS:-/sys/kernel/tracing}
 # RT 튜닝 파라미터 — i7-12700: P코어 8개(CPU 0-15, 하이퍼스레드) + E코어 4개(CPU 16-19)
 TUNE_ISO=8-15                 # 격리: 물리 P코어 4~7 (양쪽 스레드 모두) — RT 태스크 전용
 TUNE_HOUSE=0-7,16-19          # 하우스키핑·인터럽트: 나머지 P코어 + E코어
 TUNE_CMDLINE="isolcpus=managed_irq,domain,$TUNE_ISO nohz_full=$TUNE_ISO rcu_nocbs=$TUNE_ISO rcu_nocb_poll irqaffinity=$TUNE_HOUSE intel_idle.max_cstate=1 processor.max_cstate=1 nmi_watchdog=0 nosoftlockup skew_tick=1"
+# 1-6b 전원관리 실험(tune rt-poll): 위 튜닝에서 max_cstate=1→0 으로 바꾸고 아래를 덧붙인다.
+#   idle=poll                 유휴 시 HLT/MWAIT 대신 폴링 (참고: max_cstate=1 만으로도 이 커널은 POLL 상태만 등록해 이미 폴링 중)
+#   intel_pstate=disable      HWP/intel_pstate 를 끄고 acpi-cpufreq 로 → cpufreq.default_governor=performance 로 최고 P-state 고정
+#                             (governor 를 안 정하면 acpi-cpufreq 는 schedutil 기본이라 주파수 전이가 그대로 남는다)
+POLL_EXTRA="idle=poll intel_pstate=disable cpufreq.default_governor=performance"
+# C3 후 이분 탐색(1-6e): B 의 두 성분을 따로 부팅
+NOHWP_EXTRA="intel_pstate=disable cpufreq.default_governor=performance"   # B1: HWP 끔, 유휴 경로는 기본
+IDLEPOLL_EXTRA="idle=poll"                                               # B2: 유휴 폴링만, HWP 켜짐 (max_cstate=0 은 cmdline 치환으로)
 DKMS_CONF=/etc/dkms/framework.conf
 DKMS_MARK="# A1-BSW: NVIDIA 드라이버를 PREEMPT_RT 커널용으로 빌드 (NVIDIA 공식 미지원 우회)"
 NV_MAKELOG=/var/lib/dkms/nvidia-srv/470.256.02/build/make.log
@@ -41,11 +54,11 @@ NV_MAKELOG=/var/lib/dkms/nvidia-srv/470.256.02/build/make.log
 GL_LOAD=(glmark2 --off-screen --run-forever -s 3840x2160 -b refract)
 
 cmd=${1:-}
-case "$cmd" in pin|install|arm|verify|hwlat|tune|bench|soak|trace|drive|drive-report|rollback) ;; *) sed -n '2,20p' "$0"; exit 1 ;; esac
+case "$cmd" in pin|install|arm|verify|hwlat|tune|freq|bench|soak|trace|drive|drive-report|rollback) ;; *) sed -n '2,20p' "$0"; exit 1 ;; esac
 
 ts=$(date +%Y%m%d_%H%M%S)
 mkdir -p "$BASE/logs"
-LOG="$BASE/logs/${cmd}_$ts.log"
+LOG="$BASE/logs/${cmd}_$ts.run.log"   # 세션 출력. soak/trace 의 cyclictest 결과는 <cmd>_<ts>.log 로 따로 남는다(이름 충돌 방지)
 exec > >(tee -a "$LOG") 2>&1
 
 ok()   { echo "  ✅ $*"; }
@@ -284,16 +297,29 @@ cmd_hwlat() {
 #   tune rt       → RT 커널 + 격리 튜닝            (id: a1-bsw-rt-tuned)
 #   tune generic  → generic 커널 + 격리 튜닝 + preempt=full (id: a1-bsw-generic-tuned)
 #     generic 은 NVIDIA 가 공식 지원하는 조합 — RT 의 NVIDIA 문제와 비교 측정용
+#   tune rt-poll  → RT 튜닝 + 전원관리 전부 차단 (id: a1-bsw-rt-poll) — 체크리스트 1-6b 원인 판별용
+#     C-state·주파수 전이가 0.2~0.9 ms 사건의 원인인지 가르는 실험 항목. 발열·전력 증가 → 측정 때만 부팅
 cmd_tune() {
   need_root
-  local target=${2:-rt} rt id blk title newid file extra=""
+  local target=${2:-rt} rt id blk title newid file extra="" cmdline=$TUNE_CMDLINE
   case "$target" in
     rt)      rt=$(rt_installed); [[ -n "$rt" ]] || die "6.8 realtime 커널이 설치돼 있지 않음"
              file=$GRUB_TUNED; newid=a1-bsw-rt-tuned
              title="A1-BSW: Linux $rt + RT 튜닝 (격리 CPU $TUNE_ISO)" ;;
     generic) rt=$GEN; file=$GRUB_TUNED_GEN; newid=a1-bsw-generic-tuned; extra=" preempt=full"
              title="A1-BSW: Linux $GEN + 저지연 튜닝 (격리 CPU $TUNE_ISO, preempt=full)" ;;
-    *)       die "사용법: tune [rt|generic]" ;;
+    rt-poll) rt=$(rt_installed); [[ -n "$rt" ]] || die "6.8 realtime 커널이 설치돼 있지 않음"
+             file=$GRUB_TUNED_POLL; newid=a1-bsw-rt-poll
+             cmdline=${TUNE_CMDLINE//max_cstate=1/max_cstate=0}; extra=" $POLL_EXTRA"
+             title="A1-BSW: Linux $rt + RT 튜닝 + 전원관리 차단 (idle=poll, 주파수 고정) — 1-6b 실험용" ;;
+    rt-nohwp) rt=$(rt_installed); [[ -n "$rt" ]] || die "6.8 realtime 커널이 설치돼 있지 않음"
+             file=$GRUB_TUNED_NOHWP; newid=a1-bsw-rt-nohwp; extra=" $NOHWP_EXTRA"
+             title="A1-BSW: Linux $rt + RT 튜닝 + HWP 끔 (intel_pstate=disable) — 1-6e B1" ;;
+    rt-idlepoll) rt=$(rt_installed); [[ -n "$rt" ]] || die "6.8 realtime 커널이 설치돼 있지 않음"
+             file=$GRUB_TUNED_IDLEPOLL; newid=a1-bsw-rt-idlepoll
+             cmdline=${TUNE_CMDLINE//max_cstate=1/max_cstate=0}; extra=" $IDLEPOLL_EXTRA"
+             title="A1-BSW: Linux $rt + RT 튜닝 + idle=poll (HWP 유지) — 1-6e B2" ;;
+    *)       die "사용법: tune [rt|generic|rt-poll|rt-nohwp|rt-idlepoll]" ;;
   esac
   echo "== [tune $target] 튜닝 부팅 항목 추가 =="
   check_default_is_generic
@@ -303,7 +329,7 @@ cmd_tune() {
   grep -qE '^[[:space:]]*linux[[:space:]]' <<<"$blk" || die "복제한 엔트리에 linux 줄이 없음"
 
   blk=$(sed -e "1s/^menuentry '[^']*'/menuentry '$title'/" -e "1s/'$id'/'$newid'/" \
-            -e "/^[[:space:]]*linux[[:space:]]/ s|\$| ${TUNE_CMDLINE}${extra}|" <<<"$blk")
+            -e "/^[[:space:]]*linux[[:space:]]/ s|\$| ${cmdline}${extra}|" <<<"$blk")
   {
     printf '#!/bin/sh\nexec tail -n +3 "$0"\n'
     printf '# A1-BSW (%s): a1_rt.sh tune %s 가 생성. 원복: sudo rm %s && sudo update-grub\n' "$ts" "$target" "$file"
@@ -318,6 +344,42 @@ cmd_tune() {
   show_menu
   echo "== [tune $target] 완료 — 기본 부팅은 그대로 generic =="
   echo "   다음 1회만 이 항목으로 부팅: sudo grub-reboot $newid && sudo reboot"
+}
+
+# 전원관리 상태 한눈에 보기 / 주파수 governor 전환 (1-6b 의 재부팅 없는 변형)
+#   freq status       cpuidle 상태 목록, cpufreq 드라이버·governor·turbo, 격리 코어 현재 클럭
+#   freq performance  모든 CPU governor=performance (intel_pstate+HWP 면 HWP min=max=최고 → 주파수 전이 정지)
+#   freq powersave    원래대로 (재부팅해도 원복됨 — 영구 설정이 아님)
+cmd_freq() {
+  local action=${2:-status} c drv gov turbo states iso
+  case "$action" in
+    status) ;;
+    performance|powersave)
+      need_root
+      for c in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_governor; do echo "$action" > "$c"; done
+      ok "모든 CPU governor → $action" ;;
+    *) die "사용법: freq [status|performance|powersave]" ;;
+  esac
+  echo "== [freq] 전원관리 상태 — $(uname -r) =="
+  states=$(cat /sys/devices/system/cpu/cpu0/cpuidle/state*/name 2>/dev/null | tr '\n' ' ')
+  echo "   cpuidle : driver=$(cat /sys/devices/system/cpu/cpuidle/current_driver 2>/dev/null || echo none) 상태=[${states:-없음}] governor=$(cat /sys/devices/system/cpu/cpuidle/current_governor 2>/dev/null || echo -)"
+  [[ "$states" == "POLL " ]] && ok "C-state 는 POLL 뿐 → 코어·패키지 C-state 전이 없음 (idle=poll 과 동등)"
+  drv=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver 2>/dev/null || echo none)
+  gov=$(cat /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_governor 2>/dev/null | sort | uniq -c | awk '{printf "%s×%d ", $2, $1}')
+  turbo="-"; [[ -r /sys/devices/system/cpu/intel_pstate/no_turbo ]] && turbo="no_turbo=$(cat /sys/devices/system/cpu/intel_pstate/no_turbo)"
+  [[ -r /sys/devices/system/cpu/cpufreq/boost ]] && turbo="boost=$(cat /sys/devices/system/cpu/cpufreq/boost)"
+  echo "   cpufreq : driver=$drv governor=${gov:-없음} $turbo hwp=$(grep -c ' hwp ' /proc/cpuinfo | awk '{print ($1>0?"yes":"no")}')"
+  iso=$(cpulist_expand "$(tr -d '[:space:]' < /sys/devices/system/cpu/isolated 2>/dev/null)")
+  [[ -n "$iso" ]] || iso="0 1 2 3 4 5 6 7"
+  if [[ $EUID -eq 0 ]]; then
+    modprobe msr 2>/dev/null || true
+    echo "   격리 코어 실제 클럭 (APERF/MPERF, 3회 1초 창) [min max SMI누적 cpu=MHz…]:"
+    for _ in 1 2 3; do echo "     $(python3 "$BASE/core_mhz.py" --cpus "${iso// /,}" --window 1 2>&1)"; done
+  else
+    printf '   격리 코어 클럭 sysfs(MHz, HWP 에선 갱신 안 됨 — 실제값은 sudo 로 실행):'
+    for c in $iso; do f=$(cat /sys/devices/system/cpu/cpu$c/cpufreq/scaling_cur_freq 2>/dev/null || echo 0); printf ' %d' $((f / 1000)); done; echo
+  fi
+  echo "   부팅 파라미터: $(cat /proc/cmdline)"
 }
 
 # 측정용 cyclictest 명령을 CT 배열에, 첫 측정 CPU 번호를 CT_BASE 에 채운다.
@@ -485,18 +547,20 @@ run_soak() {   # $1 분, $2 출력 경로 접두, $3 요약 라벨
       echo \"\$(date +%T) \$u \$a\" >> '$gpulog'; sleep 10; done"
   # 열·클럭 기록(4-4): 10초마다 패키지 온도, GPU 온도, 격리 코어 클럭(최소/최대), 스로틀 카운터.
   # 1-2 에서 스파이크가 '패키지 단위 깨어남 지연' 으로 보였으므로 주파수 전이·온도와의 상관을 보려는 것.
+  # 클럭은 core_mhz.py(APERF/MPERF, MSR)로 잰다 — HWP 에서는 sysfs scaling_cur_freq 가 격리 코어에서 갱신되지 않아
+  # 8시간 soak 의 '800 MHz 고정' 이 자리표시자였음. 1-6b: SMI 횟수(MSR 0x34)도 같이 기록해 '전 코어 동시 정지' 가 SMI 인지 가른다.
   local thermlog="$out.thermal" iso_cpus; iso_cpus=$(cpulist_expand "$(tr -d '[:space:]' < /sys/devices/system/cpu/isolated)")
   [[ -n "$iso_cpus" ]] || iso_cpus="0 1 2 3 4 5 6 7"
-  echo "time pkg_C gpu_C iso_mhz_min iso_mhz_max throttle_core throttle_pkg" > "$thermlog"
+  modprobe msr 2>/dev/null || true
+  echo "   전원관리: cpuidle=[$(cat /sys/devices/system/cpu/cpu0/cpuidle/state*/name 2>/dev/null | tr '\n' ' ')] cpufreq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver 2>/dev/null || echo none)/$(cat /sys/devices/system/cpu/cpu${iso_cpus%% *}/cpufreq/scaling_governor 2>/dev/null || echo -) 격리 코어 [min max SMI cpu=MHz…]: $(python3 "$BASE/core_mhz.py" --cpus "${iso_cpus// /,}" 2>/dev/null)"
+  echo "time pkg_C gpu_C iso_mhz_min iso_mhz_max throttle_core throttle_pkg smi" > "$thermlog"
   start_load bash -c "sleep 5; while :; do
       pk=\$(( \$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0) / 1000 ))
       g=\$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -1)
-      mn=999999; mx=0
-      for c in $iso_cpus; do f=\$(cat /sys/devices/system/cpu/cpu\$c/cpufreq/scaling_cur_freq 2>/dev/null || echo 0)
-        (( f < mn )) && mn=\$f; (( f > mx )) && mx=\$f; done
+      read -r mn mx smi _ < <(python3 '$BASE/core_mhz.py' --cpus '${iso_cpus// /,}' --window 1 2>/dev/null)
       tc=\$(cat /sys/devices/system/cpu/cpu${iso_cpus%% *}/thermal_throttle/core_throttle_count 2>/dev/null || echo -)
       tp=\$(cat /sys/devices/system/cpu/cpu${iso_cpus%% *}/thermal_throttle/package_throttle_count 2>/dev/null || echo -)
-      echo \"\$(date +%T) \$pk \${g:--} \$((mn/1000)) \$((mx/1000)) \$tc \$tp\" >> '$thermlog'; sleep 10; done"
+      echo \"\$(date +%T) \$pk \${g:--} \${mn:--} \${mx:--} \$tc \$tp \${smi:--}\" >> '$thermlog'; sleep 9; done"
   start_watchdog
   sleep 5
   echo "   측정 시작 $(date '+%T') — 종료 예정 $(date -d "+$secs seconds" '+%T') (중단: Ctrl+C)"
@@ -523,8 +587,10 @@ run_soak() {   # $1 분, $2 출력 경로 접두, $3 요약 라벨
   fi
   if [[ -s $thermlog ]] && (( $(wc -l < "$thermlog") > 1 )); then
     awk 'NR>1 { n++; if (n==1||$2>pmx) pmx=$2; if (n==1||$2<pmn) pmn=$2; if ($3!="-" && $3>gmx) gmx=$3
-               if (n==1||$4<fmn) fmn=$4; if ($5>fmx) fmx=$5; tc=$6; tp=$7 }
-         END { printf "  🌡  패키지 %d~%d°C, GPU 최대 %d°C, 격리 코어 클럭 %d~%d MHz, 스로틀 core=%s pkg=%s (%d회 기록)\n", pmn, pmx, gmx, fmn, fmx, tc, tp, n }' "$thermlog"
+               if ($4!="-") { if (fmn==""||$4<fmn) fmn=$4; if ($5>fmx) fmx=$5 }; tc=$6; tp=$7
+               if (NF>=8 && $8!="-") { if (s0=="") s0=$8; s1=$8 } }
+         END { printf "  🌡  패키지 %d~%d°C, GPU 최대 %d°C, 격리 코어 클럭 %s~%s MHz, 스로틀 core=%s pkg=%s (%d회 기록)\n", pmn, pmx, gmx, (fmn==""?"-":fmn), (fmx==""?"-":fmx), tc, tp, n
+               if (s0!="") printf "  %s SMI(MSR 0x34) 측정 중 %d회 (누적 %s→%s)\n", (s1-s0>0 ? "⚠️ " : "✅"), s1-s0, s0, s1 }' "$thermlog"
   fi
   echo "-- 측정 중 커널 경고"
   journalctl -k --since "@$start" --no-pager -o short-monotonic 2>/dev/null \
@@ -673,7 +739,7 @@ cmd_rollback() {
   fi
   sed -i "/^# A1-BSW: NVIDIA/d; /^export IGNORE_PREEMPT_RT_PRESENCE=1$/d" "$DKMS_CONF"
   ok "DKMS 설정 원복"
-  rm -f "$GRUB_TUNED" "$GRUB_TUNED_GEN" && ok "튜닝 부팅 항목 제거"
+  rm -f "$GRUB_TUNED" "$GRUB_TUNED_GEN" "$GRUB_TUNED_POLL" "$GRUB_TUNED_NOHWP" "$GRUB_TUNED_IDLEPOLL" && ok "튜닝 부팅 항목 제거"
   update-grub
   check_default_is_generic
   echo "== [rollback] 완료. 메뉴·generic 기본값은 유지 (해제: sudo rm $GRUB_DROPIN && sudo update-grub) =="
