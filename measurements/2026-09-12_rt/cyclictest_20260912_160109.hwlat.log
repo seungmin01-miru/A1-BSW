@@ -1,0 +1,14 @@
+hwlatdetect:  test duration 60 seconds
+   detector: tracer
+   parameters:
+        Latency threshold: 20us
+        Sample window:     1000000us
+        Sample width:      500000us
+     Non-sampling period:  500000us
+        Output File:       None
+
+Starting test
+test finished
+Max Latency: Below threshold
+Samples recorded: 0
+Samples exceeding threshold: 0
