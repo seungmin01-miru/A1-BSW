@@ -352,10 +352,10 @@ Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash tools/rt/a1_r
 **남은 작업 (Phase A 잔여)**
 1. ✅ 튜닝 항목 부팅 확인 (2026-09-12 16:36) — `/proc/cmdline`에 튜닝 파라미터 반영, `isolated` = `nohz_full` = `8-15` (A-1). 격리 코어의 장치 인터럽트는 NVMe CPU별 큐뿐이며 발생 0회 (A-2)
 2. ✅ `soak 30` 2회 완료 (2026-09-12) — 정식 2차: 최악 467 µs, 99.9995 % 50 µs 이내 (위 판정 참조)
-3. **남은 측정·결정 (Phase B와 병행 가능, Phase B 착수를 막지 않음)**
-   - 비교 측정: `A1-BSW: … 저지연 튜닝(preempt=full)` 항목(generic)으로 부팅 → `sudo bash tools/rt/a1_rt.sh soak 30` — RT 커널이 실제로 이득인지 확인 (첫 시도는 스크립트가 비RT 커널을 거부해 실패 → 수정 완료)
-   - 원인 포착: RT 튜닝 부팅에서 `sudo bash tools/rt/a1_rt.sh trace 30 300` — 0.4 ms 사건 순간의 인터럽트·IPI·태스크 기록
-   - **팀 결정**: §7 실시간 예산을 "최악 1 ms, 99.99 % 100 µs"로 재정의할지 / 100 µs급 필수 루프를 MCU로 이관할지
+3. ✅ 비교·원인 측정 완료 (2026-09-14~15): generic 대조군 30분(D1 = RT 유지), trace 30 300 포착(패키지 단위 깨어남 지연), 8시간 야간(최악 828 µs, 1 ms 초과 0), 장치 IRQ 계수(격리 코어 0건), 스레드별 분해(200 µs+ 공통 사건 8코어 균등, 코어 6은 증폭기). 상세는 `2026-09-14_can_verification_checklist.md` 1-1~1-6 과 `measurements/2026-09-1{4,5}_*/README.md`.
+   - **팀 결정 D4**: §7 실시간 예산을 "최악 1 ms, 99.99 % 100 µs"로 재정의 — 8시간 실측이 이를 충족(최악 0.83 ms, 99.9985 % < 50 µs). 회의 안건.
+   - **🔜 다음 스텝 = 체크리스트 1-6 (b) 전원관리 실험** (근본 원인 판별): RT 튜닝 항목에 `idle=poll intel_pstate=disable processor.max_cstate=0 intel_idle.max_cstate=0` 을 더한 부팅 항목을 추가(`tools/rt/a1_rt.sh tune` 의 TUNE_CMDLINE 확장 또는 `tune rt-poll` 서브커맨드 신설) → 그 항목으로 부팅 → `soak 30` → 200 µs 초과 합계가 8코어에서 사라지는지 비교(기준: 30분 정식 2차 = 200–400 µs 24회, 8시간 = 코어당 ~250회). **재부팅은 사용자 확인 후.** 사라지면 원인 = 전원관리 → 발열·전력 비용(유휴 800 MHz 고정이 풀리고 코어가 100 % 폴링) 감수 여부 결정. 안 사라지면 SMI(`hwlatdetect --duration=1800`)·하드웨어 스톨로 넘어감.
+   - 코어 6 제외(`isolcpus=8-11,14-15`)는 **완화책**으로 보류 — 원인 확정 뒤 필요하면 적용.
 4. A-3: 제어 노드를 격리 코어에 `taskset`+`chrt -f`로 띄우는 실행 스크립트 또는 systemd 유닛
 5. A-4: `mlockall(MCL_CURRENT|MCL_FUTURE)` 적용 확인용 테스트 프로그램
 6. 운영 규칙: 주행 중 WiFi/BT 비활성(`rfkill block all`), 대회 기간 커널·NVIDIA 드라이버 동결(`apt-mark hold`) — RT용 NVIDIA 모듈은 우회 빌드라 업데이트 때 깨질 수 있음
