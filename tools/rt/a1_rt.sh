@@ -314,7 +314,7 @@ cmd_tune() {
     rt-poll) rt=$(rt_installed); [[ -n "$rt" ]] || die "6.8 realtime 커널이 설치돼 있지 않음"
              file=$GRUB_TUNED_POLL; newid=a1-bsw-rt-poll
              cmdline=${TUNE_CMDLINE//max_cstate=1/max_cstate=0}; extra=" $POLL_EXTRA"
-             title="A1-BSW 운용: Linux $rt + 격리 8-15 + idle=poll + intel_pstate=disable (부팅 후 iso_pm.sh eco 800 / hk ondemand)" ;;
+             title="A1-BSW 운용: Linux $rt + 격리 8-15 + idle=poll + intel_pstate=disable (부팅 후 iso_pm.sh eco 800, hk ondemand)" ;;
     rt-nohwp) rt=$(rt_installed); [[ -n "$rt" ]] || die "6.8 realtime 커널이 설치돼 있지 않음"
              file=$GRUB_TUNED_NOHWP; newid=a1-bsw-rt-nohwp; extra=" $NOHWP_EXTRA"
              title="A1-BSW: Linux $rt + RT 튜닝 + HWP 끔 (intel_pstate=disable) — 1-6e B1" ;;
@@ -334,7 +334,8 @@ cmd_tune() {
   [[ -n "$blk" ]] || die "grub.cfg 에서 $rt 엔트리를 찾지 못함"
   grep -qE '^[[:space:]]*linux[[:space:]]' <<<"$blk" || die "복제한 엔트리에 linux 줄이 없음"
 
-  blk=$(sed -e "1s/^menuentry '[^']*'/menuentry '$title'/" -e "1s/'$id'/'$newid'/" \
+  [[ $title == *'#'* ]] && die "제목에 # 을 쓸 수 없음"
+  blk=$(sed -e "1s#^menuentry '[^']*'#menuentry '$title'#" -e "1s/'$id'/'$newid'/" \
             -e "/^[[:space:]]*linux[[:space:]]/ s|\$| ${cmdline}${extra}|" <<<"$blk")
   {
     printf '#!/bin/sh\nexec tail -n +3 "$0"\n'
