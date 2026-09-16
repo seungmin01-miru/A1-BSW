@@ -355,14 +355,20 @@ Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash tools/rt/a1_r
 2. ✅ `soak 30` 2회 완료 (2026-09-12) — 정식 2차: 최악 467 µs, 99.9995 % 50 µs 이내 (위 판정 참조)
 3. ✅ 비교·원인 측정 완료 (2026-09-14~15): generic 대조군 30분(D1 = RT 유지), trace 30 300 포착(패키지 단위 깨어남 지연), 8시간 야간(최악 828 µs, 1 ms 초과 0), 장치 IRQ 계수(격리 코어 0건), 스레드별 분해(200 µs+ 공통 사건 8코어 균등, 코어 6은 증폭기). 상세는 `2026-09-14_can_verification_checklist.md` 1-1~1-6 과 `measurements/2026-09-1{4,5}_*/README.md`.
    - **팀 결정 D4**: §7 실시간 예산을 "최악 1 ms, 99.99 % 100 µs"로 재정의 — 8시간 실측이 이를 충족(최악 0.83 ms, 99.9985 % < 50 µs). 회의 안건.
-   - ✅ **1-6b 전원관리 실험 완료 (2026-09-15) — 원인 확정: CPU 전원관리(C-state·주파수 전이).** RT 튜닝 + `idle=poll intel_pstate=disable max_cstate=0` 으로 같은 30분 부하: 50 µs 초과 **102회 → 0회, 최악 467 → 43 µs**, 8코어 모두 16~43 µs(코어 6 포함 → 코어 6 제외 불필요). `max_cstate=1` 은 패키지 C-state·HWP 주파수 전이를 막지 못했음. 비용: 전 코어 폴링·최대 클럭(패키지 +3~4 °C, 스로틀 0). `measurements/2026-09-15_rt_poll/`.
-   - **🔜 다음 스텝**: 전원관리 차단을 **격리 코어에만** 적용하는 방식 설계·검증(sysfs 코어별 cpuidle disable + per-CPU governor, 또는 `intel_pstate=passive`) → 30분 재측정 → 효과가 유지되면 A-3 systemd 유닛에 포함하고 8시간 재검증. 대회 운용 설정 = "RT 튜닝 + 격리 코어 전원관리 차단".
-   - (이전 계획 기록) 1-6 (b) 절차: RT 튜닝 항목에 `idle=poll intel_pstate=disable processor.max_cstate=0 intel_idle.max_cstate=0` 을 더한 부팅 항목을 추가(`tools/rt/a1_rt.sh tune` 의 TUNE_CMDLINE 확장 또는 `tune rt-poll` 서브커맨드 신설) → 그 항목으로 부팅 → `soak 30` → 200 µs 초과 합계가 8코어에서 사라지는지 비교(기준: 30분 정식 2차 = 200–400 µs 24회, 8시간 = 코어당 ~250회). **재부팅은 사용자 확인 후.** 사라지면 원인 = 전원관리 → 발열·전력 비용(유휴 800 MHz 고정이 풀리고 코어가 100 % 폴링) 감수 여부 결정. 안 사라지면 SMI(`hwlatdetect --duration=1800`)·하드웨어 스톨로 넘어감.
-   - 코어 6 제외(`isolcpus=8-11,14-15`)는 **완화책**으로 보류 — 원인 확정 뒤 필요하면 적용.
+   - **1-6b~1-6f 전원관리 실험 (2026-09-15~16) — 결론과 정정.** 9/15 에 "원인 = C-state·주파수 전이 확정"으로 썼던 판정은 **과했다.** 이후 실험으로 밝혀진 것:
+     - 튜닝 부팅의 cpuidle 은 원래 **POLL 하나뿐**(C-state 는 처음부터 원인 아님, C3), 클럭 고정은 무효(C2 899 / C3 837 µs), HWP 끔 단독 무효(B1 640), `idle=poll` 단독 무효(B2 813), **둘을 함께** 쓴 B 만 43 µs 이고 재현됨(157 µs, 200 µs 초과 0).
+     - 정확한 표현: **`idle=poll` 과 `intel_pstate=disable` 의 조합이 필요조건** — cpuidle 프레임워크 경로와 intel_pstate/HWP 경로가 함께 작용해 수백 µs 사건을 만든다. 기전은 가설, 운용 결정에는 불필요.
+     - generic 에 같은 두 옵션을 줘도 514 µs / 50 µs 초과 1,889회(1-1b) → **D1 최종: RT 유지.** RT 의 NVIDIA 비공식 빌드 위험은 운용 규칙으로 안는다.
+     - 폴링 비용: 격리 SMT 짝 offline 은 스파이크를 되살림(498 µs, offline 스레드가 깊은 C-state 로 들어가기 때문으로 추정) → 기각. **격리 코어 800 MHz 고정(`iso_pm.sh eco 800`)은 67 µs / 50 µs 초과 1** → 채택.
+     - 유휴 전력: `performance` + `idle=poll` 은 부하 없이도 **패키지가 PL1 35 W 한도에 걸린다**(20스레드 터보 폴링). `schedutil` 은 PREEMPT_RT 에서 IRQ 스레드(FIFO)를 보고 항상 최대를 골라 무효. **하우스키핑 `ondemand`(`iso_pm.sh hk ondemand`)로 유휴 35 → 14 W, 45 → 37 °C**, 30분 soak **최악 27 µs, 50 µs 초과 0** — 전 실험 최선. 하우스키핑 클럭 전이는 격리 지연과 무관(C3 + 이번).
+   - ✅ **운용 설정 확정 (2026-09-16)**: 부팅 **`a1-bsw-rt-poll`** (RT 튜닝 + `idle=poll intel_idle.max_cstate=0 processor.max_cstate=0 intel_pstate=disable cpufreq.default_governor=performance`) + 부팅 후 **`tools/rt/iso_pm.sh eco 800`** + **`tools/rt/iso_pm.sh hk ondemand`**. 런타임 두 줄은 A-3 systemd 유닛에 넣어 자동화한다(승인 후). GRUB 기본은 여전히 generic. 상세: `measurements/2026-09-16_{bisect,generic_poll,eco}/README.md`, 체크리스트 1-6e/1-6f/1-1b.
+   - **🔜 다음**: 운용 설정으로 8시간 무인 재검증(`soak 480`) → A-3 유닛 → 2-1 인지 처리량(유휴 14 W 기준 여유 21 W; PL1 65 W 상향은 이 결과 보고 판단).
+   - (이전 계획 기록) 1-6 (b) 절차: RT 튜닝 항목에 `idle=poll intel_pstate=disable processor.max_cstate=0 intel_idle.max_cstate=0` 을 더한 부팅 항목을 추가 → 그 항목으로 부팅 → `soak 30` → 200 µs 초과 합계가 8코어에서 사라지는지 비교. 사라지면 원인 = 전원관리 → 발열·전력 비용 감수 여부 결정. — 실행됨(위 결론).
+   - 코어 6 제외(`isolcpus=8-11,14-15`)는 불필요해짐(운용 설정에서 8코어 모두 20~27 µs).
 4. A-3: 제어 노드를 격리 코어에 `taskset`+`chrt -f`로 띄우는 실행 스크립트 또는 systemd 유닛
 5. A-4: `mlockall(MCL_CURRENT|MCL_FUTURE)` 적용 확인용 테스트 프로그램
 6. 운영 규칙: 주행 중 WiFi/BT 비활성(`rfkill block all`), 대회 기간 커널·NVIDIA 드라이버 동결(`apt-mark hold`) — RT용 NVIDIA 모듈은 우회 빌드라 업데이트 때 깨질 수 있음
-7. `5.15.0-1114-realtime` 패키지 정리(메뉴 혼동·오선택 방지) — 튜닝 측정 완료 후 별도 승인
+7. ✅ 정리 (2026-09-16, `a1_rt.sh prune`): 실험용 GRUB 항목 5개 삭제(운용 `a1-bsw-rt-poll` 만 유지), `5.15.0-1114-realtime` 계열 패키지 purge. 메뉴 = generic(기본) / 6.8.1-rt(순정) / a1-bsw-rt-poll(운용)
 
 ---
 

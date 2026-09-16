@@ -46,7 +46,9 @@ def main():
             cpus = open("/sys/devices/system/cpu/isolated").read().strip() or "0-7"
         except OSError:
             cpus = "0-7"
-    cpus = cpulist(cpus)
+    cpus = [c for c in cpulist(cpus)
+            if not os.path.exists(f"/sys/devices/system/cpu/cpu{c}/online")
+            or open(f"/sys/devices/system/cpu/cpu{c}/online").read().strip() == "1"]   # offline 코어 제외
     try:
         tsc_mhz = ((rdmsr(0, MSR_PLATFORM_INFO) >> 8) & 0xFF) * 100   # 최대 비터보 배수 × 100 MHz 버스 = TSC
         before = {c: (rdmsr(c, MSR_APERF), rdmsr(c, MSR_MPERF)) for c in cpus}

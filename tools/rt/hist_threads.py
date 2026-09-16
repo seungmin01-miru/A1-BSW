@@ -40,12 +40,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("logs", nargs="+")
     ap.add_argument("--base", type=int, default=8, help="스레드 0 이 올라간 CPU 번호 (기본 8 = 격리 코어)")
+    ap.add_argument("--cpus", default=None, help="스레드 순서대로의 실제 CPU 목록, 예 8,10,12,14 (격리 코어 일부 offline 시)")
     a = ap.parse_args()
     summary = []
     for path in a.logs:
         r = parse(path); n = len(r["max"])
         print(f"== {path}  ({r['minutes']:.0f}분, 스레드 {n}개, 최악 {max(r['max'])} µs)")
-        print(f"{'버킷':<14}" + "".join(f"{'CPU'+str(a.base+t):>8}" for t in range(n)) + f"{'합계':>9}")
+        lab = a.cpus.split(",") if a.cpus else [str(a.base + t) for t in range(n)]
+        print(f"{'버킷':<14}" + "".join(f"{'CPU'+lab[t]:>8}" for t in range(n)) + f"{'합계':>9}")
         rows = [(name, r["band"][name]) for name, _, _ in BANDS] + [(">400 (범위초과)", r["over"]), ("**200 µs 초과 합**", r["over200"]), ("최악 µs", r["max"])]
         for name, vals in rows:
             tot = "" if name == "최악 µs" else f"{sum(vals):>9,}"
