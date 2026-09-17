@@ -8,7 +8,8 @@
 import argparse, os, sys
 LIMIT_BITS = {0:"PROCHOT",1:"Thermal",4:"ResidencyState",5:"RunningAvgThermal",6:"VR_Therm",7:"VR_TDC(전류)",8:"Other(Vccin/EDP)",
               10:"PL1",11:"PL2",12:"MaxTurboLimit",13:"TurboAttenuation"}
-PKG_BITS = {0:"ThermStatus",2:"ThermThreshold1",4:"ThermThreshold2",6:"PowerLimit",8:"CriticalTemp",10:"PROCHOT",12:"HWFeedbackChange"}
+# IA32_PACKAGE_THERM_STATUS: 짝수 비트 = 상태, 그 다음 홀수 비트 = 로그 (SDM 14.8.5.2)
+PKG_BITS = {0:"PkgThermal",2:"PkgPROCHOT",4:"PkgCriticalTemp",6:"PkgThreshold1",8:"PkgThreshold2",10:"PkgPowerLimit"}
 def cpulist(s):
     r=[]
     for p in s.split(","):

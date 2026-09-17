@@ -64,7 +64,8 @@
 | [ ] | RAPL 스로틀 사유 | `IA32_PACKAGE_THERM_STATUS`(0x1B1) 의 PL1/PL2/전류 제한 비트, `PERF_STATUS`(0x198) | 동상 |
 | [ ] | 유휴 진입·탈출 경로 시간 | ftrace `function_graph` on `cpuidle_enter`/`do_idle` — cpuidle 있음 vs `idle=poll` 비교 | `a1_rt.sh trace` 확장 |
 | [x] | provoke 중 격리 코어 IPI 함수 목록 (`ipi_watch.sh`) | **provoke 구간 IPI 0건**(150 s 중 kworker 코드패치 2건뿐, provoke 전) → IPI 가설 기각. 스톨은 커널 비가시 계층 | `2026-09-17_provoke` |
-| [ ] | 스파이크 창의 주파수 제한 사유 (`MSR_CORE_PERF_LIMIT_REASONS` 0x64F, `PACKAGE_THERM_STATUS` 0x1B1 로그 비트) | soak 열 로그에 10초마다 기록, 에피소드 시각과 대조 | `core_mhz.py` 확장 |
+| [~] | 스파이크 창의 주파수 제한 사유 (MSR 0x64F / 0x1B1 로그 비트) | soak 열 로그 12열로 기록 중. 재부팅 후 T0c/T0d: ondemand 4.1 GHz·72 W·EDP 비트 찍혀도 스톨 0 → **전력 과도는 무해** | `2026-09-17_hw_quick` |
+| [ ] | **장시간 가동 상태 의존성**: 같은 부팅에서 시간대별 3분 provoke (0 h / 8 h / 12 h …) → 스톨 상태가 언제 생기는가 | 저녁 8h 뒤 재부팅 없이 아침 재실행 | |
 | [ ] | 스파이크 순간 `trace` 재실행 (운용 설정) | 8h 에피소드 3건과 같은 형태가 잡히면 위 카운터와 대조 | `a1_rt.sh trace 480 400` |
 | [ ] | schedutil RT 규칙 코드 인용 | 6.8 `kernel/sched/cpufreq_schedutil.c` `sugov_get_util` → `effective_cpu_util(FREQUENCY_UTIL)` 의 RT 처리 줄 번호 | 문헌 |
 
@@ -114,3 +115,4 @@
 - 2026-09-17 초안. §1 확보 데이터 19건, §2~§5 미착수.
 - 2026-09-17 양성 대조 30 min 추가(§5), 기전 항목에 ipi_watch 추가(§3).
 - 2026-09-17 ipi_watch 결과: IPI 가설 기각(§3 [x]); 0x64F/0x1B1 항목 추가.
+- 2026-09-17 저녁: 재부팅 후 3분 대조 4건 전부 0 → governor·eco·전력 과도 가설 기각, 장시간 상태 의존성 항목 추가(§3).
