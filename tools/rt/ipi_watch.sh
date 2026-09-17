@@ -36,16 +36,25 @@ hdr=open("/proc/interrupts").readline().split()
 col={int(c[3:]):i+1 for i,c in enumerate(hdr)}
 b=before.split(); a=after.split()
 print(f"격리 코어 CAL 증가 ({sec}s):", " ".join(f"cpu{c}={int(a[col[c]])-int(b[col[c]])}" for c in cpus if c in col))
-fn=collections.Counter(); per=collections.Counter(); senders=collections.Counter()
+fn=collections.Counter(); per=collections.Counter(); senders=collections.Counter(); sendts=[]; t0=None
 for l in open(trace, errors="ignore"):
     m=re.search(r"\[(\d{3})\].*csd_function_entry:.*func=(\S+)", l)
     if m and int(m.group(1)) in cpus: fn[m.group(2)]+=1; per[int(m.group(1))]+=1
-    m2=re.search(r"^\s*(\S+)\s+\[(\d{3})\].*ipi_send_cpumask:.*callsite=(\S+)", l)
-    if m2: senders[(m2.group(1)[:24], m2.group(3))]+=1
+    m2=re.search(r"^\s*(.+?)\s+\[(\d{3})\]\s+\S+\s+([\d.]+): ipi_send_cpumask: cpumask=([0-9a-f,]+) callsite=(\S+)", l)
+    if m2:
+        mask=int(m2.group(4).replace(",",""),16)
+        if any(mask>>c & 1 for c in cpus):   # 격리 코어가 수신 대상에 포함된 송신만
+            senders[(m2.group(1).strip()[:24], m2.group(5))]+=1
+            sendts.append((float(m2.group(3)), m2.group(1).strip()[:24], bin(mask).count("1")))
+ts_all=[float(x) for x in re.findall(r"\]\s+\S+\s+([\d.]+): ", open(trace, errors="ignore").read())]
+t0=min(ts_all) if ts_all else 0
 print("격리 코어에서 실행된 IPI 함수 (횟수):")
 for f,n in fn.most_common(12): print(f"  {n:7d}  {f}")
 if senders:
-    print("IPI 보낸 쪽 (프로세스, 호출 지점) 상위:")
+    print("격리 코어로 IPI 를 보낸 쪽 (프로세스, 호출 지점):")
     for (p,c),n in senders.most_common(10): print(f"  {n:7d}  {p:<24} {c}")
+    print("송신 시각 (추적 시작 후 초, 보낸 프로세스, 대상 CPU 수):")
+    for t,p,n in sendts: print(f"  +{t-t0:7.3f}s  {p:<24} → {n} CPU")
+else: print("격리 코어로 보낸 IPI 없음")
 PY
 echo "원본: $out.trace"

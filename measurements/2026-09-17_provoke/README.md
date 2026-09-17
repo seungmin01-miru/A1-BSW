@@ -41,3 +41,17 @@
 1. **기전 5분 테스트**: `sudo bash tools/rt/ipi_watch.sh 150 -- bash tools/rt/provoke_net.sh 3 60` → 격리 코어에서 실행된 IPI 함수 상위 목록. `wbinvd`·`flush_tlb`·`sync_core` 류가 수백 회면 그것이 원인.
 2. **저녁 대회 조건 8h**: `soak_guard on race` → `soak 480`. 예상 = 에피소드 0~1.
 3. 운용 규칙 확정: 주행 중 WiFi/WWAN 라디오 끔(또는 USB 어댑터 제거) + PackageKit/snapd/unattended-upgrades 정지 — A-3 유닛에 포함.
+
+---
+
+## 기전 테스트 1 — 격리 코어 IPI 추적 (`ipi_watch.sh 150 -- provoke_net.sh 3 60`, 15:42:51~15:45:21, cyclictest 없음)
+- 150초 동안 격리 코어에 도착한 함수 호출 IPI(CAL): **코어당 6회 = 전 CPU 브로드캐스트 2건 × 3연속**(`do_sync_core`, 코드 패치 `text_poke_bp` 의 3단계 동기화). 보낸 쪽은 `kworker/4:0`, `kworker/19:1`(커널 워크큐), 시각 **+43.3 s / +43.6 s — provoke 시작(+60 s) 전**.
+- **provoke 구간(+60~+100 s: WiFi off/on, pkcon refresh)과 그 뒤 50초 동안 격리 코어로 간 IPI = 0.** TLB flush IPI(`flush_tlb_func`)는 수천 건 있었지만 전부 하우스키핑 CPU 대상.
+- **판정: "네트워크·패키지 활동 → 전 CPU IPI → 격리 코어 스톨" 가설은 기각.** 어제 9/14 ftrace(사건 창에 격리 코어 커널 이벤트 없음)와 합쳐 보면, 스톨은 **커널이 볼 수 없는 계층**(하드웨어·펌웨어·언코어)에서 난다. SMI 는 0.
+- 남은 후보: 코어 주파수 제한 사유 레지스터 `MSR_CORE_PERF_LIMIT_REASONS`(0x64F: PL1/PL2/전류(ICCmax)/VR 열/패키지 레벨 등 사유 로그 비트), `IA32_PACKAGE_THERM_STATUS`(0x1B1) 로그 비트 — 사건 전후로 비트가 켜지는지. USB 호스트(xHCI)·PCIe 링크 전원관리(ASPM/LPM)와의 연관은 `rfkill` 대신 **어댑터 물리 제거** 조건과 비교하면 갈린다.
+- 이 테스트는 부하(stress-ng·GPU) 없이 했다. 양성 대조의 130 에피소드는 부하 중이었으므로, 부하가 필요조건인지도 아직 모른다(9/12~15 의 A 계열 스파이크는 GPU 부하에서만 나타났음).
+
+### 다음 (기전)
+1. soak 열 로그에 MSR 0x64F/0x1B1 로그 비트 + 하우스키핑 실클럭 + RAPL W 를 10초마다 추가 → 저녁 8h 와 다음 provoke 30분에서 에피소드 시각과 대조.
+2. `a1_rt.sh trace 10 400` + provoke 병행 → 스톨 순간 격리 코어의 마지막 커널 이벤트 재확인(9/14 와 같은 형태인지).
+3. USB WiFi 어댑터 **물리 제거** 상태에서 pkcon 만 반복(유선 필요) vs 어댑터 연결·라디오 off 상태 비교.
