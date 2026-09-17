@@ -12,7 +12,7 @@
 #        bash a1_rt.sh freq [status|performance|powersave]  전원관리 상태 보기 / 주파수 governor 전환(재부팅 불필요, 재부팅 시 원복)
 #   sudo bash a1_rt.sh bench     7) §5.A cyclictest 실측 — 무부하 / CPU부하 / CPU+GPU부하 + 하드웨어 지연 (약 5분)
 #                                   격리 코어가 있으면 그 코어에서 측정, 없으면 CPU 0-7(튜닝 전 바닥값)
-#   sudo bash a1_rt.sh soak [분] 8) 장시간(기본 30분) 부하 측정 — 드문 스파이크 확인, 대회 전 필수
+#   sudo bash a1_rt.sh soak [분]   (A1_NOLOAD=1 을 앞에 붙이면 부하 없이 cyclictest 만) 8) 장시간(기본 30분) 부하 측정 — 드문 스파이크 확인, 대회 전 필수
 #   sudo bash a1_rt.sh trace [분] [µs] 9) 지연 원인 추적 — 임계 초과 순간의 인터럽트·IPI·태스크 기록
 #   sudo bash a1_rt.sh drive          10) 주행 프로필 — 콜드 부팅 직후 실행: 부하 10분 → 대기 5분 → 부하 10분 (실제 10분 주행 ×2 재현)
 #                                        3회 반복해 콜드 시동 과도 상태를 포함한 값을 얻는다. 요약: drive-report
@@ -547,7 +547,9 @@ run_soak() {   # $1 분, $2 출력 경로 접두, $3 요약 라벨
   trap 'exit 130' INT TERM HUP   # 신호로 끝나도 EXIT 트랩(kill_load)을 거치게 함
   disp=$(ls /tmp/.X11-unix/ 2>/dev/null | sed -nE 's/^X([0-9]+)$/:\1/p' | head -1) || disp=""
   xauth="/run/user/$(id -u "${SUDO_USER:-root}")/gdm/Xauthority"
-  if [[ -n "${SUDO_USER:-}" && -n "$disp" && -f "$xauth" ]]; then
+  if [[ -n "${A1_NOLOAD:-}" ]]; then
+    warn "A1_NOLOAD=1 → GPU·CPU 부하 없이 측정 (부하가 필요조건인지 보는 대조용)"
+  elif [[ -n "${SUDO_USER:-}" && -n "$disp" && -f "$xauth" ]]; then
     start_load sudo -u "$SUDO_USER" env DISPLAY="$disp" XAUTHORITY="$xauth" \
       timeout $((secs + 20))s "${GL_LOAD[@]}"
     gpu_on=1
@@ -555,7 +557,7 @@ run_soak() {   # $1 분, $2 출력 경로 접두, $3 요약 라벨
   else
     warn "GPU 부하 생략 (데스크톱 세션 없음)"
   fi
-  start_load stress-ng --cpu 8 --io 4 --vm 2 --vm-bytes 1G --timeout $((secs + 10))s
+  [[ -n "${A1_NOLOAD:-}" ]] || start_load stress-ng --cpu 8 --io 4 --vm 2 --vm-bytes 1G --timeout $((secs + 10))s
   # GPU 부하가 중간에 끊겨도 결과에 드러나도록 10초마다 사용률과 glmark2 생존 여부를 기록
   ((gpu_on)) && start_load bash -c "sleep 5; while :; do
       u=\$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -1)
@@ -569,14 +571,23 @@ run_soak() {   # $1 분, $2 출력 경로 접두, $3 요약 라벨
   [[ -n "$iso_cpus" ]] || iso_cpus="0 1 2 3 4 5 6 7"
   modprobe msr 2>/dev/null || true
   echo "   전원관리: cpuidle=[$(cat /sys/devices/system/cpu/cpu0/cpuidle/state*/name 2>/dev/null | tr '\n' ' ')] cpufreq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver 2>/dev/null || echo none) governor 격리=$(cat /sys/devices/system/cpu/cpu${iso_cpus%% *}/cpufreq/scaling_governor 2>/dev/null || echo -)[$(cat /sys/devices/system/cpu/cpu${iso_cpus%% *}/cpufreq/scaling_min_freq 2>/dev/null | awk '{printf "%d",$1/1000}')~$(cat /sys/devices/system/cpu/cpu${iso_cpus%% *}/cpufreq/scaling_max_freq 2>/dev/null | awk '{printf "%d",$1/1000}')] 하우스키핑=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo -) 격리 코어 [min max SMI cpu=MHz…]: $(python3 "$BASE/core_mhz.py" --cpus "${iso_cpus// /,}" 2>/dev/null)"
-  echo "time pkg_C gpu_C iso_mhz_min iso_mhz_max throttle_core throttle_pkg smi" > "$thermlog"
-  start_load bash -c "sleep 5; while :; do
+  # 열·전력·클럭 제한 사유 10초 표본. 열 로그 열: 온도, GPU, 격리/하우스키핑 실클럭(MSR), 열 스로틀, SMI,
+  # 패키지 W(RAPL 차분), 클럭 제한 사유 로그 비트(MSR 0x64F/0x1B1, 읽고 지움 → 그 10초 사이에 켜졌던 사유)
+  local hk_cpus; hk_cpus=$(for c in $(seq 0 $(( $(nproc --all) - 1 ))); do grep -qw "$c" <<<"$iso_cpus" || echo "$c"; done | tr '\n' ',' | sed 's/,$//')
+  local rapl=/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
+  python3 "$BASE/msr_limits.py" --clear >/dev/null 2>&1 || true
+  echo "time pkg_C gpu_C iso_mhz_min iso_mhz_max throttle_core throttle_pkg smi hk_mhz_min hk_mhz_max pkg_W limit_log" > "$thermlog"
+  start_load bash -c "sleep 5; e0=\$(cat $rapl 2>/dev/null || echo 0); t0=\$(date +%s.%N); while :; do
       pk=\$(( \$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0) / 1000 ))
       g=\$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -1)
       read -r mn mx smi _ < <(python3 '$BASE/core_mhz.py' --cpus '${iso_cpus// /,}' --window 1 2>/dev/null)
+      read -r hmn hmx _ < <(python3 '$BASE/core_mhz.py' --cpus '$hk_cpus' --window 1 2>/dev/null)
       tc=\$(cat /sys/devices/system/cpu/cpu${iso_cpus%% *}/thermal_throttle/core_throttle_count 2>/dev/null || echo -)
       tp=\$(cat /sys/devices/system/cpu/cpu${iso_cpus%% *}/thermal_throttle/package_throttle_count 2>/dev/null || echo -)
-      echo \"\$(date +%T) \$pk \${g:--} \${mn:--} \${mx:--} \$tc \$tp \${smi:--}\" >> '$thermlog'; sleep 9; done"
+      e1=\$(cat $rapl 2>/dev/null || echo 0); t1=\$(date +%s.%N)
+      w=\$(python3 -c \"d=\$e1-\$e0; d=d if d>=0 else d+2**32; print(f'{d/1e6/(\$t1-\$t0):.1f}')\" 2>/dev/null || echo -); e0=\$e1; t0=\$t1
+      lim=\$(python3 '$BASE/msr_limits.py' --clear 2>/dev/null | tr ' ' ';' || echo -)
+      echo \"\$(date +%T) \$pk \${g:--} \${mn:--} \${mx:--} \$tc \$tp \${smi:--} \${hmn:--} \${hmx:--} \${w:--} \${lim:--}\" >> '$thermlog'; sleep 7; done"
   start_watchdog
   sleep 5
   echo "   측정 시작 $(date '+%T') — 종료 예정 $(date -d "+$secs seconds" '+%T') (중단: Ctrl+C)"
@@ -607,6 +618,11 @@ run_soak() {   # $1 분, $2 출력 경로 접두, $3 요약 라벨
                if (NF>=8 && $8!="-") { if (s0=="") s0=$8; s1=$8 } }
          END { printf "  🌡  패키지 %d~%d°C, GPU 최대 %d°C, 격리 코어 클럭 %s~%s MHz, 스로틀 core=%s pkg=%s (%d회 기록)\n", pmn, pmx, gmx, (fmn==""?"-":fmn), (fmx==""?"-":fmx), tc, tp, n
                if (s0!="") printf "  %s SMI(MSR 0x34) 측정 중 %d회 (누적 %s→%s)\n", (s1-s0>0 ? "⚠️ " : "✅"), s1-s0, s0, s1 }' "$thermlog"
+    awk 'NR>1 && NF>=12 && $9 ~ /^[0-9]+$/ { if (hmn=="" || $9<hmn) hmn=$9; if ($10>hmx) hmx=$10; if ($11 ~ /^[0-9.]+$/) { ws+=$11; wn++; if ($11>wmax) wmax=$11 } 
+               if ($12 !~ /^limit=none;pkg=none$/ && $12 != "-") { lim[$12]++ } }
+         END { if (hmn!="") printf "  🔌 하우스키핑 실클럭 %s~%s MHz, 패키지 전력 평균 %.1f W (최대 %.1f W, RAPL PL1 35 W)\n", hmn, hmx, (wn?ws/wn:0), wmax
+               n=0; for (k in lim) n++
+               if (n==0) printf "  ✅ 클럭 제한 사유 로그(MSR 0x64F/0x1B1): 없음\n"; else { printf "  ⚠️  클럭 제한 사유 로그 발생 (10초 창 기준):\n"; for (k in lim) printf "       %5d회  %s\n", lim[k], k } }' "$thermlog"
   fi
   echo "-- 측정 중 커널 경고"
   journalctl -k --since "@$start" --no-pager -o short-monotonic 2>/dev/null \

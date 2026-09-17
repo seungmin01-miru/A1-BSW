@@ -27,9 +27,21 @@ if a.provoke:
     for l in open(a.provoke):
         mm = re.match(r"(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)(\.\d+)? (#\d+ .*)", l)
         if mm: prov.append((dt.datetime.strptime(mm.group(1), "%Y-%m-%d %H:%M:%S"), mm.group(3)))
+therm = []
+tf = a.log[:-4] + ".thermal"
+if os.path.exists(tf):
+    for l in open(tf):
+        f = l.split()
+        if f and re.match(r"\d\d:\d\d:\d\d", f[0]):
+            hh, mm_, ss = map(int, f[0].split(":")); tt = day.replace(hour=hh, minute=mm_, second=ss)
+            if tt < start - dt.timedelta(minutes=1): tt += dt.timedelta(days=1)
+            therm.append((tt, l.rstrip()))
 for e in ep:
     t0 = start + dt.timedelta(milliseconds=e[0][0]); cores = sorted({t + 8 for _, t in e})
     print(f"\n  {t0:%T}  코어 {cores}  ({len(e)}건)")
+    for tt, row in therm:
+        d = (tt - t0).total_seconds()
+        if 0 <= d <= 12: print(f"     thermal {row}  (+{d:.0f} s 표본: 그 10초 창의 W·클럭·제한사유)"); break
     for pt, what in prov:
         d = (t0 - pt).total_seconds()
         if -a.window <= d <= a.window: print(f"     provoke {pt:%T} {what}  ({d:+.0f} s 전)")
