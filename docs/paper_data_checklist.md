@@ -63,6 +63,7 @@
 | [ ] | HWP 요청·상태 | `IA32_HWP_REQUEST`(0x774) / `HWP_STATUS`(0x777) 덤프, HWP 켜짐/꺼짐 부팅 비교 | 동상 |
 | [ ] | RAPL 스로틀 사유 | `IA32_PACKAGE_THERM_STATUS`(0x1B1) 의 PL1/PL2/전류 제한 비트, `PERF_STATUS`(0x198) | 동상 |
 | [ ] | 유휴 진입·탈출 경로 시간 | ftrace `function_graph` on `cpuidle_enter`/`do_idle` — cpuidle 있음 vs `idle=poll` 비교 | `a1_rt.sh trace` 확장 |
+| [ ] | provoke 중 격리 코어 IPI 함수 목록 (`ipi_watch.sh`) — 전역 스톨 기전의 직접 증거 후보 | csd_function_entry 추적 | `ipi_watch.sh` |
 | [ ] | 스파이크 순간 `trace` 재실행 (운용 설정) | 8h 에피소드 3건과 같은 형태가 잡히면 위 카운터와 대조 | `a1_rt.sh trace 480 400` |
 | [ ] | schedutil RT 규칙 코드 인용 | 6.8 `kernel/sched/cpufreq_schedutil.c` `sugov_get_util` → `effective_cpu_util(FREQUENCY_UTIL)` 의 RT 처리 줄 번호 | 문헌 |
 
@@ -78,7 +79,8 @@
 
 | 상태 | 항목 | 값 | 출처 |
 |---|---|---|---|
-| [ ] | **대회 조건 8 h** (rfkill wifi, PackageKit/snapd/타이머 정지) | 에피소드 수 = ? (0 이면 8h 에피소드 3건의 원인 = 네트워크 계열) | |
+| [x] | **양성 대조 30 min** (네트워크 사건 유발) | 0 → 130 에피소드, 최악 892 µs; 구간별 발생률 표 | `2026-09-17_provoke` |
+| [ ] | **대회 조건 8 h** (rfkill wifi, PackageKit/snapd/타이머 정지) | 에피소드 수 = ? (양성 대조로 인과는 확정, 이것은 음성 대조) | |
 | [ ] | 실물 `can0` 송신 주기 편차 (PCAN, 정지 차량) | 평균/최대 µs, 프레임 수 | 5-1 물리 루프백 후 |
 | [ ] | 실물 `can0` 송신 주기 편차 (주행 중, 1·2차 각 10분) | | 드라이브 프로필 1-5 |
 | [ ] | 주행 중 격리 코어 지연 (cyclictest 를 CAN 스레드와 병행, 낮은 우선순위) | | |
@@ -109,3 +111,4 @@
 
 ## 갱신 이력
 - 2026-09-17 초안. §1 확보 데이터 19건, §2~§5 미착수.
+- 2026-09-17 양성 대조 30 min 추가(§5), 기전 항목에 ipi_watch 추가(§3).
