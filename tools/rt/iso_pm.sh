@@ -11,6 +11,10 @@
 #                                          idle=poll + intel_pstate=disable 부팅(rt-poll / generic-poll)에서 쓰는 것을 전제. off 로 원복(online 포함).
 #   sudo bash tools/rt/iso_pm.sh hk <governor>  ★ 하우스키핑 코어(격리 밖 전부)만 governor 변경 — 예 `hk schedutil`(⑤: 유휴 시 클럭 하강, 부하 시 상승).
 #                                          격리 코어는 건드리지 않음. 원래 governor 는 STATE.hk 에 저장, `hk restore` 로 원복. 재부팅하면 자동 원복.
+#   sudo bash tools/rt/iso_pm.sh hk smooth [step%=15] [up%=60] [down%=30] [sdf=5]
+#                                          ★ 하우스키핑을 conservative governor 로: 10 ms 마다 부하율이 up% 를 넘으면 최대의 step% 씩 올리고,
+#                                          down% 아래면 sdf 표본 뒤부터 step% 씩 내림 → 클럭-시간 기울기를 step%/10 ms 로 제한(ondemand 의 즉시 최대 점프 대신)
+#                                          하면서 up% 를 낮춰 더 민감하게 반응. 급가속 누적 가설(9/17) 검증용. 원복 `hk restore`.
 #        bash tools/rt/iso_pm.sh status   코어별 governor / 클럭 / 비활성 C-state 표 (sudo 없이)
 # on/all/eco 는 하우스키핑 코어(0-7,16-19)를 건드리지 않는다. 하우스키핑은 `hk` 서브커맨드로만 바꾼다.
 set -euo pipefail
@@ -118,9 +122,22 @@ hk)
     while read -r c g; do echo "$g" > /sys/devices/system/cpu/cpu$c/cpufreq/scaling_governor; done < "$STATE.hk"; rm -f "$STATE.hk"
     echo "✅ 하우스키핑 governor 원복"; status; exit 0
   fi
+  smooth=0
+  if [[ $gov == smooth ]]; then smooth=1; gov=conservative; step=${3:-15}; up=${4:-60}; down=${5:-30}; sdf=${6:-5}; fi
   grep -qw "$gov" /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors || { echo "governor '$gov' 없음"; exit 1; }
   [[ -f "$STATE.hk" ]] || for c in $HK; do echo "$c $(cat /sys/devices/system/cpu/cpu$c/cpufreq/scaling_governor)" >> "$STATE.hk"; done   # 최초 1회만 원본 저장
   for c in $HK; do echo "$gov" > /sys/devices/system/cpu/cpu$c/cpufreq/scaling_governor; done
+  if ((smooth)); then
+    T=/sys/devices/system/cpu/cpufreq/conservative
+    [[ -d $T ]] || { echo "conservative 튜닝 디렉터리 없음"; exit 1; }
+    echo "$sdf"  > $T/sampling_down_factor
+    echo "$down" > $T/down_threshold          # up 보다 먼저 써야 up>down 제약에 안 걸림
+    echo "$up"   > $T/up_threshold
+    echo "$step" > $T/freq_step
+    echo 1 > $T/ignore_nice_load 2>/dev/null || true
+    echo "  conservative 튠: sampling_rate=$(cat $T/sampling_rate) µs, freq_step=$(cat $T/freq_step) %, up=$(cat $T/up_threshold) %, down=$(cat $T/down_threshold) %, sampling_down_factor=$(cat $T/sampling_down_factor)"
+    echo "  → 상승 기울기 상한 = 2101 MHz × ${step}% / 10 ms ≈ $(( 2101 * step / 100 / 10 )) MHz/ms (800→2101 약 $(( (1301 * 100 / (2101 * step)) + 1 )) 표본 ≈ $(( ((1301 * 100 / (2101 * step)) + 1) * 10 )) ms; 2101 요청 이후 터보는 하드웨어가 결정)"
+  fi
   echo "✅ 하우스키핑 $(echo $HK | tr ' ' ',') governor=$gov (격리 $ISO 는 그대로). 원복: sudo bash $0 hk restore (또는 재부팅)"
   status ;;
 status) status ;;
