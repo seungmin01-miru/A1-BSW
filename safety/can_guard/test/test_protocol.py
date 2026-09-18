@@ -114,3 +114,42 @@ def test_concurrent_writer_process_no_torn_reads(shm_name):
         proc.join(timeout=5)
         reader.close()
         ch.close()
+
+
+# ---- HeartbeatChannel ----
+from protocol import HeartbeatChannel  # noqa: E402 (기존 임포트 블록과 떨어뜨려 이 절의 대상만 명확히)
+
+
+@pytest.fixture
+def hb_name():
+    return f'a1_test_hb_{uuid.uuid4().hex[:12]}'
+
+
+def test_heartbeat_never_beaten_returns_none(hb_name):
+    ch = HeartbeatChannel.create(hb_name)
+    try:
+        assert ch.age() is None
+    finally:
+        ch.close()
+
+
+def test_heartbeat_roundtrip(hb_name):
+    writer = HeartbeatChannel.create(hb_name)
+    reader = HeartbeatChannel.open(hb_name)
+    try:
+        writer.beat()
+        age = reader.age()
+        assert age is not None and 0 <= age < 0.1
+    finally:
+        reader.close()
+        writer.close()
+
+
+def test_heartbeat_age_grows(hb_name):
+    ch = HeartbeatChannel.create(hb_name)
+    try:
+        ch.beat()
+        time.sleep(0.05)
+        assert ch.age() >= 0.05
+    finally:
+        ch.close()

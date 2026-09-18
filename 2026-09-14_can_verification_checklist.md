@@ -199,8 +199,8 @@ Decision: **no MCU for this competition.** The safety layer runs on the main PC.
 
 | # | Pri | Test | Pass |
 |---|---|---|---|
-| P-1 | 🔴 | [ ] `kill -9` the ROS2 control node | first decel frame within one tick after T; `Alive_Cnt` continuous |
-| P-2 | 🔴 | [ ] `kill -9` perception (GPU) under load | guard TX period unaffected — record max jitter; `dmesg` BUG count |
+| P-1 | 🟢 | [x] `kill -9` the ROS2 control node — **PASS 2026-09-19 (SIL, vcan0, fake control node)** | first decel frame within one tick after T; `Alive_Cnt` continuous — transition logged at 55ms (T=50ms+1 tick), 0x156 Aliv_Cnt 101 frames continuous, 0x157 ACC_Cmd ramped 0.150→0.000 (cantools-verified). `safety/can_guard/sil_tests/p1_kill_control_node.py`. Real ROS2 node still pending — this used `fake_control_node.py`. |
+| P-2 | 🟢 | [x] `kill -9` perception (GPU) under load — **PASS 2026-09-19 (SIL, vcan0, fake perception)** | guard TX period unaffected — record max jitter; `dmesg` BUG count — 0x156 gap avg 10.00ms (max 10.2–10.4ms) before/after kill, `ACTIVE → DEGRADED` logged, Aliv_Cnt continuous, 0 new dmesg BUG lines. `safety/can_guard/sil_tests/p2_kill_perception.py`. Real perception process still pending. |
 | P-3 | 🔴 | [ ] `kill -9` the guard itself | systemd restarts it; **gap in 0x156 ≪ 1000 ms (target < 200 ms)**; fake vehicle never times out |
 | P-4 | 🔴 | [ ] Hang the guard (`SIGSTOP`) | `WatchdogSec` restart; same gap metric |
 | P-5 | 🔴 | [ ] Plausibility: out-of-range / rate / stuck alive from control | rejected, counted, safe value forwarded |
@@ -233,7 +233,7 @@ Decision: **no MCU for this competition.** The safety layer runs on the main PC.
 2. [x] 1-3 IPI observation (5 min) → GPU confirmed as the IPI source (4/s at 4K, 0 idle)
 3. [ ] 3-1 / 3-2 NN size + CPU WCET (30 min) — ⚠️ only if a candidate model exists; otherwise mark "pending model selection"
 4. [ ] 5-1 can0 ↔ can1 physical loopback (1 h) → "real bus testing has started"
-5. [~] Agree the `can_guard` design (§7.2) and residual risks (§7.4); schedule P-1…P-6 right after the Phase C slice — **design drafted 2026-09-19** (`can_stack_development.md` §5.D, `safety/can_guard/`: `CommandChannel` seqlock, plausibility, state machine, 0x156/0x157 encoder, all unit-tested, 38/38 pass). Main loop + P-1/P-2 SIL scripts still open; team must still confirm/agree.
+5. [~] Agree the `can_guard` design (§7.2) and residual risks (§7.4); schedule P-1…P-6 right after the Phase C slice — **design + main loop + P-1/P-2 done 2026-09-19** (`can_stack_development.md` §5.D, `safety/can_guard/`: `CommandChannel`/`HeartbeatChannel` seqlock, plausibility, state machine, command policy, 0x156/0x157 encoder, sd_notify — 51/51 unit tests pass; `can_guard.py` main loop wired and live-verified on vcan0; P-1/P-2 PASS via real `SIGKILL` on fake control/perception processes). Real ROS2 control node + perception integration, rate-limit values, and P-3+ bench tests still open; team must still confirm/agree on the design.
 
 ## 9. Open items to confirm with the team / organizer
 

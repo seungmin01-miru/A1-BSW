@@ -11,21 +11,40 @@ seqlock 프로토콜:
 읽기 쪽이 그 순간의 seq 불일치로 걸러낸다. 프로세스 두 개(스레드 아님)가 공유하므로 `multiprocessing.shared_memory`
 위에 `ctypes.Structure` 를 얹는다.
 
-  ctrl = CommandChannel.create('a1_can_guard_cmd')      # 제어 노드 쪽, 세그먼트 생성
-  guard = CommandChannel.open('a1_can_guard_cmd')       # can_guard 쪽, 기존 세그먼트 열기
+  guard = CommandChannel.create('a1_can_guard_cmd')     # can_guard 쪽 — §7.2 "guard 가 먼저 뜬다"라서
+                                                          # 세그먼트도 guard 가 만든다(재시작 때마다 새로 =
+                                                          # 항상 안전 상태에서 시작, §7.2 Startup 규칙).
+  ctrl = CommandChannel.open('a1_can_guard_cmd')        # 제어 노드 쪽, 기존 세그먼트 열기(재시작해도 재사용)
   ctrl.write(Command(eps_en=True, eps_cmd=1.5, ...))
   cmd, age_s = guard.read()                             # age_s 는 monotonic 기준 나이(초) — staleness 판정용
+
+`HeartbeatChannel` 도 같은 seqlock 패턴이지만 페이로드가 없다(살아있다는 사실 자체가 정보) — 인지 프로세스가
+얼마나 자주 신호를 보내는지도 guard 입장에선 몰라도 되고, "마지막으로 본 게 언제냐"만 있으면 된다.
 """
 import ctypes
 import time
 from dataclasses import dataclass
 from multiprocessing import shared_memory
+from multiprocessing import resource_tracker
+
+HEARTBEAT_SHM_NAME_DEFAULT = 'a1_can_guard_perception_hb'
 
 SHM_NAME_DEFAULT = 'a1_can_guard_cmd'
 
 
 class TornReadError(RuntimeError):
     """read() 가 재시도를 다 써도 안정된 스냅샷을 못 얻었을 때 — 드물면 정상(§5.D 참고), 계속 나면 이상 신호."""
+
+
+def _unregister_from_tracker(shm):
+    """Python 3.10 의 known wart: `SharedMemory(create=False)` 도 기본적으로 resource_tracker 에 등록되는데,
+    이 프로세스는 소유자가 아니라 unlink 할 일이 없다. 이 핸들을 연 프로세스가 SIGKILL 로 죽으면(P-1/P-2 SIL
+    시험이 실제로 이렇게 한다) tracker 가 "추적하던 걸 못 지웠다"는 경고를 찍는다 — 실제 누수가 아니다(세그먼트는
+    `create()` 쪽이 소유하고 있고 그쪽이 정상적으로 unlink 한다). 등록에서 빼서 이 무해한 경고를 없앤다."""
+    try:
+        resource_tracker.unregister(shm._name, 'shared_memory')
+    except Exception:
+        pass   # 이 최적화가 실패해도 기능에는 영향 없다 — 경고가 그대로 뜰 뿐
 
 
 class _Payload(ctypes.Structure):
@@ -85,6 +104,7 @@ class CommandChannel:
     @classmethod
     def open(cls, name=SHM_NAME_DEFAULT):
         shm = shared_memory.SharedMemory(name=name, create=False)
+        _unregister_from_tracker(shm)   # 이 핸들은 소유자가 아니다 — 아래 함수 설명 참고
         return cls(shm, owner=False)
 
     def write(self, cmd: Command):
@@ -136,6 +156,75 @@ class CommandChannel:
         # ctypes.Structure.from_buffer() 는 버퍼 프로토콜로 mmap 에 "내보낸 포인터"를 하나 쥐고 있다 —
         # 이걸 먼저 놓지 않으면 SharedMemory.close() 가 BufferError("cannot close exported pointers exist")
         # 로 죽는다. del 로 참조를 0 으로 만들면 CPython 은 즉시(참조카운트) 해제하므로 순서만 지키면 된다.
+        del self._payload
+        self._shm.close()
+        if self._owner:
+            self._shm.unlink()
+
+
+class _HeartbeatPayload(ctypes.Structure):
+    _fields_ = [('seq', ctypes.c_uint64), ('timestamp_ns', ctypes.c_int64)]
+
+
+class HeartbeatChannel:
+    """인지 프로세스 → can_guard "나 살아있음" 신호. 페이로드가 없어 `CommandChannel` 보다 훨씬 단순하지만
+    같은 seqlock 프로토콜(찢어진 읽기 방지)을 쓴다 — 필드가 seq+timestamp 둘뿐이라 이론상 안 겹쳐도 되지만,
+    프로토콜을 하나만 유지하는 쪽이 실수할 여지가 적다.
+
+      guard = HeartbeatChannel.create()      # can_guard 쪽 — 세그먼트 생성(먼저 뜬다)
+      perc = HeartbeatChannel.open()         # 인지 프로세스 쪽
+      perc.beat()                             # 매 프레임(또는 주기적으로) 호출
+      age_s = guard.age()                     # None = 한 번도 안 옴
+    """
+
+    def __init__(self, shm, owner):
+        self._shm = shm
+        self._owner = owner
+        self._payload = _HeartbeatPayload.from_buffer(self._shm.buf)
+
+    @classmethod
+    def create(cls, name=HEARTBEAT_SHM_NAME_DEFAULT):
+        size = ctypes.sizeof(_HeartbeatPayload)
+        try:
+            shm = shared_memory.SharedMemory(name=name, create=True, size=size)
+        except FileExistsError:
+            stale = shared_memory.SharedMemory(name=name)
+            stale.close()
+            stale.unlink()
+            shm = shared_memory.SharedMemory(name=name, create=True, size=size)
+        ch = cls(shm, owner=True)
+        ch._payload.seq = 0
+        return ch
+
+    @classmethod
+    def open(cls, name=HEARTBEAT_SHM_NAME_DEFAULT):
+        shm = shared_memory.SharedMemory(name=name, create=False)
+        _unregister_from_tracker(shm)
+        return cls(shm, owner=False)
+
+    def beat(self):
+        p = self._payload
+        seq = p.seq if p.seq % 2 == 0 else p.seq + 1
+        p.seq = seq + 1
+        p.timestamp_ns = time.monotonic_ns()
+        p.seq = seq + 2
+
+    def age(self, max_retries=1000):
+        """마지막 beat() 로부터 지난 초. 한 번도 안 왔으면 None. 너무 자주 찢어지면 TornReadError."""
+        p = self._payload
+        for _ in range(max_retries):
+            seq1 = p.seq
+            if seq1 == 0:
+                return None
+            if seq1 % 2 != 0:
+                continue
+            ts = p.timestamp_ns
+            seq2 = p.seq
+            if seq1 == seq2:
+                return (time.monotonic_ns() - ts) / 1e9
+        raise TornReadError(f'HeartbeatChannel: {max_retries}번 재시도해도 seqlock 이 안정되지 않음')
+
+    def close(self):
         del self._payload
         self._shm.close()
         if self._owner:

@@ -30,8 +30,8 @@ flowchart TB
   subgraph C["[C] ROS2 브리지 · 디코더 — EAIT 수신 4종 전부 완료(2026-09-18)"]
     DEC["can_raw_bridge → CanFrame<br/>spd/eps/acc/imu_decoder(0x712/710/711/713)<br/>EPS·ACC: Alive_Cnt E2E → /diagnostics<br/>A-3(격리+FIFO) 재측정: ROS2 슬라이스엔 무효과 확정<br/>ros2_ws/src/a1_can_bridge"]
   end
-  subgraph D["[D] 안전 SW (MCU 대체) — can_guard 설계 착수(2026-09-19)"]
-    WD["can_guard: 상태머신+plausibility+TX(0x156/0x157)<br/>safety/can_guard/, raw SocketCAN, ROS2 밖<br/>격리 코어+SCHED_FIFO 90(A-3 효과 실측된 경로)"]
+  subgraph D["[D] 안전 SW (MCU 대체) — P-1/P-2 실측 PASS(2026-09-19)"]
+    WD["can_guard: 상태머신+plausibility+TX(0x156/0x157)<br/>safety/can_guard/, raw SocketCAN, ROS2 밖<br/>P-1(제어 kill) · P-2(인지 kill) 실제 SIL 통과<br/>격리 코어+SCHED_FIFO 90(A-3 효과 실측된 경로) 미적용 상태로 검증"]
   end
   MCU["안전 MCU<br/>(미정 · 추후 하드웨어 확보 시 통합)"]
   GW["대회 게이트웨이 → 액추에이터<br/>(EPS · ACC · 기어)"]
@@ -56,7 +56,7 @@ flowchart TB
 | A | RT 커널 기반 | PREEMPT_RT 설치·튜닝(`isolcpus`/`mlockall`/`SCHED_FIFO`), `cyclictest` 측정 | 🟡 조건부 완료 (커널·격리 튜닝·30분 실측 완료. 남음: 예산 재정의 결정, generic 비교, A-3/A-4) | §5.A |
 | B | CAN 인터페이스 | 어댑터/SocketCAN, `vcan0` SIL 환경, rosbag→CAN 주입 | 🟡 진행중 (vcan0 영속화·왕복·DBC 기반 0x712 주기 송신·디코드 완료. 남음: ROS2 raw 퍼블리시=Phase C, 실 can0 전환) | §5.B |
 | C | ROS2 브리지·디코더 | `CanFrame`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | 🟡 진행중 (EAIT 수신 메시지 4종 전부 디코더 완료: 0x712/710/711/713. EPS/ACC 는 E2E(alive_count) 체크·`/diagnostics` 연동까지. A-3 레시피 재측정 완료 — ROS2 슬라이스엔 무효과 확정. 남음: 실 can0, TX 방향(can_guard)) | §5.C |
-| D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | 🟡 설계 완료, 구현 착수 전 (`can_guard`, `safety/can_guard/`) | §5.D |
+| D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | 🟡 메인 루프 구현·P-1/P-2 SIL 실측 PASS (`can_guard`, `safety/can_guard/`). 남음: 진짜 제어/인지 노드 결선, 변화율 값, 벤치 시험 | §5.D |
 | E | 검증/테스트 (V-model) | 좌/우 대응 검증 계획, 고장주입 시험 | 🟢 초안 완료 | §3 |
 | F | 안전등급 레퍼런스 (ASIL) | 41개 파라미터 ASIL 등급, 근거 | 🟢 초안 완료 | §4 |
 
@@ -580,7 +580,7 @@ ROS2 상태 브리지 슬라이스에는 A-3 레시피를 상시 적용할 필�
 raw SocketCAN 직접 + 격리 코어 + 진짜 SCHED_FIFO(`eait_tx.py`/`eait_rx.py` 에서 그 레시피가 실제로 효과 있었던
 바로 그 방식)로 만든다 — ROS2/DDS 를 거치는 순간 A-3 는 효과가 없다는 것이 이번 재측정으로 확인됐다.
 
-### 5.D 안전 SW (MCU 대체) — `can_guard` (2026-09-19 설계 착수)
+### 5.D 안전 SW (MCU 대체) — `can_guard` (2026-09-19, 설계+메인 루프 구현+P-1/P-2 실측 통과)
 
 §7 의 결정(MCU 없음, PC 가 안전계층)·§7.2 설계 규칙을 구체 아키텍처로 옮긴 것. 위치는 `safety/can_guard/` —
 **`ros2_ws/` 밖**이다(§7.2 "ROS2/DDS 를 hot loop 에 절대 넣지 않는다"를 디렉터리 경계로도 강제 — 이 프로세스는
@@ -664,20 +664,35 @@ A-3 레시피(격리 코어, `SCHED_FIFO 90` — 제어 노드의 80 보다 높�
 SocketCAN 경로에서 효과가 실측됐다**(§5.C A-3 재측정: ROS2 슬라이스엔 무효과, `eait_tx.py` 류엔 5~9 µs) —
 can_guard 가 바로 그 "효과 있는" 경로다.
 
-**6) 시험 매핑 (§7.3 체크리스트 P-1~P-11, 지금 가능한 것 vs 벤치 필요)**
+**6) 메인 루프 (`can_guard.py`)** — 위 다섯 모듈을 결선: `CommandChannel.read()`/`HeartbeatChannel.age()`
+→ `state_machine.next_state()` → `command_policy.command_for_state()`(상태별로 실제 뭘 보낼지: HOLDING 은
+진입 순간 조향각을 얼리고 가감속만 0 으로 램프, STOPPED 는 EPS/ACC En 끄고 AEB_En 은 유지) → `plausibility.
+clamp_range()`(방어 이중화) → `tx_encode` → `bus.send()`. `sd_notify.py`(systemd `Type=notify`/`WatchdogSec`,
+외부 의존 없이 유닉스 소켓 직접) 도 결선됨. guard 가 두 공유메모리 세그먼트를 **소유·생성**한다(제어
+노드·인지 프로세스는 `open()` — §7.2 "guard 가 먼저 뜬다"를 세그먼트 소유권으로도 강제, 재시작마다
+새 세그먼트 = 항상 안전 상태에서 시작).
 
-| # | 시험 | 지금(SIL, 코드만으로) 가능? |
-|---|---|---|
-| P-1 제어 노드 kill | ✅ 가능 — `CommandChannel` 나이만 보면 됨 |
-| P-2 인지 kill | ✅ 가능 — 하트비트 채널도 같은 메커니즘 |
-| P-5 plausibility(범위/변화율/카운터) | 🟡 범위는 지금 유닛테스트 가능, 변화율은 숫자 확정 후 |
-| P-3/P-4 (guard 자체 kill/hang) | 🟡 systemd 설치·재시작 시간 측정 필요 — 벤치 |
-| P-6 (CAN 선 절단) | 🔴 실 `can0`/`can1` 필요 — 5-1 이후 |
-| P-9 (8h 벤치) | 🔴 실 하드웨어 벤치 필요 |
-| P-10/P-11 (콜드부트/PC 재시작 시간) | 🔴 실 하드웨어 |
+**7) 시험 매핑 (§7.3 체크리스트 P-1~P-11) — 실측 결과**
 
-**7) 남은 작업**: `can_guard.py` 메인 루프(상태머신+plausibility+인코더 결선, RT 셋업), `can_guard.service`,
-변화율 상한 값 팀 확인, `EPS_Cmd`/`ACC_Cmd` 실제 물리 의미(조향각 기준점 등) 재확인, P-1/P-2/P-5 SIL 시험 스크립트.
+| # | 시험 | 상태 | 결과 |
+|---|---|---|---|
+| **P-1** 제어 노드 kill | ✅ **완료(2026-09-19, SIL vcan0)** | **PASS** — `sil_tests/p1_kill_control_node.py`, 가짜 제어 노드를 실제 `SIGKILL`. 전이 로그 `ACTIVE → HOLDING` 55ms(예산 T=50ms+한 틱 이내), 0x156 Aliv_Cnt 101프레임 연속(끊김 0), 0x157 ACC_Cmd 가 kill 직후 0.150 → 0.000 으로 실제 램프됨(cantools 대조로 확인) |
+| **P-2** 인지 kill | ✅ **완료(2026-09-19, SIL vcan0)** | **PASS** — `sil_tests/p2_kill_perception.py`, 가짜 인지 프로세스를 실제 `SIGKILL`. 0x156 간격 kill 전/후 평균 10.00ms(최대 10.2~10.4ms, 목표 10ms) — **주기 안 흔들림**. `ACTIVE → DEGRADED` 전이 확인(perception_age 500ms 임계 직후), Aliv_Cnt 연속, 새 dmesg BUG 없음 |
+| P-5 plausibility(범위/변화율/카운터) | 🟡 | 범위는 유닛테스트 완료(`test_plausibility.py`, `test_tx_encode.py`). 변화율은 숫자 확정 후 |
+| P-3/P-4 (guard 자체 kill/hang) | 🟡 | systemd 설치·재시작 시간 측정 필요 — 벤치 |
+| P-6 (CAN 선 절단) | 🔴 | 실 `can0`/`can1` 필요 — 5-1 이후 |
+| P-9 (8h 벤치) | 🔴 | 실 하드웨어 벤치 필요 |
+| P-10/P-11 (콜드부트/PC 재시작 시간) | 🔴 | 실 하드웨어 |
+
+개발 중 잡은 버그 3건(§5.C 스타일로 기록, 상세는 `safety/can_guard/README.md`): (a) `ctypes.Structure.
+from_buffer()` 가 mmap 익스포트 포인터를 쥐고 있어 `close()` 전 `del` 필요, (b) seqlock 재시도 기본값(8)이
+무휴지 스트레스 테스트에서 부족해 1000으로, (c) P-1/P-2 스크립트 초기 버전이 자원 생성을 `try` 밖에 둬서
+예외 시 자식 프로세스가 실제로 유출된 것을 겪고 수정(생성부터 `try/finally`).
+
+**8) 남은 작업**: 진짜 ROS2 제어 노드·인지 프로세스 결선(지금은 `fake_control_node.py`/`fake_perception.py`
+로 대신 시험), 변화율 상한 값 팀 확인, `0x157` Alive_Cnt 부재 확인, STOPPED 의 "속도 0 수렴" 을 시간이 아닌
+실제 차속(RX 0x711 VS) 기반으로 바꿀지 설계 결정, `can_guard.service` 설치 + A-3 실측(`sudo chrt`), 벤치
+시험(P-3/4/6/9/10/11, 5-1 이후).
 
 ---
 
