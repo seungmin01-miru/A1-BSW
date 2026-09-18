@@ -151,7 +151,7 @@ Test-duration decision (2026-09-14): a 60-min soak was **rejected** — with ~1 
 |---|---|---|---|---|---|
 | 5-1 | 🔴 | [ ] **can0 ↔ can1 physical loopback** | wire the two PEAK PCAN-PCIe FD channels with twisted pair + 120 Ω at both ends; `eait_tx.py` on can0, `eait_rx.py` on can1 | **a real CAN bus without the car** (bit timing, arbitration, error frames). Removes vcan0's "optimistic" limitation *today* | 1 h |
 | 5-2 | 🟡 | [ ] Physical bus latency | TX vs RX timestamps in 5-1 | 500 kbps, 8-byte frame ≈ 0.26 ms wire time + driver; number goes into the budget | with 5-1 |
-| 5-3 | 🟡 | [ ] Phase C slice end-to-end | 0x712 → `/interface/can/read/raw` → `/control/status/wheel`; `ros2 topic hz` / `delay` | §3 V-model integration row | after Phase C |
+| 5-3 | 🟢 | [x] **Phase C slice end-to-end — done 2026-09-18.** 0x712 → `can_raw_bridge` → `/interface/can/read/raw` → `spd_decoder` → `/control/status/wheel`. hz 99.97–100.02 (both topics), `ros2 topic delay` avg 2 ms / max 2–3 ms, decode cross-checked against `cantools` on 50 live frames + 4 unit tests (0 mismatches). `colcon test` (flake8/pep257/copyright/xmllint) all pass. Run without A-3 recipe (no isolated core / no SCHED_FIFO) — next: re-measure with `cpu_affinity`/`rt_priority` launch args. | `ros2_ws/`, `can_stack_development.md` §5.C | §3 V-model integration row (partially — A-3 re-measure pending) | done |
 | 5-4 | 🟡 | [ ] Fault injection on the physical bus | frame drop, stuck `Alive_Cnt`, out-of-range values (board Phase E) | H8 / E2E items | after Phase D |
 
 ---

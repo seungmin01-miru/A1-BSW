@@ -27,8 +27,8 @@ flowchart TB
     VCAN["vcan0 (SIL) · sil/vcan/eait_tx.py<br/>DBC 기반 0x712 10 ms 송신 ✅"]
     RCAN["실 CAN 어댑터: PEAK PCAN-PCIe FD 2ch<br/>(장착됨 · can0/can1, 실차 연결 전)"]
   end
-  subgraph C["[C] ROS2 브리지 · 디코더 — 예정"]
-    DEC["CanRawMsgs → Status* 디코더<br/>alive_count E2E 체크"]
+  subgraph C["[C] ROS2 브리지 · 디코더 — 첫 슬라이스 완료(2026-09-18)"]
+    DEC["can_raw_bridge → CanFrame<br/>spd_decoder(0x712) → WheelSpeeds<br/>ros2_ws/src/a1_can_bridge"]
   end
   subgraph D["[D] 안전 SW (MCU 대체) — 예정"]
     WD["헬스 슈퍼바이저<br/>stale 타임아웃 → safe-state"]
@@ -55,7 +55,7 @@ flowchart TB
 |---|---|---|---|---|
 | A | RT 커널 기반 | PREEMPT_RT 설치·튜닝(`isolcpus`/`mlockall`/`SCHED_FIFO`), `cyclictest` 측정 | 🟡 조건부 완료 (커널·격리 튜닝·30분 실측 완료. 남음: 예산 재정의 결정, generic 비교, A-3/A-4) | §5.A |
 | B | CAN 인터페이스 | 어댑터/SocketCAN, `vcan0` SIL 환경, rosbag→CAN 주입 | 🟡 진행중 (vcan0 영속화·왕복·DBC 기반 0x712 주기 송신·디코드 완료. 남음: ROS2 raw 퍼블리시=Phase C, 실 can0 전환) | §5.B |
-| C | ROS2 브리지·디코더 | `CanRawMsgs`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | ⚪ 예정 | §5.C (추후 작성) |
+| C | ROS2 브리지·디코더 | `CanFrame`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | 🟡 진행중 (걷기골격 4단계 1종 완료: 0x712 → `/interface/can/read/raw` → `/control/status/wheel`. 남음: EPS/ACC/IMU 디코더, A-3 레시피 재측정, 실 can0) | §5.C |
 | D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | ⚪ 예정 | §5.D (추후 작성) |
 | E | 검증/테스트 (V-model) | 좌/우 대응 검증 계획, 고장주입 시험 | 🟢 초안 완료 | §3 |
 | F | 안전등급 레퍼런스 (ASIL) | 41개 파라미터 ASIL 등급, 근거 | 🟢 초안 완료 | §4 |
@@ -407,7 +407,7 @@ systemd oneshot 유닛 `vcan0.service` 를 설치·활성화해 부팅마다 자
 
 **~~현재 막힌 지점~~ → 2026-09-11 해소**: `merged_0.mcap` 원본은 여전히 미보유지만, **실제 대회/차량 DBC를 확보함** — 저장소 `DBC/EAIT_CAN(AVANTE_CN7).dbc` (2026-09-12 반입; PDF 비트맵 스펙·PPTX 운용 매뉴얼은 `can_protocol/00. CAN 프로토콜/` 팀 폴더). 합성 프레임 단계를 건너뛰고 바로 실제 프로토콜로 vcan0 개발 가능.
 
-**완료 기준**: `vcan0` 기동 ✅ + `candump vcan0`/`cansend vcan0` 왕복 확인 ✅ + DBC 기반 재생 스크립트가 vcan0 에 스펙 주기로 송신 ✅ (2026-09-12) + `/interface/can/read/raw` 퍼블리시 확인 (Phase C 브리지 노드 — 미완).
+**완료 기준**: `vcan0` 기동 ✅ + `candump vcan0`/`cansend vcan0` 왕복 확인 ✅ + DBC 기반 재생 스크립트가 vcan0 에 스펙 주기로 송신 ✅ (2026-09-12) + `/interface/can/read/raw` 퍼블리시 확인 ✅ (2026-09-18, `ros2_ws/src/a1_can_bridge` — §5.C).
 
 ---
 
@@ -483,7 +483,51 @@ python3 sil/vcan/eait_tx.py --msg EAIT_Control_01 --pattern const --value 0 --se
 ---
 
 ### 5.C ROS2 브리지·디코더
-_(추후 작성 — 노드/패키지 구조, 토픽 인터페이스, 정수→의미 매핑표 확정본)_
+
+**위치**: `ros2_ws/src/`(colcon 워크스페이스, 빌드 산출물은 `.gitignore`). ROS2 Humble. 빌드·실행은 `ros2_ws/README.md` 참조.
+
+**패키지 구조**
+
+| 패키지 | 종류 | 내용 |
+|---|---|---|
+| `a1_can_msgs` | ament_cmake (msg only) | `CanFrame.msg`(원시 프레임: header/id/dlc/data\[8\]/is_extended/is_error), `WheelSpeeds.msg`(0x712 디코드: header/fr/fl/rr/rl) |
+| `a1_can_bridge` | ament_python | `can_raw_bridge`(SocketCAN → `/interface/can/read/raw`), `spd_decoder`(0x712 필터·디코드 → `/control/status/wheel`), `rt_utils.py`(A-3/A-4 레시피 공용 모듈), `launch/spd_slice.launch.py` |
+
+**토픽 인터페이스 (첫 슬라이스)**
+
+| 토픽 | 타입 | 퍼블리셔 | QoS |
+|---|---|---|---|
+| `/interface/can/read/raw` | `a1_can_msgs/CanFrame` | `can_raw_bridge` | BEST_EFFORT, depth 100 |
+| `/control/status/wheel` | `a1_can_msgs/WheelSpeeds` | `spd_decoder` | BEST_EFFORT, depth 100 |
+
+BEST_EFFORT 를 고른 이유: 차량 상태는 계속 갱신되는 스트림이라 재전송보다 최신값 유지가 우선(§3 콜백그룹/QoS 설계 행).
+구독 쪽도 반드시 BEST_EFFORT 로 맞춰야 한다 — RELIABLE 구독은 BEST_EFFORT 퍼블리셔와 DDS QoS 가 호환되지 않아 디스커버리는
+되어도 메시지가 조용히 안 온다(걷기골격에서 겪은 함정, `spd_decoder` 코드 주석에도 남김).
+
+**파싱 규칙**: 디코더는 런타임에 DBC 파일을 읽지 않는다 — 상세설계 산출물(파싱 규칙)을 코드로 고정해 성능·결정성을 우선한다
+(`spd_decoder.decode_spd`: `<HHHH` 리틀엔디언, scale 0.03125, offset 0). 정확성은 `test/test_decode_spd.py` 가 `cantools`
+정식 DBC 디코드와 동일 프레임을 대조해 검증한다(경계값 0·0xFFFF 포함).
+
+**can_guard(Phase D)와의 경계**: 이 워크스페이스의 노드는 상태 퍼블리시(모니터링·로깅·인지 융합용)까지만 담당한다.
+차량으로 나가는 TX(`EAIT_Control_01/02`, 0x156/0x157)는 `can_guard` 가 raw SocketCAN 으로 직접 가져가며
+**ROS2/DDS 를 hot loop 에 절대 넣지 않는다**(§7.2). 이 경계를 넘어 ROS2 제어 노드가 직접 CAN 에 쓰지 않도록 설계·리뷰에서 지킨다.
+
+**실측 (2026-09-18, SIL·vcan0, 일반 우선순위·격리 코어 미배치)**
+
+| 항목 | 값 |
+|---|---|
+| `/interface/can/read/raw` hz | 99.97~100.02 Hz (목표 100, 0x712 주기 10 ms) |
+| `/control/status/wheel` hz | 99.98 Hz |
+| 종단 지연(`ros2 topic delay`, header.stamp=수신 시각 기준) | 평균 2 ms, 최대 2~3 ms |
+| 디코드 정확성 | 같은 프레임 50개 실시간 대조 + 단위테스트 5개 경계값, `cantools` 대비 **불일치 0** |
+| lint | `colcon test`(flake8·pep257·copyright·xmllint) 전부 통과 |
+
+지연 2~3 ms 는 **A-3 레시피(격리 코어 + SCHED_FIFO) 미적용** 값이다 — `eait_tx.py`/`eait_rx.py` 가 그 레시피로 주기 편차
+5~9 µs 를 낸 것과 비교하면, 이 슬라이스도 같은 레시피 적용 후 재측정이 필요하다(`ros2_ws/README.md` "A-3 레시피 적용" 참고,
+아직 미실행 — `cpu_affinity`/`rt_priority` 파라미터는 만들어 뒀음).
+
+**남은 작업**: `EAIT_INFO_EPS`(0x710)·`EAIT_INFO_ACC`(0x711, `Alive_Cnt` 있음 → 첫 E2E 체크)·`EAIT_INFO_IMU`(0x713) 디코더 확장,
+A-3 레시피 재측정, 실 `can0` 전환(5-1), `can_guard` 설계 착수(§7).
 
 ### 5.D 안전 SW (MCU 대체)
 _(추후 작성 — 헬스 슈퍼바이저 상태머신, 타임아웃 값, safe-state 진입 로직)_
@@ -497,8 +541,8 @@ _(추후 작성 — 헬스 슈퍼바이저 상태머신, 타임아웃 값, safe-
 1. **[A] RT 커널 검증** — §5.A 완료 기준 충족 ("설치함"이 아니라 "쟀음")
 2. **[B] vcan0 환경 구성** — `candump`/`cansend` 왕복 확인
 3. **[B] 최소 재생 스크립트** — `EAIT_CAN(AVANTE_CN7).dbc`를 `cantools`로 로드해 가장 단순한 메시지 `EAIT_INFO_SPD`(0x712, 필드 4개) 1종을 vcan0에 10ms 주기 송신 (2026-09-11: 실 DBC 확보로 `StatusTurn`에서 변경 — Turn 신호는 독립 메시지가 아니라 0x711 안의 비트필드였음)
-4. **[C] 최소 브리지+디코더 1종** — `/interface/can/read/raw` 퍼블리시 → `EAIT_INFO_SPD` 디코더 노드(`cantools.decode_message` 또는 직접 파싱) → `/control/status/wheel` 퍼블리시까지 관통 확인 (여기서 처음으로 "끝까지 됨"이 검증됨)
-5. **[E] 이 슬라이스에 대해 `cyclictest` + ROS2 토픽 hz/지연 측정** — §3 V-model "통합 시험" 행 충족
+4. ✅ **[C] 최소 브리지+디코더 1종 (2026-09-18)** — `can_raw_bridge` 가 `/interface/can/read/raw` 퍼블리시 → `spd_decoder`(직접 파싱, `cantools` 로 정확성 대조) → `/control/status/wheel` 퍼블리시까지 관통 확인 (처음으로 "끝까지 됨"이 검증됨). `ros2_ws/src/a1_can_bridge`, 상세는 §5.C
+5. 🟡 **[E] 이 슬라이스에 대해 ROS2 토픽 hz/지연 측정** — hz 100 Hz·지연 2~3 ms 확인(§5.C). 남음: 같은 슬라이스를 A-3 레시피(격리 코어+FIFO) 로 재측정, `cyclictest` 병행 측정 — §3 V-model "통합 시험" 행 완전 충족은 이후
 6. **[C] 나머지 메시지로 확장** — EPS/ACC(안전 임계, ASIL D) 우선 → Pedal/Wheel/INS/Vehicle 순
 7. **[D] E2E(`alive_count`) 체크 + 헬스 슈퍼바이저 최소 버전** — §3 고장주입 시험 착수
 8. **[B] 실 CAN 어댑터 확보 시** — `vcan0`→`can0` 전환, HIL 재측정으로 SIL 결과 재검증

@@ -3,3 +3,8 @@ __pycache__/
 # a1_rt.sh 실행 데이터 (이 PC 전용) — 증거 스냅샷은 measurements/ 에 별도 복사
 tools/rt/logs/
 tools/rt/backup_*/
+
+# colcon 빌드 산출물 (소스만 커밋)
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
