@@ -1,0 +1,600 @@
+          <idle>-0       [003] d.h1.  4162.635635: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.635637: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.635641: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.635646: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.635659: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6835    [016] d..2.  4162.635717: sched_switch: prev_comm=stress-ng prev_pid=6835 prev_prio=120 prev_state=R ==> next_comm=ktimers/16 next_pid=106 next_prio=98
+      ktimers/16-106     [016] ..s.2  4162.635719: softirq_entry: vec=1 [action=TIMER]
+      ktimers/16-106     [016] d.s33  4162.635721: ipi_send_cpu: cpu=17 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/16-106     [016] d..3.  4162.635722: ipi_send_cpu: cpu=17 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+       stress-ng-6838    [017] d..2.  4162.635724: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=rcuog/15 next_pid=110 next_prio=98
+      ktimers/16-106     [016] d..2.  4162.635724: sched_switch: prev_comm=ktimers/16 prev_pid=106 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6835 next_prio=120
+        rcuog/15-110     [017] d..2.  4162.635728: sched_switch: prev_comm=rcuog/15 prev_pid=110 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6838 next_prio=120
+       stress-ng-6836    [019] d..2.  4162.635792: sched_switch: prev_comm=stress-ng prev_pid=6836 prev_prio=120 prev_state=R ==> next_comm=ktimers/19 next_pid=137 next_prio=98
+      ktimers/19-137     [019] ..s.2  4162.635793: softirq_entry: vec=1 [action=TIMER]
+      ktimers/19-137     [019] d.s33  4162.635795: ipi_send_cpu: cpu=16 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/19-137     [019] d..3.  4162.635797: ipi_send_cpu: cpu=16 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+       stress-ng-6835    [016] d..2.  4162.635798: sched_switch: prev_comm=stress-ng prev_pid=6835 prev_prio=120 prev_state=R ==> next_comm=rcuog/10 next_pid=79 next_prio=98
+      ktimers/19-137     [019] d..2.  4162.635798: sched_switch: prev_comm=ktimers/19 prev_pid=137 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6836 next_prio=120
+        rcuog/10-79      [016] d..2.  4162.635803: sched_switch: prev_comm=rcuog/10 prev_pid=79 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6835 next_prio=120
+          <idle>-0       [009] d..2.  4162.635874: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.635878: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+          <idle>-0       [015] d..2.  4162.635967: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6858    [015] d..2.  4162.635971: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.635981: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.635981: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.635983: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.635990: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.635996: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.636057: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.636085: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.636098: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.636201: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=alsa-sink-ALC88 next_pid=1874 next_prio=94
+ alsa-sink-ALC88-1874    [017] d..2.  4162.636235: sched_switch: prev_comm=alsa-sink-ALC88 prev_pid=1874 prev_prio=94 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [003] d..2.  4162.636318: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=ksoftirqd/3 next_pid=158 next_prio=120
+     ksoftirqd/3-158     [003] ..s.2  4162.636318: softirq_entry: vec=7 [action=SCHED]
+     ksoftirqd/3-158     [003] d..2.  4162.636320: sched_switch: prev_comm=ksoftirqd/3 prev_pid=158 prev_prio=120 prev_state=S ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.636350: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.636350: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.636353: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.636358: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.636364: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.636431: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [014] d..2.  4162.636508: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+      cyclictest-6857    [014] d..2.  4162.636512: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+          <idle>-0       [008] d..2.  4162.636528: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+      cyclictest-6851    [008] d..2.  4162.636531: sched_switch: prev_comm=cyclictest prev_pid=6851 prev_prio=0 prev_state=S ==> next_comm=swapper/8 next_pid=0 next_prio=120
+          <idle>-0       [013] d..2.  4162.636544: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.636548: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+          <idle>-0       [011] d..2.  4162.636589: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.636593: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+          <idle>-0       [012] d..2.  4162.636606: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+      cyclictest-6855    [012] d..2.  4162.636610: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [010] d..2.  4162.636620: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+      cyclictest-6853    [010] d..2.  4162.636624: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.636696: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.636696: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.636698: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.636707: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.636714: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.636742: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.636743: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=ktimers/17 next_pid=117 next_prio=98
+      ktimers/17-117     [017] ..s.2  4162.636744: softirq_entry: vec=1 [action=TIMER]
+      ktimers/17-117     [017] d.s33  4162.636746: ipi_send_cpu: cpu=18 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/17-117     [017] d..3.  4162.636748: ipi_send_cpu: cpu=18 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+      ktimers/17-117     [017] d..2.  4162.636749: sched_switch: prev_comm=ktimers/17 prev_pid=117 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+       stress-ng-6832    [018] d..2.  4162.636749: sched_switch: prev_comm=stress-ng prev_pid=6832 prev_prio=120 prev_state=R ==> next_comm=rcuog/5 next_pid=57 next_prio=98
+         rcuog/5-57      [018] d..2.  4162.636754: sched_switch: prev_comm=rcuog/5 prev_pid=57 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6832 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.636803: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.636817: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [009] d..2.  4162.636874: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.636878: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+          <idle>-0       [015] d..2.  4162.636967: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6858    [015] d..2.  4162.636971: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.637060: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.637061: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.637063: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.637069: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.637075: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.637103: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.637300: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=alsa-sink-ALC88 next_pid=1874 next_prio=94
+ alsa-sink-ALC88-1874    [017] d..2.  4162.637334: sched_switch: prev_comm=alsa-sink-ALC88 prev_pid=1874 prev_prio=94 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [003] d.h1.  4162.637403: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.637404: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.637406: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.637415: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.637421: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.637434: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.637496: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6842 next_prio=120
+          <idle>-0       [014] d..2.  4162.637508: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+      cyclictest-6857    [014] d..2.  4162.637512: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.637524: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [008] d..2.  4162.637527: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+      cyclictest-6851    [008] d..2.  4162.637531: sched_switch: prev_comm=cyclictest prev_pid=6851 prev_prio=0 prev_state=S ==> next_comm=swapper/8 next_pid=0 next_prio=120
+          <idle>-0       [013] d..2.  4162.637544: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.637548: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+          <idle>-0       [011] d..2.  4162.637588: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.637592: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+          <idle>-0       [012] d..2.  4162.637606: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+      cyclictest-6855    [012] d..2.  4162.637610: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [010] d..2.  4162.637620: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+      cyclictest-6853    [010] d..2.  4162.637624: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+       stress-ng-6835    [016] d..2.  4162.637718: sched_switch: prev_comm=stress-ng prev_pid=6835 prev_prio=120 prev_state=R ==> next_comm=ktimers/16 next_pid=106 next_prio=98
+      ktimers/16-106     [016] ..s.2  4162.637720: softirq_entry: vec=1 [action=TIMER]
+      ktimers/16-106     [016] d.s33  4162.637722: ipi_send_cpu: cpu=18 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/16-106     [016] d..3.  4162.637724: ipi_send_cpu: cpu=18 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+      ktimers/16-106     [016] d..2.  4162.637725: sched_switch: prev_comm=ktimers/16 prev_pid=106 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6835 next_prio=120
+       stress-ng-6832    [018] d..2.  4162.637725: sched_switch: prev_comm=stress-ng prev_pid=6832 prev_prio=120 prev_state=R ==> next_comm=rcuog/10 next_pid=79 next_prio=98
+        rcuog/10-79      [018] d..2.  4162.637730: sched_switch: prev_comm=rcuog/10 prev_pid=79 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6832 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.637742: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=ktimers/17 next_pid=117 next_prio=98
+      ktimers/17-117     [017] ..s.2  4162.637744: softirq_entry: vec=1 [action=TIMER]
+      ktimers/17-117     [017] d.s33  4162.637745: ipi_send_cpu: cpu=19 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/17-117     [017] d..3.  4162.637747: ipi_send_cpu: cpu=19 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+      ktimers/17-117     [017] d..2.  4162.637748: sched_switch: prev_comm=ktimers/17 prev_pid=117 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+       stress-ng-6836    [019] d..2.  4162.637749: sched_switch: prev_comm=stress-ng prev_pid=6836 prev_prio=120 prev_state=R ==> next_comm=rcuog/15 next_pid=110 next_prio=98
+        rcuog/15-110     [019] d..2.  4162.637753: sched_switch: prev_comm=rcuog/15 prev_pid=110 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6836 next_prio=120
+          <idle>-0       [003] d.h1.  4162.637774: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.637774: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.637776: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.637782: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.637788: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.637801: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [009] d..2.  4162.637874: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.637878: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+          <idle>-0       [015] d..2.  4162.637967: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6858    [015] d..2.  4162.637971: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.638118: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.638119: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.638121: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.638129: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.638135: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.638197: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.638210: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.638238: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [003] d..2.  4162.638390: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=ksoftirqd/3 next_pid=158 next_prio=120
+     ksoftirqd/3-158     [003] ..s.2  4162.638391: softirq_entry: vec=7 [action=SCHED]
+     ksoftirqd/3-158     [003] d..2.  4162.638393: sched_switch: prev_comm=ksoftirqd/3 prev_pid=158 prev_prio=120 prev_state=S ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.638400: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=alsa-sink-ALC88 next_pid=1874 next_prio=94
+ alsa-sink-ALC88-1874    [017] d..2.  4162.638434: sched_switch: prev_comm=alsa-sink-ALC88 prev_pid=1874 prev_prio=94 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [003] d.h1.  4162.638502: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.638502: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.638505: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+          <idle>-0       [014] d..2.  4162.638508: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+ irq/160-nvme0q2-450     [003] d..2.  4162.638510: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+      cyclictest-6857    [014] d..2.  4162.638512: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+    kworker/3:1H-365     [003] d..2.  4162.638516: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+          <idle>-0       [008] d..2.  4162.638527: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+      cyclictest-6851    [008] d..2.  4162.638531: sched_switch: prev_comm=cyclictest prev_pid=6851 prev_prio=0 prev_state=S ==> next_comm=swapper/8 next_pid=0 next_prio=120
+          <idle>-0       [013] d..2.  4162.638543: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.638547: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.638579: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [011] d..2.  4162.638588: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.638592: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+          <idle>-0       [012] d..2.  4162.638606: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+      cyclictest-6855    [012] d..2.  4162.638610: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [010] d..2.  4162.638620: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+      cyclictest-6853    [010] d..2.  4162.638624: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+       stress-ng-6832    [018] d..2.  4162.638767: sched_switch: prev_comm=stress-ng prev_pid=6832 prev_prio=120 prev_state=R ==> next_comm=ktimers/18 next_pid=127 next_prio=98
+      ktimers/18-127     [018] ..s.2  4162.638768: softirq_entry: vec=1 [action=TIMER]
+      ktimers/18-127     [018] d.s33  4162.638770: ipi_send_cpu: cpu=19 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/18-127     [018] d..3.  4162.638771: ipi_send_cpu: cpu=19 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+       stress-ng-6836    [019] d..2.  4162.638772: sched_switch: prev_comm=stress-ng prev_pid=6836 prev_prio=120 prev_state=R ==> next_comm=rcuog/5 next_pid=57 next_prio=98
+      ktimers/18-127     [018] d..2.  4162.638772: sched_switch: prev_comm=ktimers/18 prev_pid=127 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6832 next_prio=120
+         rcuog/5-57      [019] d..2.  4162.638776: sched_switch: prev_comm=rcuog/5 prev_pid=57 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6836 next_prio=120
+          <idle>-0       [003] d.h1.  4162.638851: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.638852: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.638854: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.638864: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.638870: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6842 next_prio=120
+          <idle>-0       [009] d..2.  4162.638874: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.638878: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.638933: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.638946: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+          <idle>-0       [015] d..2.  4162.638967: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6858    [015] d..2.  4162.638971: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.638974: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.639216: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.639216: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.639219: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.639224: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.639231: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.639259: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [003] d..2.  4162.639419: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=ksoftirqd/3 next_pid=158 next_prio=120
+     ksoftirqd/3-158     [003] ..s.2  4162.639420: softirq_entry: vec=7 [action=SCHED]
+     ksoftirqd/3-158     [003] d..2.  4162.639422: sched_switch: prev_comm=ksoftirqd/3 prev_pid=158 prev_prio=120 prev_state=S ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.639500: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=alsa-sink-ALC88 next_pid=1874 next_prio=94
+          <idle>-0       [014] d..2.  4162.639508: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+      cyclictest-6857    [014] d..2.  4162.639512: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+          <idle>-0       [008] d..2.  4162.639527: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+      cyclictest-6851    [008] d..2.  4162.639531: sched_switch: prev_comm=cyclictest prev_pid=6851 prev_prio=0 prev_state=S ==> next_comm=swapper/8 next_pid=0 next_prio=120
+ alsa-sink-ALC88-1874    [017] d..2.  4162.639534: sched_switch: prev_comm=alsa-sink-ALC88 prev_pid=1874 prev_prio=94 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [013] d..2.  4162.639544: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.639547: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.639563: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.639563: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.639566: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.639575: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.639581: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6842 next_prio=120
+          <idle>-0       [011] d..2.  4162.639588: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.639592: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+          <idle>-0       [012] d..2.  4162.639606: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+       stress-ng-6842    [003] d..2.  4162.639609: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+      cyclictest-6855    [012] d..2.  4162.639610: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [010] d..2.  4162.639620: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+       stress-ng-6840    [003] d..2.  4162.639622: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+      cyclictest-6853    [010] d..2.  4162.639624: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.639685: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6832    [018] d..2.  4162.639766: sched_switch: prev_comm=stress-ng prev_pid=6832 prev_prio=120 prev_state=R ==> next_comm=ktimers/18 next_pid=127 next_prio=98
+      ktimers/18-127     [018] ..s.2  4162.639768: softirq_entry: vec=1 [action=TIMER]
+      ktimers/18-127     [018] d.s33  4162.639770: ipi_send_cpu: cpu=16 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/18-127     [018] d..3.  4162.639771: ipi_send_cpu: cpu=16 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+      ktimers/18-127     [018] d..2.  4162.639772: sched_switch: prev_comm=ktimers/18 prev_pid=127 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6832 next_prio=120
+       stress-ng-6835    [016] d..2.  4162.639773: sched_switch: prev_comm=stress-ng prev_pid=6835 prev_prio=120 prev_state=R ==> next_comm=rcuog/10 next_pid=79 next_prio=98
+        rcuog/10-79      [016] d..2.  4162.639778: sched_switch: prev_comm=rcuog/10 prev_pid=79 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6835 next_prio=120
+       stress-ng-6836    [019] d..2.  4162.639791: sched_switch: prev_comm=stress-ng prev_pid=6836 prev_prio=120 prev_state=R ==> next_comm=ktimers/19 next_pid=137 next_prio=98
+      ktimers/19-137     [019] ..s.2  4162.639792: softirq_entry: vec=1 [action=TIMER]
+      ktimers/19-137     [019] d.s33  4162.639794: ipi_send_cpu: cpu=17 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/19-137     [019] d..3.  4162.639796: ipi_send_cpu: cpu=17 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+      ktimers/19-137     [019] d..2.  4162.639797: sched_switch: prev_comm=ktimers/19 prev_pid=137 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6836 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.639797: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=rcuog/15 next_pid=110 next_prio=98
+        rcuog/15-110     [017] d..2.  4162.639802: sched_switch: prev_comm=rcuog/15 prev_pid=110 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [009] d..2.  4162.639874: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.639877: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.639933: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.639933: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.639935: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.639941: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.639947: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.639961: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [015] d..2.  4162.639967: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6858    [015] d..2.  4162.639971: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.640275: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.640276: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.640278: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.640287: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.640293: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.640307: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.640336: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.640404: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [014] d..2.  4162.640508: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+      cyclictest-6857    [014] d..2.  4162.640512: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+          <idle>-0       [008] d..2.  4162.640527: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+      cyclictest-6851    [008] d..2.  4162.640530: sched_switch: prev_comm=cyclictest prev_pid=6851 prev_prio=0 prev_state=S ==> next_comm=swapper/8 next_pid=0 next_prio=120
+          <idle>-0       [013] d..2.  4162.640543: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.640547: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+          <idle>-0       [011] d..2.  4162.640588: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.640591: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.640598: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=alsa-sink-ALC88 next_pid=1874 next_prio=94
+          <idle>-0       [012] d..2.  4162.640605: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+      cyclictest-6855    [012] d..2.  4162.640609: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [010] d..2.  4162.640620: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+      cyclictest-6853    [010] d..2.  4162.640623: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+ alsa-sink-ALC88-1874    [017] d..2.  4162.640632: sched_switch: prev_comm=alsa-sink-ALC88 prev_pid=1874 prev_prio=94 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [003] d.h1.  4162.640633: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.640633: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.640636: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.640641: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.640648: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.640709: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6836    [019] d..2.  4162.640791: sched_switch: prev_comm=stress-ng prev_pid=6836 prev_prio=120 prev_state=R ==> next_comm=ktimers/19 next_pid=137 next_prio=98
+      ktimers/19-137     [019] ..s.2  4162.640792: softirq_entry: vec=1 [action=TIMER]
+      ktimers/19-137     [019] d.s33  4162.640794: ipi_send_cpu: cpu=18 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/19-137     [019] d..3.  4162.640795: ipi_send_cpu: cpu=18 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+      ktimers/19-137     [019] d..2.  4162.640796: sched_switch: prev_comm=ktimers/19 prev_pid=137 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6836 next_prio=120
+       stress-ng-6832    [018] d..2.  4162.640797: sched_switch: prev_comm=stress-ng prev_pid=6832 prev_prio=120 prev_state=R ==> next_comm=rcuog/5 next_pid=57 next_prio=98
+         rcuog/5-57      [018] d..2.  4162.640801: sched_switch: prev_comm=rcuog/5 prev_pid=57 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6832 next_prio=120
+          <idle>-0       [009] d..2.  4162.640873: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.640877: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+          <idle>-0       [015] d..2.  4162.640967: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6858    [015] d..2.  4162.640970: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.640980: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.640980: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.640982: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.640991: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.640997: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.641058: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.641085: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.641098: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.641346: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.641347: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.641348: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.641354: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.641360: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.641387: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [014] d..2.  4162.641508: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+      cyclictest-6857    [014] d..2.  4162.641511: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+          <idle>-0       [008] d..2.  4162.641527: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+      cyclictest-6851    [008] d..2.  4162.641530: sched_switch: prev_comm=cyclictest prev_pid=6851 prev_prio=0 prev_state=S ==> next_comm=swapper/8 next_pid=0 next_prio=120
+          <idle>-0       [013] d..2.  4162.641543: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.641547: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+          <idle>-0       [011] d..2.  4162.641588: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.641591: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+          <idle>-0       [012] d..2.  4162.641605: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+      cyclictest-6855    [012] d..2.  4162.641609: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [010] d..2.  4162.641619: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+      cyclictest-6853    [010] d..2.  4162.641623: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.641694: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.641695: irq_handler_exit: irq=160 ret=handled
+       stress-ng-6838    [017] d..2.  4162.641696: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=alsa-sink-ALC88 next_pid=1874 next_prio=94
+          <idle>-0       [003] d..2.  4162.641697: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.641706: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.641712: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       stress-ng-6835    [016] d..2.  4162.641717: sched_switch: prev_comm=stress-ng prev_pid=6835 prev_prio=120 prev_state=R ==> next_comm=ktimers/16 next_pid=106 next_prio=98
+      ktimers/16-106     [016] ..s.2  4162.641718: softirq_entry: vec=1 [action=TIMER]
+      ktimers/16-106     [016] d.s33  4162.641720: ipi_send_cpu: cpu=19 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/16-106     [016] d..3.  4162.641722: ipi_send_cpu: cpu=19 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+       stress-ng-6836    [019] d..2.  4162.641723: sched_switch: prev_comm=stress-ng prev_pid=6836 prev_prio=120 prev_state=R ==> next_comm=rcuog/10 next_pid=79 next_prio=98
+      ktimers/16-106     [016] d..2.  4162.641723: sched_switch: prev_comm=ktimers/16 prev_pid=106 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6835 next_prio=120
+ alsa-sink-ALC88-1874    [017] d..2.  4162.641726: sched_switch: prev_comm=alsa-sink-ALC88 prev_pid=1874 prev_prio=94 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+        rcuog/10-79      [019] d..2.  4162.641727: sched_switch: prev_comm=rcuog/10 prev_pid=79 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6836 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.641740: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.641741: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=ktimers/17 next_pid=117 next_prio=98
+      ktimers/17-117     [017] ..s.2  4162.641743: softirq_entry: vec=1 [action=TIMER]
+      ktimers/17-117     [017] d.s33  4162.641745: ipi_send_cpu: cpu=16 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/17-117     [017] d..3.  4162.641746: ipi_send_cpu: cpu=16 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+       stress-ng-6835    [016] d..2.  4162.641747: sched_switch: prev_comm=stress-ng prev_pid=6835 prev_prio=120 prev_state=R ==> next_comm=rcuog/15 next_pid=110 next_prio=98
+      ktimers/17-117     [017] d..2.  4162.641747: sched_switch: prev_comm=ktimers/17 prev_pid=117 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+        rcuog/15-110     [016] d..2.  4162.641752: sched_switch: prev_comm=rcuog/15 prev_pid=110 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6835 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.641800: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.641814: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [009] d..2.  4162.641873: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.641877: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+          <idle>-0       [015] d..2.  4162.641966: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6858    [015] d..2.  4162.641970: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.642062: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.642062: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.642064: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.642070: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+       stress-ng-6846    [001] d..2.  4162.642076: sched_switch: prev_comm=stress-ng prev_pid=6846 prev_prio=120 prev_state=R ==> next_comm=ktimers/1 next_pid=147 next_prio=98
+    kworker/3:1H-365     [003] d..2.  4162.642076: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       ktimers/1-147     [001] ..s.2  4162.642078: softirq_entry: vec=8 [action=HRTIMER]
+       ktimers/1-147     [001] d..2.  4162.642082: sched_switch: prev_comm=ktimers/1 prev_pid=147 prev_prio=98 prev_state=S ==> next_comm=Softwar~cThread next_pid=4121 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.642090: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+ Softwar~cThread-4121    [001] d..2.  4162.642093: sched_switch: prev_comm=Softwar~cThread prev_pid=4121 prev_prio=120 prev_state=R ==> next_comm=IPDL Background next_pid=4087 next_prio=120
+ IPDL Background-4087    [001] d..2.  4162.642105: sched_switch: prev_comm=IPDL Background prev_pid=4087 prev_prio=120 prev_state=S ==> next_comm=Softwar~cThread next_pid=4121 next_prio=120
+ Softwar~cThread-4121    [001] d..2.  4162.642113: sched_switch: prev_comm=Softwar~cThread prev_pid=4121 prev_prio=120 prev_state=S ==> next_comm=IPDL Background next_pid=4087 next_prio=120
+ IPDL Background-4087    [001] d..2.  4162.642130: sched_switch: prev_comm=IPDL Background prev_pid=4087 prev_prio=120 prev_state=S ==> next_comm=IPC I/O Child next_pid=4582 next_prio=120
+   IPC I/O Child-4582    [001] d..2.  4162.642149: sched_switch: prev_comm=IPC I/O Child prev_pid=4582 prev_prio=120 prev_state=S ==> next_comm=Privileged Cont next_pid=4563 next_prio=120
+ Privileged Cont-4563    [001] d..2.  4162.642167: sched_switch: prev_comm=Privileged Cont prev_pid=4563 prev_prio=120 prev_state=S ==> next_comm=stress-ng next_pid=6846 next_prio=120
+          <idle>-0       [003] d..2.  4162.642390: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=ksoftirqd/3 next_pid=158 next_prio=120
+     ksoftirqd/3-158     [003] ..s.2  4162.642391: softirq_entry: vec=7 [action=SCHED]
+     ksoftirqd/3-158     [003] d..2.  4162.642394: sched_switch: prev_comm=ksoftirqd/3 prev_pid=158 prev_prio=120 prev_state=S ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.642410: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.642410: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.642412: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+         glmark2-6834    [004] d..2.  4162.642418: sched_switch: prev_comm=glmark2 prev_pid=6834 prev_prio=120 prev_state=R ==> next_comm=ktimers/4 next_pid=43 next_prio=98
+       ktimers/4-43      [004] ..s.2  4162.642422: softirq_entry: vec=1 [action=TIMER]
+ irq/160-nvme0q2-450     [003] d..2.  4162.642422: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.642428: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       ktimers/4-43      [004] d..2.  4162.642434: sched_switch: prev_comm=ktimers/4 prev_pid=43 prev_prio=98 prev_state=S ==> next_comm=glmark2 next_pid=6834 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.642441: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.642502: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+          <idle>-0       [014] d..2.  4162.642507: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+      cyclictest-6857    [014] d..2.  4162.642511: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+          <idle>-0       [008] d..2.  4162.642526: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+       stress-ng-6841    [003] d..2.  4162.642530: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+      cyclictest-6851    [008] d..2.  4162.642530: sched_switch: prev_comm=cyclictest prev_pid=6851 prev_prio=0 prev_state=S ==> next_comm=swapper/8 next_pid=0 next_prio=120
+          <idle>-0       [013] d..2.  4162.642543: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.642547: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+          <idle>-0       [011] d..2.  4162.642588: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.642591: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+          <idle>-0       [012] d..2.  4162.642605: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+      cyclictest-6855    [012] d..2.  4162.642609: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [010] d..2.  4162.642619: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+      cyclictest-6853    [010] d..2.  4162.642623: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+       stress-ng-6832    [018] d..2.  4162.642767: sched_switch: prev_comm=stress-ng prev_pid=6832 prev_prio=120 prev_state=R ==> next_comm=ktimers/18 next_pid=127 next_prio=98
+      ktimers/18-127     [018] ..s.2  4162.642768: softirq_entry: vec=1 [action=TIMER]
+      ktimers/18-127     [018] d.s33  4162.642770: ipi_send_cpu: cpu=17 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/18-127     [018] d..3.  4162.642772: ipi_send_cpu: cpu=17 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+       stress-ng-6838    [017] d..2.  4162.642773: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=rcuog/5 next_pid=57 next_prio=98
+      ktimers/18-127     [018] d..2.  4162.642774: sched_switch: prev_comm=ktimers/18 prev_pid=127 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6832 next_prio=120
+         rcuog/5-57      [017] d..2.  4162.642778: sched_switch: prev_comm=rcuog/5 prev_pid=57 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [003] d.h1.  4162.642780: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.642780: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.642782: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.642788: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.642794: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.642856: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [009] d..2.  4162.642873: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.642877: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+          <idle>-0       [015] d..2.  4162.642966: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6858    [015] d..2.  4162.642970: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.642972: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=alsa-sink-ALC88 next_pid=1874 next_prio=94
+ alsa-sink-ALC88-1874    [017] d..2.  4162.643024: sched_switch: prev_comm=alsa-sink-ALC88 prev_pid=1874 prev_prio=94 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [003] d.h1.  4162.643124: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.643124: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.643126: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.643135: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.643141: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.643202: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.643215: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.643242: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [003] d..2.  4162.643466: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=ksoftirqd/3 next_pid=158 next_prio=120
+     ksoftirqd/3-158     [003] ..s.2  4162.643467: softirq_entry: vec=7 [action=SCHED]
+     ksoftirqd/3-158     [003] d..2.  4162.643469: sched_switch: prev_comm=ksoftirqd/3 prev_pid=158 prev_prio=120 prev_state=S ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.643491: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.643491: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.643493: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.643498: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.643504: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+          <idle>-0       [014] d..2.  4162.643507: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+      cyclictest-6857    [014] d..2.  4162.643511: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+          <idle>-0       [008] d..2.  4162.643526: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+      cyclictest-6851    [008] d..2.  4162.643530: sched_switch: prev_comm=cyclictest prev_pid=6851 prev_prio=0 prev_state=S ==> next_comm=swapper/8 next_pid=0 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.643532: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [013] d..2.  4162.643543: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.643547: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+          <idle>-0       [011] d..2.  4162.643587: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.643591: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+          <idle>-0       [012] d..2.  4162.643605: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+      cyclictest-6855    [012] d..2.  4162.643609: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [010] d..2.  4162.643619: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+      cyclictest-6853    [010] d..2.  4162.643623: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+       stress-ng-6835    [016] d..2.  4162.643716: sched_switch: prev_comm=stress-ng prev_pid=6835 prev_prio=120 prev_state=R ==> next_comm=ktimers/16 next_pid=106 next_prio=98
+      ktimers/16-106     [016] ..s.2  4162.643717: softirq_entry: vec=1 [action=TIMER]
+      ktimers/16-106     [016] d.s33  4162.643719: ipi_send_cpu: cpu=17 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/16-106     [016] d..3.  4162.643721: ipi_send_cpu: cpu=17 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+      ktimers/16-106     [016] d..2.  4162.643722: sched_switch: prev_comm=ktimers/16 prev_pid=106 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6835 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.643723: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=rcuog/15 next_pid=110 next_prio=98
+        rcuog/15-110     [017] d..2.  4162.643727: sched_switch: prev_comm=rcuog/15 prev_pid=110 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6838 next_prio=120
+       stress-ng-6836    [019] d..2.  4162.643790: sched_switch: prev_comm=stress-ng prev_pid=6836 prev_prio=120 prev_state=R ==> next_comm=ktimers/19 next_pid=137 next_prio=98
+      ktimers/19-137     [019] ..s.2  4162.643792: softirq_entry: vec=1 [action=TIMER]
+      ktimers/19-137     [019] d.s33  4162.643793: ipi_send_cpu: cpu=16 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/19-137     [019] d..3.  4162.643795: ipi_send_cpu: cpu=16 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+       stress-ng-6835    [016] d..2.  4162.643796: sched_switch: prev_comm=stress-ng prev_pid=6835 prev_prio=120 prev_state=R ==> next_comm=rcuog/10 next_pid=79 next_prio=98
+      ktimers/19-137     [019] d..2.  4162.643796: sched_switch: prev_comm=ktimers/19 prev_pid=137 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6836 next_prio=120
+        rcuog/10-79      [016] d..2.  4162.643801: sched_switch: prev_comm=rcuog/10 prev_pid=79 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6835 next_prio=120
+          <idle>-0       [003] d.h1.  4162.643845: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.643845: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.643847: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.643857: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.643863: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6841 next_prio=120
+          <idle>-0       [009] d..2.  4162.643873: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.643877: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.643926: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.643940: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6842 next_prio=120
+          <idle>-0       [015] d..2.  4162.643966: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+       stress-ng-6842    [003] d..2.  4162.643968: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+      cyclictest-6858    [015] d..2.  4162.643970: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.644088: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=alsa-sink-ALC88 next_pid=1874 next_prio=94
+ alsa-sink-ALC88-1874    [017] d..2.  4162.644123: sched_switch: prev_comm=alsa-sink-ALC88 prev_pid=1874 prev_prio=94 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [003] d.h1.  4162.644211: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.644211: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.644213: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.644219: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.644225: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.644239: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [003] d..2.  4162.644317: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=ksoftirqd/3 next_pid=158 next_prio=120
+     ksoftirqd/3-158     [003] ..s.2  4162.644318: softirq_entry: vec=7 [action=SCHED]
+     ksoftirqd/3-158     [003] d..2.  4162.644320: sched_switch: prev_comm=ksoftirqd/3 prev_pid=158 prev_prio=120 prev_state=S ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6830    [006] d..2.  4162.644468: sched_switch: prev_comm=stress-ng prev_pid=6830 prev_prio=120 prev_state=R ==> next_comm=ksoftirqd/6 next_pid=54 next_prio=120
+     ksoftirqd/6-54      [006] ..s.2  4162.644470: softirq_entry: vec=7 [action=SCHED]
+     ksoftirqd/6-54      [006] d..2.  4162.644475: sched_switch: prev_comm=ksoftirqd/6 prev_pid=54 prev_prio=120 prev_state=S ==> next_comm=stress-ng next_pid=6830 next_prio=120
+          <idle>-0       [014] d..2.  4162.644507: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+      cyclictest-6857    [014] d..2.  4162.644511: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+          <idle>-0       [008] d..2.  4162.644526: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+      cyclictest-6851    [008] d..2.  4162.644531: sched_switch: prev_comm=cyclictest prev_pid=6851 prev_prio=0 prev_state=S ==> next_comm=swapper/8 next_pid=0 next_prio=120
+          <idle>-0       [013] d..2.  4162.644543: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.644546: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.644560: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.644561: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.644563: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.644572: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.644579: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6841 next_prio=120
+          <idle>-0       [011] d..2.  4162.644587: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.644591: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+          <idle>-0       [012] d..2.  4162.644605: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+       stress-ng-6841    [003] d..2.  4162.644607: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6842 next_prio=120
+      cyclictest-6855    [012] d..2.  4162.644609: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [010] d..2.  4162.644619: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+       stress-ng-6842    [003] d..2.  4162.644620: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+      cyclictest-6853    [010] d..2.  4162.644623: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.644632: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=R+ ==> next_comm=ktimers/3 next_pid=157 next_prio=98
+       ktimers/3-157     [003] ..s.2  4162.644633: softirq_entry: vec=8 [action=HRTIMER]
+       ktimers/3-157     [003] d..2.  4162.644638: sched_switch: prev_comm=ktimers/3 prev_pid=157 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.644695: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=cyclictest next_pid=6850 next_prio=120
+      cyclictest-6850    [003] d..2.  4162.644700: sched_switch: prev_comm=cyclictest prev_pid=6850 prev_prio=120 prev_state=S ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.644742: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=ktimers/17 next_pid=117 next_prio=98
+      ktimers/17-117     [017] ..s.2  4162.644743: softirq_entry: vec=1 [action=TIMER]
+      ktimers/17-117     [017] d.s33  4162.644745: ipi_send_cpu: cpu=18 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/17-117     [017] d..3.  4162.644746: ipi_send_cpu: cpu=18 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+       stress-ng-6832    [018] d..2.  4162.644747: sched_switch: prev_comm=stress-ng prev_pid=6832 prev_prio=120 prev_state=R ==> next_comm=rcuog/5 next_pid=57 next_prio=98
+      ktimers/17-117     [017] d..2.  4162.644748: sched_switch: prev_comm=ktimers/17 prev_pid=117 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+         rcuog/5-57      [018] d..2.  4162.644752: sched_switch: prev_comm=rcuog/5 prev_pid=57 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6832 next_prio=120
+          <idle>-0       [009] d..2.  4162.644873: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.644877: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.644927: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.644928: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.644930: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.644936: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.644942: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+          <idle>-0       [015] d..2.  4162.644966: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6858    [015] d..2.  4162.644970: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.645011: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.645188: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=alsa-sink-ALC88 next_pid=1874 next_prio=94
+ alsa-sink-ALC88-1874    [017] d..2.  4162.645224: sched_switch: prev_comm=alsa-sink-ALC88 prev_pid=1874 prev_prio=94 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [003] d.h1.  4162.645265: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.645266: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.645268: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.645277: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.645283: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.645297: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.645327: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.645399: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [014] d..2.  4162.645507: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+      cyclictest-6857    [014] d..2.  4162.645511: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+          <idle>-0       [008] d..2.  4162.645526: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+      cyclictest-6851    [008] d..2.  4162.645530: sched_switch: prev_comm=cyclictest prev_pid=6851 prev_prio=0 prev_state=S ==> next_comm=swapper/8 next_pid=0 next_prio=120
+          <idle>-0       [013] d..2.  4162.645543: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.645547: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+          <idle>-0       [011] d..2.  4162.645587: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.645591: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+          <idle>-0       [012] d..2.  4162.645605: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+      cyclictest-6855    [012] d..2.  4162.645609: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [010] d..2.  4162.645619: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+      cyclictest-6853    [010] d..2.  4162.645623: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.645638: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.645638: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.645640: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.645645: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.645651: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.645682: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6835    [016] d..2.  4162.645715: sched_switch: prev_comm=stress-ng prev_pid=6835 prev_prio=120 prev_state=R ==> next_comm=ktimers/16 next_pid=106 next_prio=98
+      ktimers/16-106     [016] ..s.2  4162.645716: softirq_entry: vec=1 [action=TIMER]
+      ktimers/16-106     [016] d.s33  4162.645718: ipi_send_cpu: cpu=18 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/16-106     [016] d..3.  4162.645719: ipi_send_cpu: cpu=18 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+      ktimers/16-106     [016] d..2.  4162.645720: sched_switch: prev_comm=ktimers/16 prev_pid=106 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6835 next_prio=120
+       stress-ng-6832    [018] d..2.  4162.645721: sched_switch: prev_comm=stress-ng prev_pid=6832 prev_prio=120 prev_state=R ==> next_comm=rcuog/10 next_pid=79 next_prio=98
+        rcuog/10-79      [018] d..2.  4162.645725: sched_switch: prev_comm=rcuog/10 prev_pid=79 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6832 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.645741: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=ktimers/17 next_pid=117 next_prio=98
+      ktimers/17-117     [017] ..s.2  4162.645743: softirq_entry: vec=1 [action=TIMER]
+      ktimers/17-117     [017] d.s33  4162.645745: ipi_send_cpu: cpu=19 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/17-117     [017] d..3.  4162.645746: ipi_send_cpu: cpu=19 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+       stress-ng-6836    [019] d..2.  4162.645747: sched_switch: prev_comm=stress-ng prev_pid=6836 prev_prio=120 prev_state=R ==> next_comm=rcuog/15 next_pid=110 next_prio=98
+      ktimers/17-117     [017] d..2.  4162.645748: sched_switch: prev_comm=ktimers/17 prev_pid=117 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+        rcuog/15-110     [019] d..2.  4162.645752: sched_switch: prev_comm=rcuog/15 prev_pid=110 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6836 next_prio=120
+          <idle>-0       [009] d..2.  4162.645873: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6852    [009] d..2.  4162.645877: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+          <idle>-0       [015] d..2.  4162.645966: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6858    [015] d..2.  4162.645970: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.646000: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.646001: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.646003: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.646010: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.646015: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.646079: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.646106: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.646119: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+       stress-ng-6838    [017] d..2.  4162.646287: sched_switch: prev_comm=stress-ng prev_pid=6838 prev_prio=120 prev_state=R ==> next_comm=alsa-sink-ALC88 next_pid=1874 next_prio=94
+ alsa-sink-ALC88-1874    [017] d..2.  4162.646323: sched_switch: prev_comm=alsa-sink-ALC88 prev_pid=1874 prev_prio=94 prev_state=S ==> next_comm=stress-ng next_pid=6838 next_prio=120
+          <idle>-0       [003] d.h1.  4162.646366: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.646366: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.646368: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.646373: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+         glmark2-6834    [004] d.h..  4162.646378: irq_handler_entry: irq=129 name=xhci_hcd
+         glmark2-6834    [004] d.h..  4162.646378: irq_handler_exit: irq=129 ret=handled
+    kworker/3:1H-365     [003] d..2.  4162.646378: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+         glmark2-6834    [004] d..2.  4162.646384: sched_switch: prev_comm=glmark2 prev_pid=6834 prev_prio=120 prev_state=R ==> next_comm=irq/129-xhci_hc next_pid=408 next_prio=49
+       stress-ng-6839    [003] d..2.  4162.646394: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=ksoftirqd/3 next_pid=158 next_prio=120
+     ksoftirqd/3-158     [003] ..s.2  4162.646395: softirq_entry: vec=7 [action=SCHED]
+     ksoftirqd/3-158     [003] d..2.  4162.646397: sched_switch: prev_comm=ksoftirqd/3 prev_pid=158 prev_prio=120 prev_state=S ==> next_comm=swapper/3 next_pid=0 next_prio=120
+ irq/129-xhci_hc-408     [004] ..s.2  4162.646401: softirq_entry: vec=6 [action=TASKLET]
+ irq/129-xhci_hc-408     [004] d..2.  4162.646435: sched_switch: prev_comm=irq/129-xhci_hc prev_pid=408 prev_prio=49 prev_state=S ==> next_comm=glmark2 next_pid=6834 next_prio=120
+          <idle>-0       [014] d..2.  4162.646507: sched_switch: prev_comm=swapper/14 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6857 next_prio=0
+       stress-ng-6845    [000] d..2.  4162.646508: sched_switch: prev_comm=stress-ng prev_pid=6845 prev_prio=120 prev_state=R ==> next_comm=kworker/u40:0 next_pid=6550 next_prio=120
+      cyclictest-6857    [014] d..2.  4162.646511: sched_switch: prev_comm=cyclictest prev_pid=6857 prev_prio=0 prev_state=S ==> next_comm=swapper/14 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.646708: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.646708: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.646710: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.646717: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.646722: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6841 next_prio=120
+       stress-ng-6841    [003] d..2.  4162.646749: sched_switch: prev_comm=stress-ng prev_pid=6841 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6840 next_prio=120
+       stress-ng-6832    [018] d..2.  4162.646765: sched_switch: prev_comm=stress-ng prev_pid=6832 prev_prio=120 prev_state=R ==> next_comm=ktimers/18 next_pid=127 next_prio=98
+      ktimers/18-127     [018] ..s.2  4162.646766: softirq_entry: vec=1 [action=TIMER]
+      ktimers/18-127     [018] d.s33  4162.646768: ipi_send_cpu: cpu=19 callsite=wakeup_preempt+0x47/0x80 callback=0x0
+      ktimers/18-127     [018] d..3.  4162.646769: ipi_send_cpu: cpu=19 callsite=irq_work_queue_on+0xde/0x150 callback=generic_smp_call_function_single_interrupt+0x0/0x20
+      ktimers/18-127     [018] d..2.  4162.646770: sched_switch: prev_comm=ktimers/18 prev_pid=127 prev_prio=98 prev_state=S ==> next_comm=stress-ng next_pid=6832 next_prio=120
+       stress-ng-6836    [019] d..2.  4162.646771: sched_switch: prev_comm=stress-ng prev_pid=6836 prev_prio=120 prev_state=R ==> next_comm=rcuog/5 next_pid=57 next_prio=98
+         rcuog/5-57      [019] d..2.  4162.646775: sched_switch: prev_comm=rcuog/5 prev_pid=57 prev_prio=98 prev_state=I ==> next_comm=stress-ng next_pid=6836 next_prio=120
+       stress-ng-6840    [003] d..2.  4162.646811: sched_switch: prev_comm=stress-ng prev_pid=6840 prev_prio=120 prev_state=D ==> next_comm=stress-ng next_pid=6842 next_prio=120
+       stress-ng-6842    [003] d..2.  4162.646823: sched_switch: prev_comm=stress-ng prev_pid=6842 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [003] d.h1.  4162.647075: irq_handler_entry: irq=160 name=nvme0q2
+          <idle>-0       [003] d.h1.  4162.647075: irq_handler_exit: irq=160 ret=handled
+          <idle>-0       [003] d..2.  4162.647077: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=irq/160-nvme0q2 next_pid=450 next_prio=49
+ irq/160-nvme0q2-450     [003] d..2.  4162.647082: sched_switch: prev_comm=irq/160-nvme0q2 prev_pid=450 prev_prio=49 prev_state=S ==> next_comm=kworker/3:1H next_pid=365 next_prio=100
+    kworker/3:1H-365     [003] d..2.  4162.647087: sched_switch: prev_comm=kworker/3:1H prev_pid=365 prev_prio=100 prev_state=I ==> next_comm=stress-ng next_pid=6839 next_prio=120
+       stress-ng-6839    [003] d..2.  4162.647149: sched_switch: prev_comm=stress-ng prev_pid=6839 prev_prio=120 prev_state=D ==> next_comm=swapper/3 next_pid=0 next_prio=120
+          <idle>-0       [008] d..2.  4162.647340: sched_switch: prev_comm=swapper/8 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6851 next_prio=0
+          <idle>-0       [013] d..2.  4162.647342: sched_switch: prev_comm=swapper/13 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6856 next_prio=0
+          <idle>-0       [011] d..2.  4162.647343: sched_switch: prev_comm=swapper/11 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6854 next_prio=0
+          <idle>-0       [012] d..2.  4162.647345: sched_switch: prev_comm=swapper/12 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6855 next_prio=0
+          <idle>-0       [010] d..2.  4162.647346: sched_switch: prev_comm=swapper/10 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6853 next_prio=0
+      cyclictest-6856    [013] d..2.  4162.647347: sched_switch: prev_comm=cyclictest prev_pid=6856 prev_prio=0 prev_state=S ==> next_comm=swapper/13 next_pid=0 next_prio=120
+          <idle>-0       [009] d..2.  4162.647347: sched_switch: prev_comm=swapper/9 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6852 next_prio=0
+      cyclictest-6854    [011] d..2.  4162.647349: sched_switch: prev_comm=cyclictest prev_pid=6854 prev_prio=0 prev_state=S ==> next_comm=swapper/11 next_pid=0 next_prio=120
+      cyclictest-6855    [012] d..2.  4162.647349: sched_switch: prev_comm=cyclictest prev_pid=6855 prev_prio=0 prev_state=S ==> next_comm=swapper/12 next_pid=0 next_prio=120
+          <idle>-0       [015] d..2.  4162.647350: sched_switch: prev_comm=swapper/15 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=cyclictest next_pid=6858 next_prio=0
+      cyclictest-6853    [010] d..2.  4162.647350: sched_switch: prev_comm=cyclictest prev_pid=6853 prev_prio=0 prev_state=S ==> next_comm=swapper/10 next_pid=0 next_prio=120
+      cyclictest-6851    [008] .....  4162.647351: tracing_mark_write: hit latency threshold (819 > 300)
+      cyclictest-6852    [009] d..2.  4162.647352: sched_switch: prev_comm=cyclictest prev_pid=6852 prev_prio=0 prev_state=S ==> next_comm=swapper/9 next_pid=0 next_prio=120
+      cyclictest-6858    [015] d..2.  4162.647355: sched_switch: prev_comm=cyclictest prev_pid=6858 prev_prio=0 prev_state=S ==> next_comm=swapper/15 next_pid=0 next_prio=120

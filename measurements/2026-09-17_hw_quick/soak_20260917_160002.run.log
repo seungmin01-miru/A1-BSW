@@ -1,0 +1,18 @@
+== [soak] 부하 상태 장시간 측정 3분 — 6.8.1-1059-realtime ==
+   부팅 파라미터: BOOT_IMAGE=/boot/vmlinuz-6.8.1-1059-realtime root=UUID=3cb4c60d-1e8a-444b-8efc-612a444cc5b6 ro quiet splash vt.handoff=7 isolcpus=managed_irq,domain,8-15 nohz_full=8-15 rcu_nocbs=8-15 rcu_nocb_poll irqaffinity=0-7,16-19 intel_idle.max_cstate=0 processor.max_cstate=0 nmi_watchdog=0 nosoftlockup skew_tick=1 idle=poll intel_pstate=disable cpufreq.default_governor=performance
+  ✅ 격리 코어 8-15 에서 측정 (스레드 8개, 관리 스레드는 0-7,16-19) — 튜닝 적용 상태
+  ✅ GPU 부하(glmark2 refract) 시작
+   전원관리: cpuidle=[] cpufreq=acpi-cpufreq governor 격리=performance[800~2101] 하우스키핑=performance 격리 코어 [min max SMI cpu=MHz…]: 2502 2502 266 cpu8=2502 cpu9=2502 cpu10=2502 cpu11=2502 cpu12=2502 cpu13=2502 cpu14=2502 cpu15=2502
+   측정 시작 16:00:08 — 종료 예정 16:03:08 (중단: Ctrl+C)
+
+== 결과 (3분 부하) ==
+  ✅ 3분 부하    최악   34 µs (CPU 15) | 평균  4.2 µs | 400µs 초과 0회
+  ✅ GPU 부하 유지: 사용률 평균 77% (최소 0% / 최대 85%), glmark2 중단 0회 (19회 확인)
+  🌡  패키지 44~47°C, GPU 최대 82°C, 격리 코어 클럭 2212~2462 MHz, 스로틀 core=0 pkg=0 (20회 기록)
+  ✅ SMI(MSR 0x34) 측정 중 0회 (누적 266→266)
+  🔌 하우스키핑 실클럭 2097~2421 MHz, 패키지 전력 평균 35.0 W (최대 35.0 W, RAPL PL1 35 W)
+  ⚠️  클럭 제한 사유 로그 발생 (10초 창 기준):
+          20회  limit=PL1;now=PL1;pkg=PROCHOT
+-- 측정 중 커널 경고
+[ 1205.860459] ubuntu22 kernel: warning: `iwconfig' uses wireless extensions which will stop working for Wi-Fi 7 hardware; use nl80211
+== [soak] 끝 — 원본: /home/ailab/git/A1-BSW/tools/rt/logs/soak_20260917_160002.log ==

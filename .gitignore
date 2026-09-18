@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+# a1_rt.sh 실행 데이터 (이 PC 전용) — 증거 스냅샷은 measurements/ 에 별도 복사
+tools/rt/logs/
+tools/rt/backup_*/
