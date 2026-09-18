@@ -1,12 +1,11 @@
 """
-Launch the walking-skeleton slice: can_raw_bridge + spd_decoder together.
+Launch the full status-bridge set: can_raw_bridge + all decoders (SPD/EPS/ACC/IMU).
 
-  ros2 launch a1_can_bridge spd_slice.launch.py channel:=vcan0
-  ros2 launch a1_can_bridge spd_slice.launch.py channel:=can0 cpu_affinity:=8 rt_priority:=80
+  ros2 launch a1_can_bridge status_bridge.launch.py channel:=vcan0
+  ros2 launch a1_can_bridge status_bridge.launch.py channel:=can0 cpu_affinity:=8 rt_priority:=80
 
-rt_priority>0 이면 SCHED_FIFO 를 시도한다 — sudo 없이 launch 하면 권한 실패 경고만 찍고
-계속 동작(A-3/A-4). 실제 RT 측정 시에는 (rtprio 영구 부여 안 함):
-  sudo chrt -f 80 sudo -u ailab ros2 launch a1_can_bridge spd_slice.launch.py ...
+spd_slice.launch.py 는 최소 재현용(걷기골격 첫 슬라이스)으로 그대로 둔다 — 이 파일이 실제 운용 조합.
+EPS/ACC 는 Alive_Cnt 진단을 /diagnostics 로도 낸다(§2 카테고리 C E2E 체크).
 """
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -16,7 +15,7 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-    """Build the LaunchDescription for the SPD walking-skeleton slice."""
+    """Build the LaunchDescription for the full status-bridge set."""
     channel = LaunchConfiguration('channel')
     interface = LaunchConfiguration('interface')
     cpu_affinity = LaunchConfiguration('cpu_affinity')
@@ -30,11 +29,11 @@ def generate_launch_description():
         DeclareLaunchArgument('interface', default_value='socketcan'),
         DeclareLaunchArgument(
             'cpu_affinity', default_value='',
-            description='격리 코어 배치, 예 "8" (A-3)',
+            description='can_raw_bridge 격리 코어 배치, 예 "8" (A-3)',
         ),
         DeclareLaunchArgument(
             'rt_priority', default_value='0',
-            description='SCHED_FIFO 우선순위, 0=미적용',
+            description='can_raw_bridge SCHED_FIFO 우선순위, 0=미적용',
         ),
         Node(
             package='a1_can_bridge', executable='can_raw_bridge', name='can_raw_bridge',
@@ -49,8 +48,12 @@ def generate_launch_description():
             }],
             output='screen',
         ),
-        Node(
-            package='a1_can_bridge', executable='spd_decoder', name='spd_decoder',
-            output='screen',
-        ),
+        Node(package='a1_can_bridge', executable='spd_decoder',
+             name='spd_decoder', output='screen'),
+        Node(package='a1_can_bridge', executable='eps_decoder',
+             name='eps_decoder', output='screen'),
+        Node(package='a1_can_bridge', executable='acc_decoder',
+             name='acc_decoder', output='screen'),
+        Node(package='a1_can_bridge', executable='imu_decoder',
+             name='imu_decoder', output='screen'),
     ])

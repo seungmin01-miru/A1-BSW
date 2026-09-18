@@ -27,11 +27,11 @@ flowchart TB
     VCAN["vcan0 (SIL) · sil/vcan/eait_tx.py<br/>DBC 기반 0x712 10 ms 송신 ✅"]
     RCAN["실 CAN 어댑터: PEAK PCAN-PCIe FD 2ch<br/>(장착됨 · can0/can1, 실차 연결 전)"]
   end
-  subgraph C["[C] ROS2 브리지 · 디코더 — 첫 슬라이스 완료(2026-09-18)"]
-    DEC["can_raw_bridge → CanFrame<br/>spd_decoder(0x712) → WheelSpeeds<br/>ros2_ws/src/a1_can_bridge"]
+  subgraph C["[C] ROS2 브리지 · 디코더 — EAIT 수신 4종 전부 완료(2026-09-18)"]
+    DEC["can_raw_bridge → CanFrame<br/>spd/eps/acc/imu_decoder(0x712/710/711/713)<br/>EPS·ACC: Alive_Cnt E2E → /diagnostics<br/>A-3(격리+FIFO) 재측정: ROS2 슬라이스엔 무효과 확정<br/>ros2_ws/src/a1_can_bridge"]
   end
-  subgraph D["[D] 안전 SW (MCU 대체) — 예정"]
-    WD["헬스 슈퍼바이저<br/>stale 타임아웃 → safe-state"]
+  subgraph D["[D] 안전 SW (MCU 대체) — can_guard 설계 착수(2026-09-19)"]
+    WD["can_guard: 상태머신+plausibility+TX(0x156/0x157)<br/>safety/can_guard/, raw SocketCAN, ROS2 밖<br/>격리 코어+SCHED_FIFO 90(A-3 효과 실측된 경로)"]
   end
   MCU["안전 MCU<br/>(미정 · 추후 하드웨어 확보 시 통합)"]
   GW["대회 게이트웨이 → 액추에이터<br/>(EPS · ACC · 기어)"]
@@ -55,8 +55,8 @@ flowchart TB
 |---|---|---|---|---|
 | A | RT 커널 기반 | PREEMPT_RT 설치·튜닝(`isolcpus`/`mlockall`/`SCHED_FIFO`), `cyclictest` 측정 | 🟡 조건부 완료 (커널·격리 튜닝·30분 실측 완료. 남음: 예산 재정의 결정, generic 비교, A-3/A-4) | §5.A |
 | B | CAN 인터페이스 | 어댑터/SocketCAN, `vcan0` SIL 환경, rosbag→CAN 주입 | 🟡 진행중 (vcan0 영속화·왕복·DBC 기반 0x712 주기 송신·디코드 완료. 남음: ROS2 raw 퍼블리시=Phase C, 실 can0 전환) | §5.B |
-| C | ROS2 브리지·디코더 | `CanFrame`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | 🟡 진행중 (걷기골격 4단계 1종 완료: 0x712 → `/interface/can/read/raw` → `/control/status/wheel`. 남음: EPS/ACC/IMU 디코더, A-3 레시피 재측정, 실 can0) | §5.C |
-| D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | ⚪ 예정 | §5.D (추후 작성) |
+| C | ROS2 브리지·디코더 | `CanFrame`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | 🟡 진행중 (EAIT 수신 메시지 4종 전부 디코더 완료: 0x712/710/711/713. EPS/ACC 는 E2E(alive_count) 체크·`/diagnostics` 연동까지. A-3 레시피 재측정 완료 — ROS2 슬라이스엔 무효과 확정. 남음: 실 can0, TX 방향(can_guard)) | §5.C |
+| D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | 🟡 설계 완료, 구현 착수 전 (`can_guard`, `safety/can_guard/`) | §5.D |
 | E | 검증/테스트 (V-model) | 좌/우 대응 검증 계획, 고장주입 시험 | 🟢 초안 완료 | §3 |
 | F | 안전등급 레퍼런스 (ASIL) | 41개 파라미터 ASIL 등급, 근거 | 🟢 초안 완료 | §4 |
 
@@ -490,27 +490,47 @@ python3 sil/vcan/eait_tx.py --msg EAIT_Control_01 --pattern const --value 0 --se
 
 | 패키지 | 종류 | 내용 |
 |---|---|---|
-| `a1_can_msgs` | ament_cmake (msg only) | `CanFrame.msg`(원시 프레임: header/id/dlc/data\[8\]/is_extended/is_error), `WheelSpeeds.msg`(0x712 디코드: header/fr/fl/rr/rl) |
-| `a1_can_bridge` | ament_python | `can_raw_bridge`(SocketCAN → `/interface/can/read/raw`), `spd_decoder`(0x712 필터·디코드 → `/control/status/wheel`), `rt_utils.py`(A-3/A-4 레시피 공용 모듈), `launch/spd_slice.launch.py` |
+| `a1_can_msgs` | ament_cmake (msg only) | `CanFrame.msg`(원시 프레임), `WheelSpeeds.msg`(0x712), `EpsStatus.msg`(0x710), `AccStatus.msg`(0x711), `ImuStatus.msg`(0x713) — 전부 header + DBC 신호 1:1 |
+| `a1_can_bridge` | ament_python | `can_raw_bridge`(SocketCAN → `/interface/can/read/raw`), `spd_decoder`(0x712), `eps_decoder`(0x710), `acc_decoder`(0x711), `imu_decoder`(0x713), `dbc_bits.py`(비트필드 공용 추출기), `e2e.py`(`AliveCounter`, Alive_Cnt 연속성), `rt_utils.py`(A-3/A-4 레시피 공용 모듈), `launch/spd_slice.launch.py`(최소 재현용), `launch/status_bridge.launch.py`(전체 상태 브리지, EAIT 수신 메시지 4종 전부) |
 
-**토픽 인터페이스 (첫 슬라이스)**
+**토픽 인터페이스**
 
 | 토픽 | 타입 | 퍼블리셔 | QoS |
 |---|---|---|---|
 | `/interface/can/read/raw` | `a1_can_msgs/CanFrame` | `can_raw_bridge` | BEST_EFFORT, depth 100 |
 | `/control/status/wheel` | `a1_can_msgs/WheelSpeeds` | `spd_decoder` | BEST_EFFORT, depth 100 |
+| `/control/status/eps` | `a1_can_msgs/EpsStatus` | `eps_decoder` | BEST_EFFORT, depth 100 |
+| `/control/status/acc` | `a1_can_msgs/AccStatus` | `acc_decoder` | BEST_EFFORT, depth 100 |
+| `/control/status/imu` | `a1_can_msgs/ImuStatus` | `imu_decoder` | BEST_EFFORT, depth 100 |
+| `/diagnostics` | `diagnostic_msgs/DiagnosticArray` | `eps_decoder`, `acc_decoder` | 표준, 1 Hz |
+
+이로써 **EAIT 가 보내는 상태 메시지 4종(0x710~0x713) 전부** ROS2 토픽으로 나온다. `EAIT_INFO_IMU`(0x713)는 4 신호가
+8바이트를 정확히 채워 `Alive_Cnt` 가 없다 — E2E 체크 대상이 아니며(§2), 0x712 처럼 전부 바이트 정렬돼 있어 `struct`로 직접 푼다.
 
 BEST_EFFORT 를 고른 이유: 차량 상태는 계속 갱신되는 스트림이라 재전송보다 최신값 유지가 우선(§3 콜백그룹/QoS 설계 행).
 구독 쪽도 반드시 BEST_EFFORT 로 맞춰야 한다 — RELIABLE 구독은 BEST_EFFORT 퍼블리셔와 DDS QoS 가 호환되지 않아 디스커버리는
 되어도 메시지가 조용히 안 온다(걷기골격에서 겪은 함정, `spd_decoder` 코드 주석에도 남김).
 
-**파싱 규칙**: 디코더는 런타임에 DBC 파일을 읽지 않는다 — 상세설계 산출물(파싱 규칙)을 코드로 고정해 성능·결정성을 우선한다
-(`spd_decoder.decode_spd`: `<HHHH` 리틀엔디언, scale 0.03125, offset 0). 정확성은 `test/test_decode_spd.py` 가 `cantools`
-정식 DBC 디코드와 동일 프레임을 대조해 검증한다(경계값 0·0xFFFF 포함).
+**파싱 규칙**: 디코더는 런타임에 DBC 파일을 읽지 않는다 — 상세설계 산출물(파싱 규칙)을 코드로 고정해 성능·결정성을 우선한다.
+0x712 는 바이트 정렬돼 있어 `struct`(`<HHHH`)로 직접 풀고, 0x710/0x711 은 1~16비트 필드가 바이트 경계 없이 섞여 있어
+`dbc_bits.unpack()`(전체 페이로드를 64비트 리틀엔디언 정수로 보고 [start, start+length) 비트를 뽑는 일반 함수, Vector DBC
+little_endian 관례)로 푼다. 정확성은 `test/test_decode_spd.py`·`test/test_eps_acc_decode.py`·`test/test_dbc_bits.py` 가
+`cantools` 정식 DBC 디코드와 다수의 합성 값(0·0xFF·바이트별 단일비트·교대패턴·순차값)을 대조해 검증한다.
+
+**E2E(alive_count) 체크**: `EpsStatus`/`AccStatus` 는 DBC 의 `EPS_Alive_Cnt`/`ACC_Alive_Cnt`(0~255 롤오버)를 `e2e.AliveCounter`
+로 추적해 `alive_ok` 필드로 매 메시지에 싣고, 1 Hz 로 `/diagnostics`(건너뛴 프레임 수·누적 스킵)를 낸다. 이 계층은 **감지만**
+한다 — stale 판정 후 safe-state 로 전이하는 것은 §5.D 헬스 슈퍼바이저(Phase D, 미착수)의 몫이다.
 
 **can_guard(Phase D)와의 경계**: 이 워크스페이스의 노드는 상태 퍼블리시(모니터링·로깅·인지 융합용)까지만 담당한다.
 차량으로 나가는 TX(`EAIT_Control_01/02`, 0x156/0x157)는 `can_guard` 가 raw SocketCAN 으로 직접 가져가며
 **ROS2/DDS 를 hot loop 에 절대 넣지 않는다**(§7.2). 이 경계를 넘어 ROS2 제어 노드가 직접 CAN 에 쓰지 않도록 설계·리뷰에서 지킨다.
+
+**`/control/status/*` 허용 지연 — 감시(monitoring) 등급, 제어(control) 등급이 아니다.** A-3 재측정(위)으로 이 지연
+(1~2 ms)이 격리 코어·SCHED_FIFO 로 줄지 않는다는 게 확정됐으므로, "언젠가 튜닝해서 줄이면 된다"가 아니라 **애초에
+이 경로에 그 정도 지연을 감수 못 하는 소비자를 올리면 안 된다**는 것을 설계 규칙으로 못 박는다.
+- **허용 기준**: 한 CAN 메시지 주기(10~20 ms) 수준까지는 이 경로를 그대로 쓴다 — 인지 융합, 로깅, 대시보드, 헬스 슈퍼바이저(§5.D)의 상태 판단(수십~수백 ms 타임아웃) 전부 해당.
+- **금지**: 빠른 피드백 루프(예: 제어 주기 10 ms 대에서 매 주기 최신값이 필요한 로직)가 이 토픽을 **직접** 구독해 그 루프의 일부로 쓰는 것. 그런 소비자는 `can_guard`처럼 raw SocketCAN 을 직접 읽어야 한다 — DDS 를 거치는 순간 A-3 로도 못 줄이는 지연이 붙는다(위 실측).
+- **왜 지금 안 줄이는가**: 이 지연은 안전 경로(TX)와 완전히 분리돼 있어 지금 최적화할 이유가 없다. 나중에 정말 필요해지면(예: 위 "금지"에 해당하는 소비자가 생기면) 손잡이는 싼 것부터 — ① 그 소비자만 `/interface/can/read/raw` 를 직접 구독해 DDS 홉 하나 줄이기 → ② RMW 를 CycloneDDS 로 교체해 A/B 측정(`ros-humble-rmw-fastrtps-cpp` 만 설치돼 있고 CycloneDDS 는 미설치 — `apt install ros-humble-rmw-cyclonedds-cpp` 후 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` 로 비교) → ③ 브리지+디코더를 한 프로세스로 묶어 intra-process 통신(rclpy 는 rclcpp 대비 지원이 제한적) → ④ 그래도 부족하면 `can_guard` 처럼 아예 raw SocketCAN 전용 프로세스로 분리.
 
 **실측 (2026-09-18, SIL·vcan0, 일반 우선순위·격리 코어 미배치)**
 
@@ -518,19 +538,146 @@ BEST_EFFORT 를 고른 이유: 차량 상태는 계속 갱신되는 스트림이
 |---|---|
 | `/interface/can/read/raw` hz | 99.97~100.02 Hz (목표 100, 0x712 주기 10 ms) |
 | `/control/status/wheel` hz | 99.98 Hz |
-| 종단 지연(`ros2 topic delay`, header.stamp=수신 시각 기준) | 평균 2 ms, 최대 2~3 ms |
-| 디코드 정확성 | 같은 프레임 50개 실시간 대조 + 단위테스트 5개 경계값, `cantools` 대비 **불일치 0** |
+| `/control/status/eps` hz | 49.99 Hz (0x710 주기 20 ms) |
+| `/control/status/acc` hz | 99.98 Hz (0x711 주기 10 ms) |
+| `/control/status/imu` hz | 99.97 Hz (0x713 주기 10 ms) |
+| 종단 지연(`ros2 topic delay`, header.stamp=수신 시각 기준) | 평균 2 ms, 최대 2~4 ms |
+| 디코드 정확성 | 실시간 프레임 대조 + 단위테스트, `cantools` 대비 **불일치 0**(28개 테스트 전부 통과) |
+| `/diagnostics` (정상 vcan0 루프백) | 0x710/0x711 모두 level=OK, total_skips=0 |
 | lint | `colcon test`(flake8·pep257·copyright·xmllint) 전부 통과 |
 
-지연 2~3 ms 는 **A-3 레시피(격리 코어 + SCHED_FIFO) 미적용** 값이다 — `eait_tx.py`/`eait_rx.py` 가 그 레시피로 주기 편차
-5~9 µs 를 낸 것과 비교하면, 이 슬라이스도 같은 레시피 적용 후 재측정이 필요하다(`ros2_ws/README.md` "A-3 레시피 적용" 참고,
-아직 미실행 — `cpu_affinity`/`rt_priority` 파라미터는 만들어 뒀음).
+**A-3 레시피 재측정 (2026-09-18) — 결론 확정: 이 슬라이스의 1~2 ms 지연에 격리 코어·SCHED_FIFO 는 기여하지 않는다.**
 
-**남은 작업**: `EAIT_INFO_EPS`(0x710)·`EAIT_INFO_ACC`(0x711, `Alive_Cnt` 있음 → 첫 E2E 체크)·`EAIT_INFO_IMU`(0x713) 디코더 확장,
-A-3 레시피 재측정, 실 `can0` 전환(5-1), `can_guard` 설계 착수(§7).
+| 조건 | wheel 지연 | eps 지연 | acc 지연 |
+|---|---|---|---|
+| 격리 없음(기본, 위 표) | 평균 2 / 최대 2~3 ms | 평균 2 / 최대 2 ms | 평균 2 / 최대 2~3 ms |
+| `cpu_affinity=8`(격리 코어, FIFO 없음) | 평균 1 / 최대 2 ms | 평균 2 / 최대 2 ms | 평균 2 / 최대 3 ms |
+| `cpu_affinity=8` + `rt_priority=80`(권한 없어 FIFO 미적용, `mlockall`만 성공) | 평균 1 / 최대 2 ms | 평균 2 / 최대 2 ms | (재실행 중 종료, 미측정) |
+| **`cpu_affinity=8` + 진짜 `SCHED_FIFO 80`(사용자가 `sudo chrt -f 80 sudo -u ailab ros2 launch ...` 실행, `chrt -p` 로 정책·우선순위 확인)** | **평균 1 / 최대 2 ms** | **평균 2 / 최대 2 ms** | **평균 1 / 최대 2 ms** |
 
-### 5.D 안전 SW (MCU 대체)
-_(추후 작성 — 헬스 슈퍼바이저 상태머신, 타임아웃 값, safe-state 진입 로직)_
+네 조건이 사실상 같다 — 마지막 줄은 `chrt -p <pid>`로 `SCHED_FIFO`·우선순위 80을 실제로 확인한 뒤 잰 값이라, **추정이
+아니라 확정**이다. `taskset -c 8`로 프로세스가 실제로 CPU 8에서 도는 것도 `/proc/<pid>/stat`로 확인했지만 지연은 안 줄
+었다. 해석: `eait_tx.py`/`eait_rx.py` 가 5~9 µs 를 낸 건 **커널 타이머(sleep) 정밀도** 문제였고, 그건 SCHED_FIFO·타이머
+여유·격리로 직접 고쳐진다. 반면 이 ROS2 슬라이스의 1~2 ms 는 자릿수가 다른 지연(수백 배)이라 **DDS 퍼블리시·구독 경로
+(RMW 직렬화, rclpy 콜백 디스패치, 프로세스 간 IPC)** 가 지배적이다 — 그 구간은 코어 배치·우선순위로 줄어드는 종류가
+아니다. `ros2 run ... -p cpu_affinity:=8` 처럼 `ros2 run`/`--ros-args -p` 로 직접 줄 때는 숫자로 보이는 문자열이 YAML
+상 정수로 해석돼 타입 오류가 난다 — **`ros2 launch`(이 프로젝트의 launch 파일들, `ParameterValue` 로 타입 고정)로만
+`cpu_affinity`/`rt_priority` 를 넘긴다.**
+
+이 결과는 A-3(격리 코어+FIFO)가 무의미하다는 뜻이 아니라, **그 레시피가 효과 있는 지점은 "커널이 sleep 에서 깨는 시각의
+정밀도"이지 "ROS2 메시지가 프로세스 경계를 넘는 시간"이 아니다**라는 뜻이다. `can_guard`(Phase D)가 ROS2/DDS 를 hot
+loop 에서 뺀 이유(§7.2)가 바로 이것과 같은 맥락 — 안전 임계 경로는 DDS 를 거치지 않아야 이 격차를 피한다. **결론: 이
+ROS2 상태 브리지 슬라이스에는 A-3 레시피를 상시 적용할 필요가 없다** — `can_raw_bridge`를 격리 코어에 상시 배치하면
+오히려 CAN 스택 전용 코어 예산(§5.A eco 800 의 취지)을 인지/디코더 작업이 아닌 곳에 쓰게 된다. A-3 는 `can_guard`
+(Phase D, raw SocketCAN 직접 TX)에 적용하는 것이 맞다.
+
+**개발 중 잡은 버그(기록)**: 단위테스트 안에서 assert 메시지 변수명을 `msg`로 지어 바깥 스코프의 `cantools.Message`
+객체(같은 이름 `msg`)를 겹쳐 썼다가, 두 번째 데이터 패턴부터 `'str' object has no attribute 'signals'`로 터진 것을 발견·수정
+(`test_dbc_bits.py`) — 파일명이 아니라 **변수명 섀도잉**이라 처음엔 cantools API 문제로 오인했다. lint 자동수정 과정에서
+넣은 변수명이 원인이었다는 점만 기록해 둔다.
+
+**남은 작업**: 실 `can0` 전환(5-1), `can_guard` 설계 착수(§7) — TX 방향(0x156/0x157)은 이 워크스페이스가 아니라
+raw SocketCAN 직접 + 격리 코어 + 진짜 SCHED_FIFO(`eait_tx.py`/`eait_rx.py` 에서 그 레시피가 실제로 효과 있었던
+바로 그 방식)로 만든다 — ROS2/DDS 를 거치는 순간 A-3 는 효과가 없다는 것이 이번 재측정으로 확인됐다.
+
+### 5.D 안전 SW (MCU 대체) — `can_guard` (2026-09-19 설계 착수)
+
+§7 의 결정(MCU 없음, PC 가 안전계층)·§7.2 설계 규칙을 구체 아키텍처로 옮긴 것. 위치는 `safety/can_guard/` —
+**`ros2_ws/` 밖**이다(§7.2 "ROS2/DDS 를 hot loop 에 절대 넣지 않는다"를 디렉터리 경계로도 강제 — 이 프로세스는
+`rclpy`·`cantools` 등 어떤 무거운 런타임 의존도 없이 표준 라이브러리 + `python-can` 만으로 돈다).
+
+**구현 언어 = Python (잠정, 근거 명시)**: C 로 다시 쓰면 워커 스레드 지연의 최악값 예측이 더 좋아지지만,
+`sil/vcan/eait_tx.py` 가 **같은 레시피**(격리 코어+SCHED_FIFO+mlockall, A-3 로 root 권한까지 확인된 방식)로
+주기 편차 5~9 µs 를 이미 실측했고, D4 예산(최악 ≤1 ms)에 100배 넘는 여유가 있다 — 지금 C 로 새로 쓸 근거가
+없다. 8시간 벤치(P-9)에서 GC 정지·인터프리터 지터가 문제로 나오면 그때 재검토한다.
+
+```mermaid
+flowchart LR
+  CTRL["ROS2 제어 노드<br/>(MPC/판단, ros2_ws)"] -->|"1. 공유메모리 CommandChannel<br/>(seqlock, seq+timestamp)"| GUARD
+  PERC["인지 프로세스<br/>(heartbeat)"] -->|"2. 같은 방식, 별도 채널"| GUARD
+  subgraph GUARD["can_guard (safety/can_guard/, 격리 코어, SCHED_FIFO 90, mlockall)"]
+    direction TB
+    SM["상태머신<br/>INIT→ACTIVE→HOLDING/DEGRADED→STOPPED"]
+    PL["Plausibility<br/>범위·변화율 클램프, 위반 카운트"]
+    ENC["0x156/0x157 인코더<br/>Aliv_Cnt 소유"]
+    SM --> PL --> ENC
+  end
+  ENC -->|"raw SocketCAN, can0"| VEH["차량(EAIT 보드)"]
+  GUARD -.->|"sd_notify 하트비트"| SYSTEMD["systemd<br/>Restart=always, WatchdogSec"]
+```
+
+**1) IPC — `CommandChannel`(`protocol.py`).** §7.2 원문은 "작은 공유메모리 ring"이라고 했지만, 실제로 필요한 건
+**최신값 하나**뿐이다(제어 명령은 새 값이 오면 이전 값이 의미가 없다 — 큐가 아니다) → **seqlock 단일 슬롯**으로
+구현(설계 변경 사유를 여기 남긴다). `multiprocessing.shared_memory.SharedMemory` 위에 `ctypes.Structure` 를 얹는다.
+
+```
+seq: uint64          # 쓰기 시작 시 홀수, 끝나면 +1(짝수) — 리더가 홀수/불일치를 보면 재시도
+timestamp_ns: int64   # time.monotonic_ns() — 벽시계 아님(NTP 점프에 안전), 나이 계산 기준
+eps_en, eps_override_ignore, acc_en, aeb_en: uint8(bool)
+eps_speed: uint8       # 10~250 (DBC EPS_Speed)
+turn_signal: uint8     # 0(없음)/1/2/4 (DBC 값 그대로, 비트마스크 아님)
+aeb_decel_value: float32   # 0~1 g
+eps_cmd: float32           # -500~500 deg (부호 있음)
+acc_cmd: float32           # -3~1 m/s^2
+```
+
+리더(can_guard)는 seq 를 읽고 → 페이로드 복사 → seq 를 다시 읽어 두 값이 같고 짝수인지 확인, 아니면 재시도.
+제어 노드가 죽어 있으면 seq 가 안 바뀌므로 `age_ns = now - timestamp_ns` 로 staleness 를 판정한다(§3-6 의
+"50 ms" 제안값을 watchdog T 로 채택 — 팀 확정 필요, 아래 미확정 항목).
+
+**2) Plausibility (`plausibility.py`)** — §3-7 "출력 클램핑"이 최종적으로 여기로 옮겨온다.
+
+| 신호 | 범위 클램프(DBC 그대로) | 변화율(rate) 제한 |
+|---|---|---|
+| `eps_cmd`(조향각) | −500~500 deg | **미확정 — deg/s 상한, 실차/EAIT 사양 필요** |
+| `acc_cmd`(가감속) | −3~1 m/s² | **미확정 — jerk(m/s³) 상한, 실차 사양 필요** |
+| `eps_speed` | 10~250 | 해당 없음(참조값) |
+| `aeb_decel_value` | 0~1 g | 해당 없음(AEB 발동 즉시값) |
+
+범위는 DBC 에서 그대로 가져와 지금 바로 구현·테스트 가능하다. **변화율 제한은 숫자를 임의로 넣지 않는다** —
+`can_status_parameters_full.md`(이 저장소에 없음, 팀 원본 문서로 추정) 나 EAIT 보드 사양에서 받아야 할 값이라
+`RateLimiter` 클래스는 만들되 기본값은 "비활성"으로 두고 실제 숫자가 오면 채운다.
+
+**3) 상태머신 (`state_machine.py`)**
+
+```
+INIT(En=0, safe-state) → 제어 노드 첫 유효 명령 수신 → ACTIVE(명령 클램프해서 전달)
+ACTIVE → 명령 age > T(50ms 잠정) → HOLDING(조향 최종값 유지, 가감속 0 으로 램프)
+HOLDING → 명령 재개 → ACTIVE  |  HOLDING 지속 → STOPPED(속도 0 수렴 후 En=0)
+(모든 상태) 인지 하트비트 끊김 → DEGRADED(팀 정책에 따른 감속) — §7.2 "GPU-crash rule"
+(모든 상태) 재시작 → 항상 INIT 부터(안전 상태에서 시작 — §7.2 Startup 규칙)
+```
+
+**4) TX 인코딩 (`tx_encode.py`)** — 0x156/0x157, `struct` 직접 패킹(런타임 DBC 의존 없음, 디코더들과 같은 원칙).
+`Aliv_Cnt`(DBC 오타 그대로 사용)는 **can_guard 가 소유**하고 매 전송마다 +1(0~255 롤오버) — 제어 노드가 보내는
+`seq`(공유메모리 채널 내부용)와는 다른 카운터다, 섞지 않는다.
+
+⚠️ **미확인 사실 (팀 확인 필요)**: `0x157`(EAIT_Control_02, EPS_Cmd/ACC_Cmd)에는 DBC 상 `Alive_Cnt` 가 **없다**
+— `0x156` 의 카운터 하나로 EAIT 보드가 두 메시지 모두의 생존을 판단하는지, 아니면 `0x157` 은 별도 타임아웃
+로직이 있는지 DBC 만으로는 알 수 없다. `can_guard` 는 두 메시지를 항상 같은 주기(10 ms)에 짝지어 보내는 것으로
+설계해 이 불확실성을 흡수하지만, 확정은 EAIT 쪽 확인이 필요하다.
+
+**5) 생존성** — systemd 유닛(`can_guard.service`, 저장소에 파일만 두고 미설치): `Restart=always`,
+`WatchdogSec=`(can_guard 가 `sd_notify(WATCHDOG=1)` 하트비트를 보내지 않으면 systemd 가 강제 재시작),
+`OOMScoreAdjust=-1000`(OOM 이 나면 인지가 먼저 죽는다), 인지는 별도 cgroup 메모리 제한 아래(P-7). 배치는
+A-3 레시피(격리 코어, `SCHED_FIFO 90` — 제어 노드의 80 보다 높음, `mlockall`) 그대로. **이 레시피는 raw
+SocketCAN 경로에서 효과가 실측됐다**(§5.C A-3 재측정: ROS2 슬라이스엔 무효과, `eait_tx.py` 류엔 5~9 µs) —
+can_guard 가 바로 그 "효과 있는" 경로다.
+
+**6) 시험 매핑 (§7.3 체크리스트 P-1~P-11, 지금 가능한 것 vs 벤치 필요)**
+
+| # | 시험 | 지금(SIL, 코드만으로) 가능? |
+|---|---|---|
+| P-1 제어 노드 kill | ✅ 가능 — `CommandChannel` 나이만 보면 됨 |
+| P-2 인지 kill | ✅ 가능 — 하트비트 채널도 같은 메커니즘 |
+| P-5 plausibility(범위/변화율/카운터) | 🟡 범위는 지금 유닛테스트 가능, 변화율은 숫자 확정 후 |
+| P-3/P-4 (guard 자체 kill/hang) | 🟡 systemd 설치·재시작 시간 측정 필요 — 벤치 |
+| P-6 (CAN 선 절단) | 🔴 실 `can0`/`can1` 필요 — 5-1 이후 |
+| P-9 (8h 벤치) | 🔴 실 하드웨어 벤치 필요 |
+| P-10/P-11 (콜드부트/PC 재시작 시간) | 🔴 실 하드웨어 |
+
+**7) 남은 작업**: `can_guard.py` 메인 루프(상태머신+plausibility+인코더 결선, RT 셋업), `can_guard.service`,
+변화율 상한 값 팀 확인, `EPS_Cmd`/`ACC_Cmd` 실제 물리 의미(조향각 기준점 등) 재확인, P-1/P-2/P-5 SIL 시험 스크립트.
 
 ---
 
@@ -543,7 +690,7 @@ _(추후 작성 — 헬스 슈퍼바이저 상태머신, 타임아웃 값, safe-
 3. **[B] 최소 재생 스크립트** — `EAIT_CAN(AVANTE_CN7).dbc`를 `cantools`로 로드해 가장 단순한 메시지 `EAIT_INFO_SPD`(0x712, 필드 4개) 1종을 vcan0에 10ms 주기 송신 (2026-09-11: 실 DBC 확보로 `StatusTurn`에서 변경 — Turn 신호는 독립 메시지가 아니라 0x711 안의 비트필드였음)
 4. ✅ **[C] 최소 브리지+디코더 1종 (2026-09-18)** — `can_raw_bridge` 가 `/interface/can/read/raw` 퍼블리시 → `spd_decoder`(직접 파싱, `cantools` 로 정확성 대조) → `/control/status/wheel` 퍼블리시까지 관통 확인 (처음으로 "끝까지 됨"이 검증됨). `ros2_ws/src/a1_can_bridge`, 상세는 §5.C
 5. 🟡 **[E] 이 슬라이스에 대해 ROS2 토픽 hz/지연 측정** — hz 100 Hz·지연 2~3 ms 확인(§5.C). 남음: 같은 슬라이스를 A-3 레시피(격리 코어+FIFO) 로 재측정, `cyclictest` 병행 측정 — §3 V-model "통합 시험" 행 완전 충족은 이후
-6. **[C] 나머지 메시지로 확장** — EPS/ACC(안전 임계, ASIL D) 우선 → Pedal/Wheel/INS/Vehicle 순
+6. ✅ **[C] 나머지 메시지로 확장 — EAIT 수신 4종 전부 완료(2026-09-18)** — `EpsStatus`/`AccStatus`(E2E `alive_count` 체크 첫 적용) + `ImuStatus`(Alive_Cnt 없음, 대상 아님). 다음은 TX 방향(0x156/0x157, `can_guard`)
 7. **[D] E2E(`alive_count`) 체크 + 헬스 슈퍼바이저 최소 버전** — §3 고장주입 시험 착수
 8. **[B] 실 CAN 어댑터 확보 시** — `vcan0`→`can0` 전환, HIL 재측정으로 SIL 결과 재검증
 

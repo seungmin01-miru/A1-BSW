@@ -30,6 +30,9 @@ setup(
         'console_scripts': [
             'can_raw_bridge = a1_can_bridge.can_raw_bridge:main',
             'spd_decoder = a1_can_bridge.spd_decoder:main',
+            'eps_decoder = a1_can_bridge.eps_decoder:main',
+            'acc_decoder = a1_can_bridge.acc_decoder:main',
+            'imu_decoder = a1_can_bridge.imu_decoder:main',
         ],
     },
 )
