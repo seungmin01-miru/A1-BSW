@@ -17,6 +17,8 @@
 #   sudo bash a1_rt.sh drive          10) 주행 프로필 — 콜드 부팅 직후 실행: 부하 10분 → 대기 5분 → 부하 10분 (실제 10분 주행 ×2 재현)
 #                                        3회 반복해 콜드 시동 과도 상태를 포함한 값을 얻는다. 요약: drive-report
 #   sudo bash a1_rt.sh arm       (선택) 원격(SSH)용 — 다음 1회 부팅만 6.8-rt로 예약
+#   sudo bash a1_rt.sh finalize  확정) 기본 부팅 = a1-bsw-rt-poll (메뉴 10초는 유지, generic 은 선택 가능) + 부팅마다 eco 800/hk ondemand 를
+#                                   적용하는 systemd 유닛 a1-bsw-rt-tune.service 설치. `finalize undo` 로 원복(기본 generic, 유닛 제거)
 #   sudo bash a1_rt.sh prune     정리) 실험용 GRUB 항목(rt-tuned/generic-tuned/rt-nohwp/rt-idlepoll/generic-poll) 삭제 — 운용 항목 a1-bsw-rt-poll 만 남김,
 #                                   + 안 쓰는 커널 패키지(5.15-realtime 계열, 6.8.0-40-generic) purge. 부팅 중 커널·기본 generic 은 절대 건드리지 않음
 #   sudo bash a1_rt.sh rollback  *) 6.8-rt 패키지·DKMS 설정 제거 (메뉴·generic 기본값은 유지)
@@ -57,7 +59,7 @@ NV_MAKELOG=/var/lib/dkms/nvidia-srv/470.256.02/build/make.log
 GL_LOAD=(glmark2 --off-screen --run-forever -s 3840x2160 -b refract)
 
 cmd=${1:-}
-case "$cmd" in pin|install|arm|verify|hwlat|tune|freq|bench|soak|trace|drive|drive-report|prune|rollback) ;; *) sed -n '2,20p' "$0"; exit 1 ;; esac
+case "$cmd" in pin|install|arm|verify|hwlat|tune|freq|bench|soak|trace|drive|drive-report|prune|finalize|rollback) ;; *) sed -n '2,20p' "$0"; exit 1 ;; esac
 
 ts=$(date +%Y%m%d_%H%M%S)
 mkdir -p "$BASE/logs"
@@ -122,10 +124,18 @@ cpulist_count() {
   echo "$n"
 }
 
-# 기본 부팅이 generic으로 고정돼 있는지 — 모든 변경 단계의 전제조건
+# 기본 부팅이 기대값(finalize 전 = generic, finalize 후 = a1-bsw-rt-poll)으로 고정돼 있는지 — 모든 변경 단계의 전제조건
+FINAL_MARK=/etc/a1-bsw/grub_default     # finalize 가 쓰는 마커: 기본 부팅 엔트리 id
 check_default_is_generic() {
-  local env first
+  local env first want
   env=$(grub-editenv list)
+  if [[ -s $FINAL_MARK ]]; then
+    want=$(cat "$FINAL_MARK")
+    [[ "$env" == *"saved_entry=$want"* ]] || die "grubenv 기본 엔트리가 finalize 값($want)이 아님: '$env'"
+    grep -qF "'$want'" "$GRUB_CFG" || die "grub.cfg 에 기본 항목 $want 없음"
+    ok "기본 부팅 = $want (finalize 됨; generic 은 메뉴에서 선택 가능)"
+    return
+  fi
   [[ "$env" == *"saved_entry=$(entry_path "$GEN")"* ]] || die "grubenv 기본 엔트리가 generic이 아님: '$env'"
   grep -qF 'set default="${saved_entry}"' "$GRUB_CFG" || die "grub.cfg가 saved_entry를 쓰지 않음 (GRUB_DEFAULT=saved 미반영)"
   grep -qF "'gnulinux-${GEN}-advanced-${ROOT_UUID}'" "$GRUB_CFG" || die "grub.cfg에 $GEN 엔트리 없음"
@@ -240,6 +250,14 @@ cmd_verify() {
   local iso; iso=$(tr -d '[:space:]' < /sys/devices/system/cpu/isolated 2>/dev/null)
   if [[ -n "$iso" ]]; then
     ok "격리 코어: $iso (RT 튜닝 항목으로 부팅됨)"
+    if [[ -e $UNIT ]]; then
+      local st g8 ghk mn8 mx8
+      st=$(systemctl is-active "$(basename $UNIT)" 2>/dev/null); g8=$(cat /sys/devices/system/cpu/cpu${iso%%[-,]*}/cpufreq/scaling_governor 2>/dev/null)
+      mn8=$(cat /sys/devices/system/cpu/cpu${iso%%[-,]*}/cpufreq/scaling_min_freq 2>/dev/null); mx8=$(cat /sys/devices/system/cpu/cpu${iso%%[-,]*}/cpufreq/scaling_max_freq 2>/dev/null)
+      ghk=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)
+      if [[ $st == active && $mn8 == 800000 && $mx8 == 800000 && $ghk == ondemand ]]; then ok "운용 런타임 튜닝 적용됨 (유닛 active, 격리 $g8 800 MHz 고정, 하우스키핑 $ghk)"
+      else warn "운용 런타임 튜닝 미적용: 유닛=$st 격리=$g8[$((${mn8:-0}/1000))~$((${mx8:-0}/1000))] 하우스키핑=$ghk → sudo systemctl restart a1-bsw-rt-tune"; fi
+    fi
     local -A isoset=(); local c f irq; local bad=()
     for c in $(cpulist_expand "$iso"); do isoset[$c]=1; done
     for f in /proc/irq/*/effective_affinity_list; do
@@ -794,6 +812,60 @@ cmd_prune() {
   dkms status 2>/dev/null | sed 's/^/   dkms: /'
   show_menu
   echo "== [prune] 완료 — 메뉴: generic(기본) / 6.8.1-rt(순정) / a1-bsw-rt-poll(운용). 5.15-rt·6.8.0-40 제거 =="
+}
+
+# 운용 확정: 기본 부팅을 운용 항목으로, 런타임 튜닝(eco 800 + hk ondemand)을 부팅마다 자동 적용.
+# 안전: 메뉴·타임아웃 10초 유지(generic 선택 가능), 유닛은 isolcpus 부팅에서만 동작, `finalize undo` 로 완전 원복.
+UNIT=/etc/systemd/system/a1-bsw-rt-tune.service
+LIBDIR=/usr/local/lib/a1-bsw
+cmd_finalize() {
+  need_root
+  local want=a1-bsw-rt-poll
+  if [[ "${2:-}" == undo ]]; then
+    echo "== [finalize undo] 기본 부팅 generic 으로, 유닛 제거 =="
+    systemctl disable --now "$(basename $UNIT)" 2>/dev/null || true; rm -f "$UNIT"; systemctl daemon-reload
+    rm -f "$FINAL_MARK"; grub-set-default "$(entry_path "$GEN")"
+    check_default_is_generic; show_menu
+    echo "== [finalize undo] 완료 — 런타임 값은 재부팅 시 초기화 (지금 되돌리려면 sudo bash tools/rt/iso_pm.sh off; hk restore) =="; return
+  fi
+  echo "== [finalize] 운용 설정 확정 =="
+  grep -qF "'$want'" "$GRUB_CFG" || die "운용 항목 $want 이 메뉴에 없음 — 먼저 tune rt-poll"
+  [[ -e /boot/vmlinuz-$GEN ]] || die "안전 복귀용 $GEN 이미지가 없음"
+  # (1) 기본 부팅 = 운용 항목 (GRUB_DEFAULT=saved 는 pin 에서 설정됨)
+  mkdir -p "$(dirname $FINAL_MARK)"; echo "$want" > "$FINAL_MARK"
+  grub-set-default "$want"
+  grep -q "saved_entry=$want" <(grub-editenv list) || die "grub-set-default 실패"
+  ok "기본 부팅 = $want (메뉴 ${GRUB_TIMEOUT_SEC:-10}초 유지 → generic 선택 가능)"
+  # (2) 런타임 튜닝 스크립트 사본 + systemd 유닛
+  mkdir -p "$LIBDIR"; cp "$BASE/iso_pm.sh" "$BASE/core_mhz.py" "$LIBDIR/"; chmod 755 "$LIBDIR"/*
+  cat > "$UNIT" <<UNITEOF
+[Unit]
+Description=A1-BSW RT runtime tuning (isolated cores 800 MHz pinned, housekeeping ondemand)
+# 튜닝 부팅(isolcpus)에서만 동작 — generic 기본 부팅에서는 아무것도 하지 않음
+ConditionKernelCommandLine=isolcpus
+After=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash $LIBDIR/iso_pm.sh eco 800
+ExecStart=/bin/bash $LIBDIR/iso_pm.sh hk ondemand
+ExecStop=/bin/bash $LIBDIR/iso_pm.sh hk restore
+ExecStop=/bin/bash $LIBDIR/iso_pm.sh off
+
+[Install]
+WantedBy=multi-user.target
+UNITEOF
+  systemctl daemon-reload; systemctl enable "$(basename $UNIT)" >/dev/null 2>&1
+  ok "유닛 설치·활성화: $UNIT (스크립트 사본 $LIBDIR)"
+  # (3) 지금 부팅이 튜닝 부팅이면 즉시 적용해서 검증
+  if [[ -n "$(tr -d '[:space:]' < /sys/devices/system/cpu/isolated)" ]]; then
+    systemctl restart "$(basename $UNIT)" && ok "유닛 실행: $(systemctl is-active "$(basename $UNIT)")"
+    bash "$BASE/iso_pm.sh" status | sed -n 3,4p; bash "$BASE/iso_pm.sh" status | grep "(HK)" | head -2
+  else warn "지금은 격리 부팅이 아니라 유닛은 다음 튜닝 부팅부터 동작"; fi
+  check_default_is_generic; show_menu
+  echo "== [finalize] 완료 — 재부팅하면 $want 로 올라오고 eco 800 + hk ondemand 가 자동 적용됨. 확인: bash a1_rt.sh verify =="
+  echo "   원복: sudo bash $0 finalize undo"
 }
 
 cmd_rollback() {
