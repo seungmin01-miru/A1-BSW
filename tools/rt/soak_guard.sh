@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 장시간 soak 전후로 측정을 방해하는 것을 잠시 끄고(on), 끝나면 되돌린다(off).
 #   bash tools/rt/soak_guard.sh on        # 화면잠금·유휴꺼짐 해제 + apt 타이머 정지 (sudo 는 내부에서 필요할 때만)
-#   bash tools/rt/soak_guard.sh on race   # ★ 대회 조건: 위 + WiFi/WWAN 라디오 끔 + PackageKit·snapd·unattended-upgrades·
-#                                         #   fwupd/motd/ua/man-db/logrotate/fstrim/update-notifier 타이머 정지
+#   bash tools/rt/soak_guard.sh on race   # ★ 대회 조건: apt 타이머 정지 + WiFi/WWAN 라디오 끔 + PackageKit·unattended-upgrades·백그라운드 타이머 정지
+#                                         #   + 60초 뒤 화면 잠금·꺼짐(디스플레이 비활성 — 9/18 S2 로 스톨 0 조건 확인). snapd 는 건드리지 않음
 #   bash tools/rt/soak_guard.sh check     # 지금 상태 표 (soak 시작 전 확인용)
 #   bash tools/rt/soak_guard.sh off       # 원복 (라디오·타이머·서비스·GNOME 설정)
 # 바뀌는 것은 전부 '일시적'이다 — GNOME 설정은 원래 값을 저장했다가 되돌리고, 서비스·타이머는 stop 만 하므로(disable 아님)
@@ -21,7 +21,8 @@ gs() { if [[ $EUID -eq 0 ]]; then sudo -u "$U" DBUS_SESSION_BUS_ADDRESS="unix:pa
 KEYS=("org.gnome.desktop.session idle-delay" "org.gnome.desktop.screensaver lock-enabled" "org.gnome.settings-daemon.plugins.power idle-dim")
 
 APT_UNITS=(apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service)
-RACE_UNITS=(packagekit.service snapd.service snapd.socket unattended-upgrades.service
+# snapd.service/socket 은 정지하지 않는다 — 정지하면 snapd-desktop-integration 이 1 Hz 오류 루프에 빠진다(9/17 밤 확인)
+RACE_UNITS=(packagekit.service unattended-upgrades.service
             fwupd-refresh.timer motd-news.timer ua-timer.timer man-db.timer logrotate.timer fstrim.timer update-notifier-motd.timer)
 
 case "${1:-}" in
@@ -29,10 +30,18 @@ on)
   race=0; [[ "${2:-}" == race ]] && race=1
   : > "$STATE"
   for k in "${KEYS[@]}"; do echo "gs $k=$(gs get $k)" >> "$STATE"; done
-  gs set org.gnome.desktop.session idle-delay 0
-  gs set org.gnome.desktop.screensaver lock-enabled false
-  gs set org.gnome.settings-daemon.plugins.power idle-dim false
-  echo "  ✅ [$U] 화면 잠금·유휴 꺼짐·어둡게 해제 (원래 값 저장: $STATE)"
+  if ((race)); then
+    # 대회 조건 = 디스플레이 꺼짐(9/18 S2: 화면 잠금+DPMS 만으로 스톨 0). 60초 뒤 자동 잠금 → 화면 꺼짐. glmark2 오프스크린 부하는 계속 돈다.
+    gs set org.gnome.desktop.session idle-delay 60
+    gs set org.gnome.desktop.screensaver lock-enabled true
+    gs set org.gnome.settings-daemon.plugins.power idle-dim false
+    echo "  ✅ [$U] 60초 유휴 후 화면 잠금·꺼짐 (대회 조건: 디스플레이 비활성)"
+  else
+    gs set org.gnome.desktop.session idle-delay 0
+    gs set org.gnome.desktop.screensaver lock-enabled false
+    gs set org.gnome.settings-daemon.plugins.power idle-dim false
+    echo "  ✅ [$U] 화면 잠금·유휴 꺼짐·어둡게 해제 (원래 값 저장: $STATE)"
+  fi
   $S systemctl stop "${APT_UNITS[@]}" 2>/dev/null || true
   echo "  ✅ apt 자동 갱신·업그레이드 타이머 정지"
   if ((race)); then
