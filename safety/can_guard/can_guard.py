@@ -14,6 +14,7 @@ TODO(남은 작업, README 참고): 인지 하트비트는 --hb-shm 로 채널�
 이건 버그가 아니라 "인지 프로세스가 아직 없다"는 사실을 정직하게 반영한 것이다.
 """
 import argparse
+import signal
 import sys
 import time
 
@@ -28,6 +29,8 @@ from rt_setup import parse_cpulist
 from state_machine import DEFAULT_PERCEPTION_TIMEOUT_S, DEFAULT_STOPPED_AFTER_S, DEFAULT_WATCHDOG_T_S
 from state_machine import State, next_state
 from tx_encode import encode_0x156, encode_0x157
+
+SPIKE_THRESHOLD_S = 100e-6   # 스냅샷에서 "튐"으로 셀 자체측정 편차 문턱 — 8h 연속운전 관측용(§8, 2026-09-18)
 
 
 def parse_args(argv=None):
@@ -46,17 +49,34 @@ def parse_args(argv=None):
     ap.add_argument('--cmd-shm', default=None)
     ap.add_argument('--hb-shm', default=None)
     ap.add_argument('--max-cycles', type=int, default=0, help='0=무한. SIL 시험용으로 유한 실행할 때 사용')
+    ap.add_argument('--stats-interval-s', type=float, default=0.0,
+                    help='이 간격(초)마다 자체측정 지연 스냅샷을 로그로 남김. 0=비활성(기본, 장시간 운전용)')
     ap.add_argument('--quiet', action='store_true')
     return ap.parse_args(argv)
 
 
+_stop_requested = False
+
+
+def _on_shutdown_signal(signum, frame):
+    global _stop_requested
+    _stop_requested = True
+
+
 def run(a):
+    # SIGTERM 은 Python 기본 처리(즉시 커널 종료, finally 미실행)라 방치하면 cmd_ch/hb_ch.close() 의
+    # unlink() 가 안 돌아 /dev/shm 세그먼트가 누수된다(재현 확인, 2026-09-18) — 정상 종료 경로로 흡수한다.
+    signal.signal(signal.SIGTERM, _on_shutdown_signal)
+    signal.signal(signal.SIGINT, _on_shutdown_signal)
     cpus = parse_cpulist(a.cpu)
     notes = apply_rt(cpus, a.rt_priority)
     log = (lambda *args, **kw: None) if a.quiet else (lambda *args, **kw: print(*args, **kw))
     log(f'[can_guard] 실행 환경: {", ".join(notes) if notes else "기본값"}', file=sys.stderr)
 
     cycle = 0
+    tx_err_sum = 0.0
+    tx_worst = 0.0
+    tx_spikes = 0
     cmd_ch = hb_ch = bus = None
     try:
         cmd_kwargs = {'name': a.cmd_shm} if a.cmd_shm else {}
@@ -80,11 +100,35 @@ def run(a):
         log(f'[can_guard] INIT — 안전 상태로 시작 (watchdog_t={a.watchdog_t * 1000:.0f}ms)', file=sys.stderr)
 
         next_t = time.monotonic()
-        while a.max_cycles == 0 or cycle < a.max_cycles:
+        win_start_t = next_t
+        win_err_sum = 0.0
+        win_worst = 0.0
+        win_n = 0
+        win_spikes = 0
+        while not _stop_requested and (a.max_cycles == 0 or cycle < a.max_cycles):
             now = time.monotonic()
             if now < next_t:
                 time.sleep(next_t - now)
                 now = time.monotonic()
+            late = now - next_t   # 자체 측정: eait_tx.py 와 같은 정의(now-next_t), 외부 관찰자 없음
+            tx_err_sum += abs(late)
+            tx_worst = max(tx_worst, late)
+            if abs(late) > SPIKE_THRESHOLD_S:
+                tx_spikes += 1
+
+            if a.stats_interval_s > 0:
+                win_err_sum += abs(late)
+                win_worst = max(win_worst, late)
+                win_n += 1
+                if abs(late) > SPIKE_THRESHOLD_S:
+                    win_spikes += 1
+                if now - win_start_t >= a.stats_interval_s:
+                    log(f'[can_guard] 지연 스냅샷 {win_n}주기(윈도 {now - win_start_t:.0f}s) | '
+                        f'평균={win_err_sum / win_n * 1e6:.1f}µs 최대={win_worst * 1e6:.1f}µs '
+                        f'스파이크(>{SPIKE_THRESHOLD_S * 1e6:.0f}µs)={win_spikes} | '
+                        f'누적 평균={tx_err_sum / (cycle + 1) * 1e6:.1f}µs 최대={tx_worst * 1e6:.1f}µs '
+                        f'스파이크={tx_spikes}', file=sys.stderr)
+                    win_start_t, win_err_sum, win_worst, win_n, win_spikes = now, 0.0, 0.0, 0, 0
 
             # --- 1. 채널 읽기 (실패해도 마지막으로 확인된 절대시각 기준으로 나이를 계속 계산) ---
             try:
@@ -141,7 +185,10 @@ def run(a):
             cmd_ch.close()
         if hb_ch is not None:
             hb_ch.close()
-        log(f'[can_guard] 종료 — {cycle} 주기', file=sys.stderr)
+        avg_err = tx_err_sum / cycle * 1e6 if cycle else 0.0
+        log(f'[can_guard] 종료 — {cycle} 주기 | 자체측정(late=now-next_t) 평균 {avg_err:.1f}µs'
+            f' 최대 {tx_worst * 1e6:.1f}µs 스파이크(>{SPIKE_THRESHOLD_S * 1e6:.0f}µs)={tx_spikes}건',
+            file=sys.stderr)
 
 
 def main():

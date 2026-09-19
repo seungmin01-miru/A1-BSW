@@ -36,7 +36,10 @@ def main():
     guard = ctrl = perc = rec = None
     try:
         guard = start_can_guard(cmd_shm, hb_shm, channel=a.channel, watchdog_t=a.watchdog_t, period=a.period)
-        if not wait_for_shm(cmd_shm):
+        # cmd_shm 만 기다리면 안 된다 — can_guard 는 cmd_shm 을 먼저 만들고 hb_shm 을 그 다음에 만드므로,
+        # 그 틈에 fake_perception 을 띄우면 HeartbeatChannel.open() 이 FileNotFoundError 로 즉사한다
+        # (2026-09-18, soak_8h.py 8h 실행에서 실제로 재현됨 — perception_age 가 계속 None).
+        if not wait_for_shm(cmd_shm) or not wait_for_shm(hb_shm):
             sys.exit('[P-1] FAIL — can_guard 가 공유메모리를 안 만듦(시작 실패)')
 
         ctrl = start_fake_control_node(cmd_shm, period=a.period)

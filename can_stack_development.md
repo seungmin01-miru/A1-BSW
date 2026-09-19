@@ -56,7 +56,7 @@ flowchart TB
 | A | RT 커널 기반 | PREEMPT_RT 설치·튜닝(`isolcpus`/`mlockall`/`SCHED_FIFO`), `cyclictest` 측정 | 🟡 조건부 완료 (커널·격리 튜닝·30분 실측 완료. 남음: 예산 재정의 결정, generic 비교, A-3/A-4) | §5.A |
 | B | CAN 인터페이스 | 어댑터/SocketCAN, `vcan0` SIL 환경, rosbag→CAN 주입 | 🟡 진행중 (vcan0 영속화·왕복·DBC 기반 0x712 주기 송신·디코드 완료. 남음: ROS2 raw 퍼블리시=Phase C, 실 can0 전환) | §5.B |
 | C | ROS2 브리지·디코더 | `CanFrame`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | 🟡 진행중 (EAIT 수신 메시지 4종 전부 디코더 완료: 0x712/710/711/713. EPS/ACC 는 E2E(alive_count) 체크·`/diagnostics` 연동까지. A-3 레시피 재측정 완료 — ROS2 슬라이스엔 무효과 확정. 남음: 실 can0, TX 방향(can_guard)) | §5.C |
-| D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | 🟡 메인 루프 구현·P-1/P-2 SIL 실측 PASS (`can_guard`, `safety/can_guard/`). 남음: 진짜 제어/인지 노드 결선, 변화율 값, 벤치 시험 | §5.D |
+| D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | 🟡 메인 루프 구현·P-1/P-2 SIL 실측 PASS·A-3 지연 실측 완료·**SIL 8시간 PASS**(스푸리어스 전이 0, 자체측정 최대 44.6µs, D4 예산 4.46%) (`can_guard`, `safety/can_guard/`). 남음: 진짜 제어/인지 노드 결선, 변화율 값, 벤치 시험(실 하드웨어) | §5.D |
 | E | 검증/테스트 (V-model) | 좌/우 대응 검증 계획, 고장주입 시험 | 🟢 초안 완료 | §3 |
 | F | 안전등급 레퍼런스 (ASIL) | 41개 파라미터 ASIL 등급, 근거 | 🟢 초안 완료 | §4 |
 
@@ -681,18 +681,60 @@ clamp_range()`(방어 이중화) → `tx_encode` → `bus.send()`. `sd_notify.py
 | P-5 plausibility(범위/변화율/카운터) | 🟡 | 범위는 유닛테스트 완료(`test_plausibility.py`, `test_tx_encode.py`). 변화율은 숫자 확정 후 |
 | P-3/P-4 (guard 자체 kill/hang) | 🟡 | systemd 설치·재시작 시간 측정 필요 — 벤치 |
 | P-6 (CAN 선 절단) | 🔴 | 실 `can0`/`can1` 필요 — 5-1 이후 |
-| P-9 (8h 벤치) | 🔴 | 실 하드웨어 벤치 필요 |
+| P-9 (8h 벤치) | 🟡 | **SIL 근사판 완료(2026-09-18 21:14–09-19 05:14, vcan0)** — `sil_tests/soak_8h.py`, A-3+디스플레이 끔(§5.A S2 조건). 2,880,000주기 전부 완주, 상태 전이 1건(시작 INIT→ACTIVE 뿐, 스푸리어스 0), 자체측정 누적 평균 17.1µs·최대 44.6µs(D4 예산 4.46%), dmesg BUG 없음. 실 하드웨어 벤치는 5-1 이후 |
 | P-10/P-11 (콜드부트/PC 재시작 시간) | 🔴 | 실 하드웨어 |
 
-개발 중 잡은 버그 3건(§5.C 스타일로 기록, 상세는 `safety/can_guard/README.md`): (a) `ctypes.Structure.
+개발 중 잡은 버그 6건(§5.C 스타일로 기록, 상세는 `safety/can_guard/README.md`): (a) `ctypes.Structure.
 from_buffer()` 가 mmap 익스포트 포인터를 쥐고 있어 `close()` 전 `del` 필요, (b) seqlock 재시도 기본값(8)이
 무휴지 스트레스 테스트에서 부족해 1000으로, (c) P-1/P-2 스크립트 초기 버전이 자원 생성을 `try` 밖에 둬서
-예외 시 자식 프로세스가 실제로 유출된 것을 겪고 수정(생성부터 `try/finally`).
+예외 시 자식 프로세스가 실제로 유출된 것을 겪고 수정(생성부터 `try/finally`), (d) **SIGTERM 이 Python
+기본 처리(즉시 종료, `finally` 미실행)라 `Popen.terminate()` 로 끄는 P-1/P-2/A-3 측정 모두 `/dev/shm`
+세그먼트를 실제로 누수시키고 있었음(재현 확인) → SIGTERM/SIGINT 핸들러로 플래그만 세워 정상 종료 경로로
+흡수하도록 수정, (e) A-3 측정 오염 — 아래 참고, (f) **`wait_for_shm(cmd_shm)` 만으로는 부족** — can_guard
+가 `cmd_shm` 을 먼저·`hb_shm` 을 나중에 만드는데 오케스트레이션 스크립트들이 `cmd_shm` 만 보고 바로
+`fake_perception.py` 를 띄워, 그 틈에 걸리면 `HeartbeatChannel.open()` 이 즉사(실제 8h 첫 시도에서 재현
+— 20초 만에 허위 `INIT → DEGRADED` 로 끝남) → 네 스크립트 전부 `hb_shm` 도 같이 기다리도록 수정,
+`soak_8h.py` 는 가짜 노드가 8h 도중 죽어도 자동 재시작하도록 보강.
 
-**8) 남은 작업**: 진짜 ROS2 제어 노드·인지 프로세스 결선(지금은 `fake_control_node.py`/`fake_perception.py`
-로 대신 시험), 변화율 상한 값 팀 확인, `0x157` Alive_Cnt 부재 확인, STOPPED 의 "속도 0 수렴" 을 시간이 아닌
-실제 차속(RX 0x711 VS) 기반으로 바꿀지 설계 결정, `can_guard.service` 설치 + A-3 실측(`sudo chrt`), 벤치
-시험(P-3/4/6/9/10/11, 5-1 이후).
+**8) 남은 작업**
+
+보류(외부 입력 필요, 2026-09-19 기준 이 세션에서 진행 불가 — 나중에):
+1. 진짜 ROS2 제어 노드를 `CommandChannel.open()` 으로 결선 — ros2_ws 에 MPC/판단 노드가 아직 없음
+2. 진짜 인지 프로세스를 `HeartbeatChannel.open()` 으로 결선 — 마찬가지로 아직 없음
+3. 변화율(rate) 상한 값 — 팀/EAIT 사양 확인 필요(`can_status_parameters_full.md` 이 저장소에 없음)
+
+지금 진행 중: STOPPED "속도 0 수렴" 을 실제 차속 기반으로 바꿀지 설계 결정. `0x157` Alive_Cnt 부재 확인,
+`can_guard.service` 설치, 벤치 시험(P-3/4/6/9/10/11)은 실 `can0`/`can1`·팀 확인이 있어야 하는 이후 단계.
+
+**A-3 레시피 지연 실측 완료 (2026-09-18)**: 외부 관찰(vcan0 프레임 간격) 로는 평균 16.8µs·최대 178.8µs,
+can_guard 자체측정(`late=now-next_t`, `eait_tx.py` 와 동일 정의, `can_guard.py --max-cycles 500` 직접 실행)
+으로는 평균 **17.0µs·최대 29.1µs**(D4 예산 ≤1ms 대비 **2.9%**). 최대값이 29.1 대 178.8 로 6배 차이 나는 게
+핵심 증거 — **외부 관찰자(비격리·일반우선순위 파이썬 프로세스)가 자기 스케줄링 지연을 can_guard 탓으로
+잘못 기록**하고 있었음을 자체측정으로 확인. can_guard 의 진짜 송신 타이밍 판단은 이제부터 자체측정 기준.
+자체측정(17.0/29.1µs)이 `eait_tx.py`(5~9µs)보다 2-3배 큰 건 루프당 일이 많아서(seqlock 읽기 2회+
+`dataclasses.replace()` 2회+`bus.send()` 2회) — 구조적으로 설명되는 정상 범위. 상세 분석·과정에서 잡은
+부수 버그(SIGTERM 이 `finally` 를 안 태워 `/dev/shm` 누수)는 `safety/can_guard/README.md` 참고.
+
+**SIL 8시간 연속 운전 완료 — PASS (2026-09-18 21:14–09-19 05:14)**: `sil_tests/soak_8h.py` — A-3 조건
+(격리 코어+`SCHED_FIFO 90`)으로 can_guard 를 오래 돌리며 지연과 상태머신 안정성을 함께 봤다. `can_guard.py`
+에 `--stats-interval-s`(기본 비활성, 장시간 운전에만 사용) 옵션을 추가해 1분 단위로 자체측정 지연 스냅샷
+(윈도 평균/최대 + 100µs 초과 "스파이크" 횟수, 누적치 동반)을 stderr 로그에 남기도록 했다 — RT 조사 때
+짧은 측정으로는 못 본 드문 이벤트가 8h 관측에서만 드러났던 전례(§5.A)를 참고한 설계. 실행 조건은 그
+전례와 맞춰 **디스플레이도 껐다**(§5.A 의 검증된 S2 조건: idle-delay 60s+화면잠금, dimming 끔).
+
+첫 시도(같은 날 21:08)는 20초 만에 허위 경보로 끝났다 — `wait_for_shm(cmd_shm)` 만 확인하고 `fake_perception.py`
+를 띄우는 경합 버그(can_guard 가 hb_shm 을 cmd_shm 보다 나중에 만드는 그 틈에 걸리면 `HeartbeatChannel.
+open()` 이 즉사, perception_age 가 영원히 None) 때문이었다. p1/p2/measure_a3_latency/soak_8h 네 스크립트
+전부에 있던 잠재 버그로, hb_shm 도 같이 기다리도록 고치고 `soak_8h.py` 에 가짜 노드 자동 재시작까지
+보강한 뒤(상세는 `safety/can_guard/README.md` 버그 6번) 재실행한 게 위 결과다.
+
+**최종 결과**: 목표 2,880,000주기(8h×10ms) **전부 완주**, 상태 전이 **1건**(시작 시 INIT→ACTIVE 뿐 —
+8시간 내내 스푸리어스 전이 0). 자체측정 누적 평균 **17.1µs**, 최대 **44.6µs**(D4 예산 ≤1ms 대비 **4.46%**),
+100µs 초과 스파이크 **0건**. 1분 단위 479개 윈도 최대값도 20.0~44.6µs 범위로 드리프트·이상치 없이 안정
+— RT 커널 조사 때처럼 짧은 측정에서 안 보이던 드문 꼬리 이벤트가 여기선 없었다(디스플레이 끈 조건의
+효과로 보임). dmesg BUG류 없음, 실행 후 `/dev/shm`·프로세스 전부 깨끗이 정리됨 확인. **P-9 SIL 근사판
+완료 — can_guard Phase D 의 핵심 자체 검증 항목은 전부 끝남, 남은 건 실 하드웨어 벤치와 진짜 제어/인지
+노드 결선뿐.**
 
 ---
 

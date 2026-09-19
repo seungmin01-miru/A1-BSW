@@ -53,7 +53,9 @@ def main():
     try:
         guard = start_can_guard(cmd_shm, hb_shm, channel=a.channel, period=a.period,
                                 extra_args=['--perception-timeout', str(a.perception_timeout)])
-        if not wait_for_shm(cmd_shm):
+        # cmd_shm 만 기다리면 안 된다 — hb_shm 은 그 다음에 만들어져서, 그 틈에 fake_perception 을 띄우면
+        # HeartbeatChannel.open() 이 즉사한다(2026-09-18, soak_8h.py 8h 실행에서 실제로 재현됨).
+        if not wait_for_shm(cmd_shm) or not wait_for_shm(hb_shm):
             sys.exit('[P-2] FAIL — can_guard 가 공유메모리를 안 만듦(시작 실패)')
 
         ctrl = start_fake_control_node(cmd_shm, period=a.period)

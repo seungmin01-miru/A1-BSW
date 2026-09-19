@@ -18,7 +18,7 @@
 | `sd_notify.py` | systemd `Type=notify`/`WatchdogSec` 하트비트 (외부 의존 없이 소켓 직접) |
 | `can_guard.py` | 메인 루프 — 위 전부를 결선 |
 | `can_guard.service` | systemd 유닛(미설치) |
-| `sil_tests/` | P-1/P-2 실행 시험(가짜 제어노드·인지 프로세스로 실제 kill 검증) |
+| `sil_tests/` | P-1/P-2/A-3/8h 실행 시험(가짜 제어노드·인지 프로세스로 실제 kill 검증, 지연 실측, 장시간 운전) |
 
 ```bash
 cd safety/can_guard
@@ -27,6 +27,8 @@ python3 -m pytest test/ -v                              # 51개, 하드웨어 �
 python3 can_guard.py --channel vcan0                     # SIL 로 직접 실행
 python3 sil_tests/p1_kill_control_node.py --channel vcan0   # §7.3 P-1 (실제 kill -9 로 검증)
 python3 sil_tests/p2_kill_perception.py --channel vcan0     # §7.3 P-2
+python3 sil_tests/measure_a3_latency.py --channel vcan0 --cpu 8 --rt-priority 90 --duration 5  # A-3 지연
+python3 sil_tests/soak_8h.py --channel vcan0 --hours 8 --cpu 8 --rt-priority 90                # §7.3 P-9 SIL 근사
 ```
 
 ## 실측 (2026-09-19, SIL·vcan0)
@@ -37,17 +39,55 @@ python3 sil_tests/p2_kill_perception.py --channel vcan0     # §7.3 P-2
 | INIT 상태 실제 프레임 | vcan0 에 0x156/0x157 실전송 확인, `cantools` 디코드로 안전 기본값(En=0 등) 대조 일치 |
 | **P-1** (제어 노드 kill -9) | **PASS** — 전이 55ms(예산 50ms+한 틱 안), Aliv_Cnt 101프레임 연속, ACC_Cmd 0.150→0.000 램프 확인 |
 | **P-2** (인지 kill -9) | **PASS** — 0x156 간격 kill 전/후 평균 10.00ms(최대 10.2~10.4ms), Aliv_Cnt 연속, DEGRADED 전이 확인, 새 dmesg BUG 없음 |
+| **A-3 지연 기준선** (RT 없음, `measure_a3_latency.py`) | 주기 편차(|실제−10ms 목표|) 평균 **70µs**, 최대 **~415µs** (5초 × 2회 재현) |
+| **A-3 적용, 외부 관찰**(격리 코어+`sudo chrt` 로 진짜 SCHED_FIFO 90, vcan0 에서 프레임 간격으로 측정) | 평균 **16.8µs**, 최대 **178.8µs**(5초) — 기준선 대비 개선되나, 아래 자체측정과 비교하면 **관찰자 자신의 오차가 섞인 과대평가**임이 드러남 |
+| **A-3 적용, 자체측정**(`can_guard.py --max-cycles 500`, `late=now-next_t`, `eait_tx.py` 와 동일 정의) | 평균 **17.0µs**, 최대 **29.1µs**(500주기≈5초) — **이게 진짜 비교 대상.** D4 예산(최대 ≤1ms) 대비 **2.9%** 사용 |
+| **P-9 SIL 근사, 8시간** (`sil_tests/soak_8h.py`, A-3+디스플레이 끔 조건, 2026-09-18 21:14–09-19 05:14) | **PASS** — 목표 2,880,000주기 전부 완주(중단 없음). 상태 전이 **1건**(시작 시 INIT→ACTIVE 뿐, 8h 동안 스푸리어스 전이 0). 자체측정 누적 평균 **17.1µs** 최대 **44.6µs**(D4 예산 대비 4.46%), 스파이크(>100µs) **0건**. 1분 단위 479개 창(윈도) 최대값도 20.0~44.6µs 범위로 드리프트·이상치 없이 안정. dmesg BUG류 없음, `/dev/shm`·프로세스 전부 정리 확인 |
 
-## 아직 없는 것 (다음 단계)
+**세 수치 해석 (2026-09-18 결론)**:
+1. **최대값 29.1µs vs 178.8µs — 6배 차이가 핵심 증거**: can_guard 자신이 보낸 시각은 최악 29.1µs 밖에 안
+   늦었는데, vcan0 에서 받아 적는 외부 관찰자(`FrameRecorder`, 일반 우선순위·비격리 코어의 파이썬 루프)는
+   자기도 가끔 스케줄링 지연을 먹어 178.8µs 까지 늦게 기록했다. **외부 관찰 수치는 can_guard 의 결함이
+   아니라 관찰자의 측정 오차를 반영한다** — 이제부터 can_guard 자신의 송신 타이밍 판단은 자체측정
+   (stderr 의 "자체측정(late=now-next_t)" 줄, `eait_tx.py` 와 동일 정의)을 기준으로 삼는다.
+   (처음엔 "`sudo chrt` 를 오케스트레이션 스크립트 전체에 씌우면 관찰자까지 FIFO 90 을 상속해 경합한다"는
+   가설을 세워 `_common.start_can_guard()` 가 can_guard.py 프로세스 하나만 감싸도록 고쳤다 — 평균은
+   20.6→16.8µs 로 예측대로 개선됐지만 최대는 174.7→178.8µs 로 거의 안 바뀌어, **관찰자의 FIFO 상속 경합이
+   아니라 관찰자라는 측정 방식 자체의 한계**였음이 이번 자체측정으로 최종 확인됐다.)
+2. **자체측정(17.0/29.1µs)이 `eait_tx.py`(5~9µs)보다 2-3배 큰 건 구조적 차이로 설명된다**: can_guard 루프는
+   매 주기 seqlock 읽기 2회(`CommandChannel.read()`+`HeartbeatChannel.age()`, ctypes 필드 접근),
+   `dataclasses.replace()` 2회, `bus.send()` 2회(0x156/0x157) — `eait_tx.py`(메시지 1개 인코딩+송신 1회)
+   보다 할 일이 많다. 이 정도 배율 차이는 정상 범위로 판단, D4 예산의 2.9%면 여유 충분.
+3. 실행법: `sudo chrt -f 90 sudo -u ailab python3 can_guard.py --channel vcan0 --cpu 8 --rt-priority 90
+   --max-cycles N` — 오케스트레이션 스크립트(`measure_a3_latency.py`)를 거치지 않고 can_guard 를 직접
+   돌리면 stderr 가 파이프 캡처 없이 터미널에 바로 찍혀 가장 확실하다(오케스트레이션 스크립트에서는
+   `sudo` 이중 래핑 때문에 `guard.communicate()` 가 가끔 stderr 캡처에 실패하는 현상 관찰됨 — 알려진 제약,
+   근본 수정은 안 함, 직접 실행으로 우회).
 
-- [ ] 진짜 ROS2 제어 노드가 `CommandChannel.open()` 으로 결선 (지금은 `fake_control_node.py` 로 대신 시험)
-- [ ] 진짜 인지 프로세스가 `HeartbeatChannel.open()` 으로 결선
-- [ ] 변화율(rate) 상한 값 — 팀/EAIT 사양 확인 전까지 `RateLimiter` 는 비활성 상태로 둔다
-- [ ] `0x157` 에 `Alive_Cnt` 가 없는 이유 확인 (§5.D 미확인 사실)
+## 보류 — 지금 여기서 못 하는 것 (외부 입력 필요, 나중에)
+
+이 셋은 코드 문제가 아니라 **이 세션 밖의 무언가**(팀 확인, 아직 없는 실제 프로세스)가 있어야 진행된다 —
+그래서 뒤로 미룬다. 다른 항목과 섞이지 않도록 따로 둔다.
+
+- [ ] **진짜 ROS2 제어 노드**를 `CommandChannel.open()` 으로 결선 — ros2_ws 쪽에 아직 MPC/판단 노드가 없다
+      (지금은 `fake_control_node.py` 로 대신 시험, P-1/P-2 는 이걸로 이미 검증됨)
+- [ ] **진짜 인지 프로세스**를 `HeartbeatChannel.open()` 으로 결선 — 마찬가지로 아직 없다
+- [ ] **변화율(rate) 상한 값** — `eps_cmd`(deg/s)·`acc_cmd`(jerk) 실차/EAIT 보드 사양. 이 저장소에
+      `can_status_parameters_full.md` 가 없어 팀이 줘야 한다. 그 전까지 `RateLimiter` 는 비활성.
+- [ ] `0x157`(EAIT_Control_02)에 `Alive_Cnt` 가 없는 이유 — EAIT 쪽에 물어봐야 아는 사실(§5.D 참고)
+
+## 다음 단계 (지금 할 수 있는 것)
+
 - [ ] STOPPED 상태의 "속도 0 수렴" 판정 — 지금은 시간(HOLDING 지속시간)만으로 근사(`command_policy.py` TODO
       참고). 실제로는 RX(0x711 VS)를 같이 구독해야 정확해진다 — 그러려면 can_guard 가 RX 도 보게 할지,
       아니면 별도 감시 프로세스를 둘지 설계 결정 필요.
-- [ ] `can_guard.service` 설치·A-3 레시피 실측(격리 코어+`SCHED_FIFO 90`, `sudo chrt` 로 검증)
+- [x] A-3 레시피 지연 실측(격리 코어+`SCHED_FIFO 90`, `sudo chrt` 로 root 확인) — **완료(2026-09-18)**.
+      자체측정 평균 17.0µs·최대 29.1µs, D4 예산 2.9% 사용. 위 표 참고.
+- [ ] `can_guard.service` **설치는 보류** — 진짜 제어 노드 없이 상시 기동하는 건 이르다고 판단, A-3 측정은
+      `can_guard.py` 를 직접 `sudo chrt` 로 실행해서 한다(§5.C 때와 같은 방법, 설치 없이)
+- [x] SIL 8시간 연속 운전(P-9 의 SIL 근사판 — 진짜 벤치는 실 `can0`/`can1` 필요, 5-1 이후) — **완료
+      (2026-09-18 21:14–09-19 05:14)**. `sil_tests/soak_8h.py`, A-3+디스플레이 끔(§5.A 검증된 S2 조건)으로
+      2,880,000주기 전부 완주, 스푸리어스 전이 0, 자체측정 누적 최대 44.6µs, dmesg BUG 없음. 위 표 참고.
 - [ ] 벤치 시험(P-3/4/6/9/10/11) — 실 `can0`/`can1` 필요, 5-1 이후
 
 ## 설계 결정 기록 (§7.2 원문과 다른/구체화된 부분)
@@ -70,3 +110,20 @@ python3 sil_tests/p2_kill_perception.py --channel vcan0     # §7.3 P-2
 4. `SharedMemory(create=False)` 핸들이 `multiprocessing.resource_tracker` 에 등록돼, 그 프로세스가
    SIGKILL 로 죽으면(P-1/P-2 가 실제로 이렇게 함) "leaked shared_memory" 경고가 뜸(실제 누수 아님,
    소유자는 따로 있음) → `open()` 시점에 tracker 등록 해제로 제거.
+5. **SIGTERM 이 `finally` 를 안 태움 → 진짜 리소스 누수** (2026-09-18, 실제 재현 확인). Python 은 SIGTERM 에
+   기본 핸들러가 없어(SIGINT 와 달리 `KeyboardInterrupt` 로 안 바뀜) `Popen.terminate()` 가 프로세스를 즉시
+   죽이고 `try/finally` 의 `finally` 가 아예 안 돈다 — `cmd_ch.close()`/`hb_ch.close()` 의 `unlink()` 가
+   실행되지 않아 `/dev/shm` 세그먼트가 프로세스마다 2개씩 영구히 남는다. P-1/P-2/`measure_a3_latency.py`
+   모두 `guard.terminate()` 로 종료시키므로 지금까지의 모든 SIL 실행이 이렇게 새고 있었다(각 실행이
+   `uuid` 로 이름을 새로 만들어 서로 충돌은 안 해서 안 보였을 뿐). → `run()` 앞에서 SIGTERM/SIGINT 를
+   `_on_shutdown_signal` 로 받아 `_stop_requested` 플래그만 세우고 메인 루프 조건에서 확인하도록 고침 —
+   정상 종료 경로(= `finally` 실행)로 흡수됨. 고친 뒤 실제로 `kill -TERM` 후 `/dev/shm` 이 비는 것,
+   exit code 0 인 것 확인.
+6. **`wait_for_shm(cmd_shm)` 만으로는 부족 — `hb_shm` 경합** (2026-09-18, 실제 8h 첫 시도에서 재현).
+   can_guard 는 `cmd_shm` 을 먼저 만들고 `hb_shm` 을 그 다음에 만드는데, 오케스트레이션 스크립트들
+   (p1/p2/measure_a3_latency/soak_8h)이 `cmd_shm` 만 확인하고 바로 `fake_perception.py` 를 띄웠다.
+   그 틈(마이크로초 단위지만 실제로 걸림)에 걸리면 `HeartbeatChannel.open()` 이 `FileNotFoundError` 로
+   즉사 — perception_age 가 영원히 `None` 이 돼 `INIT → DEGRADED` 에서 안 벗어남(8h 목표가 20초 만에
+   허위 경보로 끝남). `hb_shm` 도 같이 기다리도록 네 스크립트 전부 수정, 10회 반복 스모크 테스트로 재현
+   안 되는 것 확인(0/10 재시작). 덤으로 `soak_8h.py` 는 가짜 노드가 8h 도중 죽어도 자동 재시작하도록
+   보강(재시작 횟수는 최종 요약에 포함) — 초반 한 번의 우연한 실패로 나머지 몇 시간을 다 날리지 않도록.

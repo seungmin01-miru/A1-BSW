@@ -9,3 +9,6 @@ tools/rt/backup_*/
 ros2_ws/build/
 ros2_ws/install/
 ros2_ws/log/
+
+# soak_8h.py 등 SIL 실행 로그 (이 PC 전용 실측 원본 — 요약은 문서에 반영)
+safety/can_guard/sil_tests/*.log

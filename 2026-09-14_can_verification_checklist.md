@@ -207,7 +207,7 @@ Decision: **no MCU for this competition.** The safety layer runs on the main PC.
 | P-6 | 🔴 | [ ] CAN line cut (hard E-stop emulation): unplug can0 | fake vehicle sees silence (vendor-AEB path); guard sees TX errors / bus-off and recovers on reconnect |
 | P-7 | 🟡 | [ ] OOM injection: perception allocates until OOM | guard survives, TX unaffected |
 | P-8 | 🟡 | [ ] DDS storm: heavy topic traffic | guard unaffected (no DDS in loop) |
-| P-9 | 🔴 | [ ] 8-h bench, full stack + guard | **zero spurious fallbacks**; TX period max recorded |
+| P-9 | 🟡 | [x] 8-h bench, full stack + guard — **SIL PASS 2026-09-18 21:14–09-19 05:14 (vcan0, A-3+display off)** | **zero spurious fallbacks** — 1 transition total (startup INIT→ACTIVE only), 2,880,000/2,880,000 cycles completed; self-measured jitter avg 17.1µs / max 44.6µs (0.05ms/1ms budget = 4.46%), 0 dmesg BUG. `safety/can_guard/sil_tests/soak_8h.py`. Real hardware bench (full stack, real can0/can1) still pending — this was SIL with fake control/perception. |
 | P-10 | 🟡 | [ ] Cold boot order | guard transmitting safe-state before control/perception are up |
 | P-11 | 🟡 | [ ] PC hard-reset time | know the number — during it only the vendor AEB protects |
 
