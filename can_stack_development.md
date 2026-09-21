@@ -643,8 +643,9 @@ acc_cmd: float32           # -3~1 m/s^2
 ```
 INIT(En=0, safe-state) → 제어 노드 첫 유효 명령 수신 → ACTIVE(명령 클램프해서 전달)
 ACTIVE → 명령 age > T(50ms 잠정) → HOLDING(조향 최종값 유지, 가감속 0 으로 램프)
-HOLDING → 명령 재개 → ACTIVE  |  HOLDING 지속 → STOPPED(속도 0 수렴 후 En=0)
-(모든 상태) 인지 하트비트 끊김 → DEGRADED(팀 정책에 따른 감속) — §7.2 "GPU-crash rule"
+HOLDING → 명령 재개 → ACTIVE  |  HOLDING 지속 또는 실측 차속 정지 문턱 이하 → STOPPED(En=0)
+(모든 상태) 인지 하트비트 끊김 → DEGRADED(HOLDING 과 같은 메커니즘, 초안) — §7.2 "GPU-crash rule"
+DEGRADED 지속 또는 실측 차속 정지 문턱 이하 → STOPPED (2026-09-21 초안, 아래 참고)
 (모든 상태) 재시작 → 항상 INIT 부터(안전 상태에서 시작 — §7.2 Startup 규칙)
 ```
 
@@ -703,8 +704,29 @@ from_buffer()` 가 mmap 익스포트 포인터를 쥐고 있어 `close()` 전 `d
 2. 진짜 인지 프로세스를 `HeartbeatChannel.open()` 으로 결선 — 마찬가지로 아직 없음
 3. 변화율(rate) 상한 값 — 팀/EAIT 사양 확인 필요(`can_status_parameters_full.md` 이 저장소에 없음)
 
-지금 진행 중: STOPPED "속도 0 수렴" 을 실제 차속 기반으로 바꿀지 설계 결정. `0x157` Alive_Cnt 부재 확인,
-`can_guard.service` 설치, 벤치 시험(P-3/4/6/9/10/11)은 실 `can0`/`can1`·팀 확인이 있어야 하는 이후 단계.
+지금 진행 중: `0x157` Alive_Cnt 부재 확인, `can_guard.service` 설치, 벤치 시험(P-3/4/6/9/10/11)은 실
+`can0`/`can1`·팀 확인이 있어야 하는 이후 단계.
+
+**DEGRADED 정책 + STOPPED 차속수렴 초안 완료 (2026-09-21, 팀 확인 대기)**: 둘 다 "팀 결정 필요"로 남겨
+뒀던 항목인데, §7.2 원문 근거("perception-process death is a safety event ... decel per team policy")를
+바탕으로 잠정 초안을 코드로 만들었다 — 최종 확정 전까지지만 지금 이대로도 안전 방향(더 보수적)이라
+바로 쓸 수 있다.
+
+- **DEGRADED**: ACTIVE 그대로 통과시키던 걸 **HOLDING 과 같은 메커니즘**(조향 얼림+가감속 0 램프)으로
+  바꿨다 — 이미 검증된 코드 재사용, 새 로직 최소화. cmd 가 계속 fresh 해서 HOLDING 경로를 안 타는 만큼,
+  DEGRADED 자신의 지속시간 상한(기본 2.0s, HOLDING 과 별도 조정 가능)을 넘으면 STOPPED 로 직접 넘어가게
+  했다 — "인지 없이 무한정 명령을 신뢰하지 않는다"를 실제로 강제.
+- **STOPPED 차속수렴**: `rx_decode.py`(신규) 로 0x711 VS 만 읽는다. **설계 결정**: can_guard 가 이미 열어
+  둔 TX 용 `bus` 를 그대로 RX 에도 재사용(non-blocking `recv(timeout=0)`, 한 주기 최대 16회 드레인) —
+  별도 감시 프로세스+새 IPC 채널 대신 이 방법을 택함(새 실패 지점을 안 늘리고, ROS2/DDS 도 여전히 안 씀).
+  HOLDING/DEGRADED → STOPPED 는 "지속시간 상한" **또는** "실측 차속이 정지 문턱(기본 3km/h) 이하" 중 먼저
+  오는 쪽 — 차속 미확보/오래됨(1초 초과)이면 기존 시간 기반 안전망으로 자동 복귀. **ACTIVE 에서는 차속을
+  절대 참조하지 않는다**(정상 주행 중 서행·정차를 정지로 오판 방지).
+- 잠정값(2.0s, 3km/h)은 `plausibility.py` 변화율처럼 "몰라서 비움" 이 아니라 "합리적 기본값 채움, 팀
+  검토 대상" — `--perception-lost-stopped-after`/`--stop-speed-kph` CLI 인자로 코드 변경 없이 조정 가능.
+- 유닛테스트 13개 추가(51→64, rx_decode 는 cantools 대조), 라이브 vcan0 로 DEGRADED→STOPPED(시간 경로)·
+  차속 조기 정지(VS=1km/h 주입) 둘 다 확인, P-1/P-2 재실행 회귀 없음. TX 루프에 non-blocking recv 가
+  늘었으니 **A-3 지연 재검증은 아직 안 함** — 다음에 재확인 필요(`safety/can_guard/README.md` 참고).
 
 **A-3 레시피 지연 실측 완료 (2026-09-18)**: 외부 관찰(vcan0 프레임 간격) 로는 평균 16.8µs·최대 178.8µs,
 can_guard 자체측정(`late=now-next_t`, `eait_tx.py` 와 동일 정의, `can_guard.py --max-cycles 500` 직접 실행)

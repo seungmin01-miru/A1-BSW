@@ -54,13 +54,25 @@ def test_stopped_cuts_en_flags():
     assert out.eps_speed == 180
 
 
-def test_degraded_same_as_active_for_now():
+def test_degraded_freezes_steering_and_ramps_accel_to_zero():
+    """2026-09-21 초안: DEGRADED 는 이제 ACTIVE 가 아니라 HOLDING 과 같은 메커니즘(조향 얼림+가감속 0 램프)."""
+    acc_rl = RateLimiter(max_delta_per_s=10.0)
+    acc_rl.step(5.0, dt_s=0.01)
+    last = Command(eps_en=True, acc_en=True, eps_cmd=20.0, acc_cmd=5.0)
+    out = command_for_state(State.DEGRADED, last, held_eps_cmd=20.0,
+                            eps_limiter=RateLimiter(), acc_limiter=acc_rl, dt_s=0.1)
+    assert out.eps_cmd == 20.0
+    assert out.acc_cmd == 4.0
+
+
+def test_degraded_differs_from_active():
+    """회귀 방지 — DEGRADED 가 실수로 다시 ACTIVE 와 같아지지 않았는지."""
     last = Command(eps_cmd=15.0, acc_cmd=0.3)
     a = command_for_state(State.ACTIVE, last, held_eps_cmd=0.0,
                           eps_limiter=RateLimiter(), acc_limiter=RateLimiter(), dt_s=0.01)
     d = command_for_state(State.DEGRADED, last, held_eps_cmd=0.0,
                           eps_limiter=RateLimiter(), acc_limiter=RateLimiter(), dt_s=0.01)
-    assert a == d   # 팀 정책이 정해지기 전까지는 동일(§5.D TODO)
+    assert a != d
 
 
 def test_init_resets_limiters():

@@ -14,6 +14,7 @@
 | `state_machine.py` | `next_state()` — INIT/ACTIVE/HOLDING/DEGRADED/STOPPED 순수 전이 함수 |
 | `command_policy.py` | 상태별로 실제 어떤 `Command` 를 보낼지(조향 유지, 가감속 램프 등) — 순수 함수 |
 | `tx_encode.py` | `Command` → 0x156/0x157 8바이트 인코더 |
+| `rx_decode.py` | 0x711(EAIT_INFO_ACC) 에서 VS(차속) 만 읽는 RX 디코더 — STOPPED 실측 차속 판정용(2026-09-21 초안) |
 | `rt_setup.py` | A-3 레시피(timer slack, cpu affinity, SCHED_FIFO, mlockall) — `eait_tx.py` 와 같은 방식, 독립 구현 |
 | `sd_notify.py` | systemd `Type=notify`/`WatchdogSec` 하트비트 (외부 의존 없이 소켓 직접) |
 | `can_guard.py` | 메인 루프 — 위 전부를 결선 |
@@ -22,7 +23,7 @@
 
 ```bash
 cd safety/can_guard
-python3 -m pytest test/ -v                              # 51개, 하드웨어 없이 전부 통과
+python3 -m pytest test/ -v                              # 64개, 하드웨어 없이 전부 통과
 
 python3 can_guard.py --channel vcan0                     # SIL 로 직접 실행
 python3 sil_tests/p1_kill_control_node.py --channel vcan0   # §7.3 P-1 (실제 kill -9 로 검증)
@@ -78,9 +79,11 @@ python3 sil_tests/soak_8h.py --channel vcan0 --hours 8 --cpu 8 --rt-priority 90 
 
 ## 다음 단계 (지금 할 수 있는 것)
 
-- [ ] STOPPED 상태의 "속도 0 수렴" 판정 — 지금은 시간(HOLDING 지속시간)만으로 근사(`command_policy.py` TODO
-      참고). 실제로는 RX(0x711 VS)를 같이 구독해야 정확해진다 — 그러려면 can_guard 가 RX 도 보게 할지,
-      아니면 별도 감시 프로세스를 둘지 설계 결정 필요.
+- [x] STOPPED 상태의 "속도 0 수렴" 판정 — **초안 완료(2026-09-21), 팀 확인 대기**. `rx_decode.py` 추가,
+      can_guard 가 이미 열려 있는 TX 용 bus 를 그대로 RX 에도 써서(새 프로세스/IPC 없음, 설계 결정 완료)
+      0x711(VS) 를 non-blocking 으로 읽는다. HOLDING/DEGRADED → STOPPED 는 "지속시간 상한" 또는 "실측
+      차속이 정지 문턱(기본 3km/h) 이하" 중 먼저 오는 쪽 — 차속 모르면(RX 없음/오래됨) 기존 시간 기반
+      안전망 그대로. 라이브 vcan0 로 조기 정지 경로까지 확인(VS=1km/h 주입 → 즉시 STOPPED). 아래 참고.
 - [x] A-3 레시피 지연 실측(격리 코어+`SCHED_FIFO 90`, `sudo chrt` 로 root 확인) — **완료(2026-09-18)**.
       자체측정 평균 17.0µs·최대 29.1µs, D4 예산 2.9% 사용. 위 표 참고.
 - [ ] `can_guard.service` **설치는 보류** — 진짜 제어 노드 없이 상시 기동하는 건 이르다고 판단, A-3 측정은
@@ -96,8 +99,23 @@ python3 sil_tests/soak_8h.py --channel vcan0 --hours 8 --cpu 8 --rt-priority 90 
 - `plausibility.py` 의 변화율 상한은 **의도적으로 비워 뒀다** — 안전 파라미터를 추측으로 채우지 않는다.
 - HOLDING: 조향은 진입 순간 값에 얼리고(`held_eps_cmd`), 가감속은 0 으로 램프. STOPPED: EPS/ACC En 을 끄고
   AEB_En 은 유지(안전장치라 끄지 않음).
-- DEGRADED(인지 하트비트 끊김)의 실제 감속 정책은 **팀 결정 전까지 ACTIVE 와 동일** — `command_policy.py`
-  안에 정책을 넣을 자리를 명시적으로 남겨 뒀다.
+- **DEGRADED/STOPPED 초안 (2026-09-21, 팀 확인 대기)**:
+  - DEGRADED(인지 하트비트 끊김, §7.2 "GPU-crash rule": "decel per team policy")는 이제 ACTIVE 가 아니라
+    **HOLDING 과 같은 메커니즘**(조향 얼림 + 가감속 0 램프) — 이미 검증된 코드 경로 재사용, 새 안전 로직을
+    늘리지 않는 선택. 팀이 실제 제동(목표를 0 이 아닌 음수로)을 원하면 `command_policy.py` 의 목표값
+    하나만 바꾸면 된다.
+  - DEGRADED 도 HOLDING 처럼 **지속시간 상한**(기본 2.0s, `--perception-lost-stopped-after`)이 지나면
+    STOPPED 로 넘어간다 — 명령이 계속 fresh 해도(HOLDING 경로를 안 타므로) 인지 없이 무한정 명령을
+    따르지 않도록. "perception-process death is a safety event"(§7.2) 를 직접 구현한 것.
+  - **차속 조기 정지**: HOLDING/DEGRADED 어느 쪽이든 실측 차속(`rx_decode.py`, 0x711 VS)이 정지 문턱(기본
+    3km/h, `--stop-speed-kph`) 이하면 지속시간 상한을 안 기다리고 바로 STOPPED. ACTIVE 상태에서는 차속을
+    절대 참조하지 않는다(정상 주행 중 서행·정차를 정지로 오판하면 안 되므로) — `state_machine.py`
+    docstring 에 이 이유를 명시.
+  - 숫자들(2.0s, 3km/h)은 전부 **잠정값** — `plausibility.py` 의 변화율처럼 "몰라서 비워 둔" 게 아니라
+    "합리적 기본값으로 채워 넣었으니 팀이 검토·조정"하라는 쪽. `--eps-rate-limit` 등과 같은 패턴으로
+    CLI 인자만 바꾸면 코드 변경 없이 조정 가능.
+  - 유닛테스트 13개 추가(state_machine 7·command_policy 2·rx_decode 5, cantools 대조 포함), 라이브
+    vcan0 로 DEGRADED→STOPPED(지속시간 경로)·차속 조기 정지 경로 둘 다 확인, P-1/P-2 재실행 회귀 없음.
 
 ## 개발 중 잡은 버그들 (기록)
 
