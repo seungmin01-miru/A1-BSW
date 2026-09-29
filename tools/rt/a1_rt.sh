@@ -27,8 +27,13 @@
 
 set -euo pipefail
 
-GEN=6.8.0-138-generic
-ROOT_UUID=3cb4c60d-1e8a-444b-8efc-612a444cc5b6
+# 다른 PC(대회 PC)에서도 동작하도록 자동 탐지 — 이 PC에서는 기존 하드코딩 값(6.8.0-138-generic / 3cb4c60d-...)과 같다.
+#   A1_GEN=<버전> 으로 덮어쓸 수 있다. 6.8 계열 generic 중 가장 높은 버전을 고른다.
+GEN=${A1_GEN:-$(ls /boot 2>/dev/null | sed -nE 's/^vmlinuz-(6\.8\.[0-9]+-[0-9]+-generic)$/\1/p' | sort -V | tail -1)}
+[[ -n "$GEN" ]] || GEN=6.8.0-138-generic
+ROOT_UUID=${A1_ROOT_UUID:-$(findmnt -no UUID / 2>/dev/null || echo 3cb4c60d-1e8a-444b-8efc-612a444cc5b6)}
+# A1_OFFLINE=1: 인터넷 없이 로컬 번들 저장소(/etc/apt/sources.list.d/a1-bundle.list)만으로 설치 (deploy/00_local_repo.sh 가 구성)
+A1_OFFLINE=${A1_OFFLINE:-0}
 BASE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)   # 저장소 tools/rt/ — 로그·백업은 여기 하위(.gitignore)
 GRUB_CFG=/boot/grub/grub.cfg
 GRUB_DROPIN=/etc/default/grub.d/99z-a1-bsw-safe-default.cfg
@@ -190,13 +195,34 @@ cmd_install() {
   check_default_is_generic
   nvidia-smi -L >/dev/null 2>&1 || die "설치 전 기준선: 현재 nvidia-smi 부터 실패함"
 
-  apt-get update -qq || warn "apt update 경고 (계속 진행)"
-  local sim others rt
-  sim=$(apt-get -s install linux-realtime-hwe-22.04) || die "apt 설치 시뮬레이션 실패"
-  grep -qE '^0 upgraded, [0-9]+ newly installed, 0 to remove' <<<"$sim" \
-    || { grep -E 'upgraded|^Inst|^Remv' <<<"$sim"; die "기존 패키지 업그레이드/삭제가 포함됨"; }
-  others=$(grep -E '^Inst' <<<"$sim" | grep -v realtime || true)
-  [[ -z "$others" ]] || die "realtime 외 패키지가 설치 목록에 있음: $others"
+  local APT=(apt-get)
+  if [[ $A1_OFFLINE == 1 ]]; then
+    APT=(apt-get -o Dir::Etc::SourceList=/etc/apt/sources.list.d/a1-bundle.list -o Dir::Etc::SourceParts=/dev/null)
+    "${APT[@]}" update -qq || die "번들 저장소 update 실패 (deploy/00_local_repo.sh 먼저)"
+    ok "오프라인 모드: 번들 저장소만 사용"
+  else
+    apt-get update -qq || warn "apt update 경고 (계속 진행)"
+  fi
+  local sim others rt RTPKGS=(linux-realtime-hwe-22.04) abi
+  if [[ $A1_OFFLINE == 1 ]]; then
+    # 번들엔 검증된 커널의 버전 명시 패키지만 있다(메타패키지는 esm 에 최신만 남아 번들 불가) → 그중 가장 높은 6.8.1-N 을 직접 설치
+    rt=$("${APT[@]}" -o Dir::Etc::SourceList=/etc/apt/sources.list.d/a1-bundle.list -s install linux-image-6.8.1-1059-realtime >/dev/null 2>&1 && echo 6.8.1-1059-realtime || true)
+    [[ -n "$rt" ]] || rt=$(apt-cache -o Dir::Etc::SourceList=/etc/apt/sources.list.d/a1-bundle.list -o Dir::Etc::SourceParts=/dev/null pkgnames linux-image-6.8 | sed -nE 's/^linux-image-(6\.8\.[0-9]+-[0-9]+-realtime)$/\1/p' | sort -V | tail -1)
+    [[ -n "$rt" ]] || die "번들에 6.8.x-realtime 커널 이미지가 없음"
+    abi=${rt%-realtime}
+    RTPKGS=("linux-image-$rt" "linux-modules-$rt" "linux-modules-extra-$rt" "linux-headers-$rt" "linux-tools-$rt" "linux-realtime-6.8-headers-$abi" "linux-realtime-6.8-tools-$abi")
+  fi
+  sim=$("${APT[@]}" -s install "${RTPKGS[@]}") || die "apt 설치 시뮬레이션 실패"
+  if [[ $A1_OFFLINE == 1 ]]; then
+    # 번들 의존 패키지가 설치본보다 새 버전일 수 있어 업그레이드는 허용하되 목록을 남기고, 삭제(Remv)는 여전히 중단
+    grep -qE '^Remv' <<<"$sim" && { grep -E '^Remv' <<<"$sim"; die "기존 패키지 삭제가 포함됨"; }
+    grep -E '^Inst' <<<"$sim" | grep -v 'linux-.*realtime' | sed 's/^/   (함께 설치·갱신) /' || true
+  else
+    grep -qE '^0 upgraded, [0-9]+ newly installed, 0 to remove' <<<"$sim" \
+      || { grep -E 'upgraded|^Inst|^Remv' <<<"$sim"; die "기존 패키지 업그레이드/삭제가 포함됨"; }
+    others=$(grep -E '^Inst' <<<"$sim" | grep -v realtime || true)
+    [[ -z "$others" ]] || die "realtime 외 패키지가 설치 목록에 있음: $others"
+  fi
   rt=$(sed -nE 's/^Inst linux-image-(6\.8\.[0-9]+-[0-9]+-realtime) .*/\1/p' <<<"$sim")
   rt=${rt%%$'\n'*}
   [[ -n "$rt" ]] || die "설치될 RT 커널 버전을 찾지 못함"
@@ -207,7 +233,7 @@ cmd_install() {
   fi
   ok "DKMS: IGNORE_PREEMPT_RT_PRESENCE=1 (RT 검사만 건너뜀 — generic 빌드엔 영향 없음)"
 
-  DEBIAN_FRONTEND=noninteractive apt-get install -y linux-realtime-hwe-22.04
+  DEBIAN_FRONTEND=noninteractive "${APT[@]}" install -y "${RTPKGS[@]}"
 
   echo "-- 설치 후 점검"
   [[ -f /boot/vmlinuz-$rt ]] && ok "커널 이미지 설치됨: $rt" || die "vmlinuz-$rt 없음"

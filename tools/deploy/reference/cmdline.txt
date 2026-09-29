@@ -1,0 +1,1 @@
+BOOT_IMAGE=/boot/vmlinuz-6.8.1-1059-realtime root=UUID=3cb4c60d-1e8a-444b-8efc-612a444cc5b6 ro quiet splash vt.handoff=7 isolcpus=managed_irq,domain,8-15 nohz_full=8-15 rcu_nocbs=8-15 rcu_nocb_poll irqaffinity=0-7,16-19 intel_idle.max_cstate=0 processor.max_cstate=0 nmi_watchdog=0 nosoftlockup skew_tick=1 idle=poll intel_pstate=disable cpufreq.default_governor=performance

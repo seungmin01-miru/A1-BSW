@@ -1,0 +1,1 @@
+Linux ubuntu22 6.8.1-1059-realtime #60~22.04.1-Ubuntu SMP PREEMPT_RT Wed Aug 19 20:08:51 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
