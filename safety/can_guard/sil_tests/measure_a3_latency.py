@@ -3,7 +3,7 @@
 eait_tx.py 가 이 레시피로 5~9µs 를 낸 것과 같은 방식의 측정을, can_guard 자체 TX 루프에 대해 한다
 (§5.C 의 "ROS2 슬라이스엔 A-3 무효과" 결론과 대칭 — can_guard 는 raw SocketCAN 이라 효과가 있어야 정상).
 
-가짜 제어노드+인지로 ACTIVE 상태를 유지시켜(상태 전이 잡음 제거) 0x156 프레임 간격만 순수하게 잰다.
+가짜 제어노드+인지로 ACTIVE 상태를 유지시켜(상태 전이 잡음 제거) 0x210 프레임 간격만 순수하게 잰다.
 
   python3 measure_a3_latency.py --channel vcan0 --duration 5                          # 기준선(RT 없음)
   python3 measure_a3_latency.py --channel vcan0 --cpu 8 --rt-priority 90 --duration 5  # A-3
@@ -28,7 +28,7 @@ from sil_tests._common import (FrameRecorder, start_can_guard, start_fake_contro
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--channel', default='vcan0')
-    ap.add_argument('--period', type=float, default=0.010)
+    ap.add_argument('--period', type=float, default=0.020)
     ap.add_argument('--duration', type=float, default=5.0, help='측정 구간(초), 정착 시간 0.5s 는 별도')
     ap.add_argument('--cpu', default='', help='can_guard 에 넘길 --cpu (격리 코어, A-3)')
     ap.add_argument('--rt-priority', type=int, default=0, help='can_guard 에 넘길 --rt-priority (A-3)')
@@ -74,11 +74,11 @@ def main():
             stderr = ''
         env_line = next((ln for ln in stderr.splitlines() if '실행 환경' in ln), '(실행 환경 로그 없음)')
 
-        ts = [t for t, fid, _ in rec.frames if fid == 0x156]
+        ts = [t for t, fid, _ in rec.frames if fid == 0x210]
         gaps = [b - a_ for a_, b in zip(ts, ts[1:])]
         if not gaps:
             sys.exit('FAIL — 프레임을 못 받음')
-        dev = [abs(g - a.period) for g in gaps]   # 목표 주기(10ms)로부터의 편차 — eait_tx.py 와 같은 지표
+        dev = [abs(g - a.period) for g in gaps]   # 목표 주기로부터의 편차 — eait_tx.py 와 같은 지표
         print(env_line)
         print(f'채널={a.channel} 목표주기={a.period*1000:.1f}ms 표본={len(gaps)}개({a.duration:.1f}s)')
         print(f'실제 간격    평균={statistics.mean(gaps)*1e6:8.1f}µs  '

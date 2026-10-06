@@ -1,4 +1,4 @@
-# 실차 인수 당일 매뉴얼 (초안 v2, 2026-10-06 작성 / 10-07 실행, 실험 시간 3시간)
+# 실차 인수 당일 매뉴얼 (v3, 2026-10-07 — 실험 시간 3시간, 리프트 송신 시험 포함)
 
 내일 목표는 세 가지다.
 
@@ -7,8 +7,13 @@
 2. **CAN 형식과 DBC 확보** — 업체가 DBC를 주는지에 따라 B1 / B2 / B3 중 하나로 진행한다.
 3. **검증 체크리스트(`2026-09-14_can_verification_checklist.md`) 미결 항목 확인** — 원격이 되면 차량
    fail-safe·E-stop·우선권 등을 실제로 관측한다(아래 "체크리스트 대응표").
+4. **리프트 송신 시험(C단계)** — 차량을 리프트에 올린 상태에서 can_guard 로 0x210 을 보내 기본 명령이 먹히는지
+   확인한다(아래 "C. 리프트 송신 시험"). 계획·근거: `docs/2026-10-06_a1_dbc_update_and_lift_plan.md`.
 
-**내일 우리 PC는 끝까지 듣기만 한다(listen-only).** 송신은 실차 프로토콜 전환(노션 09번)이 끝난 뒤의 일이다.
+**송신은 C단계에서만, 전제 조건을 전부 통과한 뒤에만 한다.** 그 외 시간은 끝까지 listen-only.
+
+> ⚠️ **업체 DBC(`DBC/A1_dbc.dbc`)의 0x210 조향 배율 ×0.1 은 틀렸다 — 실제는 ×1 deg**(9/17 로그 1,354구간에서
+> 위치/명령 비율 1.000). 그대로 쓰면 핸들이 10배로 돈다. 우리 코드·현장 디코드는 전부 `DBC/A1_dbc_fixed.dbc` 기준.
 
 ---
 
@@ -22,14 +27,29 @@
 | 0:15 | 15 | ★ 1단계 종단 측정 → 연결 → listen-only → 비트레이트 | PC |
 | 0:30 | 5 | ★ 2단계 녹화 시작 + S0 기준선(1분) + 주기 측정 | PC |
 | 0:35 | 15 | ★ A-1 원격 판정 T1~T3 | PC + 대회 측 |
-| 0:50 | 90 | 갈래별 실험 — **A-직결**(아래 표) 또는 **A-비직결**. 질문 담당은 **동시에 B(DBC)** 진행 | 전원 |
-| 2:20 | 20 | ☆ 남은 질문(V4~V8, R4~R6, 규정) + 못 한 시나리오 보충 | 질문 담당 |
+| 0:50 | 70 | 갈래별 실험 — **A-직결**(★ 시나리오 위주, ☆는 시간 될 때) 또는 **A-비직결**. 질문 담당은 **동시에 B(DBC)** | 전원 |
+| 2:00 | 25 | ★ **C. 리프트 송신 시험** C0~C7 (업체 허락·리프트·E-stop 확인 후. 안 되면 건너뛰고 질문으로) | 전원 |
+| 2:25 | 15 | ☆ 남은 질문(V4~V8, R4~R6, 규정) + 못 한 시나리오 보충 | 질문 담당 |
 | 2:40 | 20 | ★ 3단계 마무리·백업 2부, answers.md 빈칸 확인 | PC |
+
+리프트 시험을 원격 판정보다 뒤에 두는 이유: 원격이 직결이면 원격이 0x210 을 보내므로 **원격을 끈 뒤에만** 우리가
+송신할 수 있다(can_guard 가 다른 0x210 송신자를 보면 시작을 거부한다). 원격 데이터를 먼저 다 받고 끈다.
 
 **인원 2명 권장**: PC 담당(녹화·메모 `m`·cansniffer 관찰) / 질문 담당(대회 측·업체 대응, `answers.md` 작성,
 사진). 1명이면 B(DBC)는 실험 중 대기 시간에 끼워 넣는다.
 
 ---
+
+## 아침 확인 (출발 전 5분, 이 PC에서)
+
+어젯밤 만든 도구가 전부 정상인지 한 번에 확인한다. 전부 vcan0(가상 버스)에서 돌고 실차와 무관하다.
+```bash
+cd ~/git/A1-BSW
+python3 -m pytest -q -p no:cacheprovider safety/can_guard/test tools/race_day/test_lift_tx.py   # 유닛테스트
+bash tools/race_day/rehearse_lift_guard.sh      # C단계 리허설(can_guard + lift_cmd), 약 1분 30초
+bash tools/race_day/rehearse_lift_tx.sh         # 비상용 lift_tx 리허설, 약 1분
+```
+마지막 줄이 각각 `PASS n / FAIL 0` 이면 OK. FAIL 이 있으면 **C단계는 하지 말고** 듣기만 한다.
 
 ## 출발 전 (오늘 밤)
 
@@ -203,7 +223,7 @@ cansniffer -c can0          # 끝내려면 Ctrl+C
 
 ---
 
-## A-직결 — 주행 로그 + 체크리스트 확인 (90분)
+## A-직결 — 주행 로그 + 체크리스트 확인 (70분)
 
 대회 측 조작자에게 아래 표를 보여 주며 순서대로 부탁한다. **정지 상태 시험을 먼저**(안전하고 빠름),
 주행 시험은 공간이 있을 때만. 각 시나리오의 시작·끝에 `m`.
@@ -234,7 +254,7 @@ cansniffer -c can0          # 끝내려면 Ctrl+C
 
 ---
 
-## A-비직결 — 원격 인터페이스 기록 + 수동 역추적 (90분)
+## A-비직결 — 원격 인터페이스 기록 + 수동 역추적 (70분)
 
 오늘은 **연결 방식과 데이터 형식만** 확보한다. 우리 PC가 대신 CAN으로 보내는 건 can_guard 실차 전환 후.
 
@@ -295,6 +315,89 @@ timeout 10 candump can0 | python3 -m cantools decode "$D/dbc/<파일>.dbc" \
 요청하는 것을 최우선으로.
 
 ---
+
+## C. 리프트 송신 시험 (25분) — can_guard 로 0x210 송신
+
+우리 PC 가 처음으로 차량에 명령을 보내는 단계. 구조: `lift_cmd.py`(사람이 한 줄 명령 → 가짜 제어 노드 + 가짜 인지
+하트비트) → 공유메모리 → **can_guard**(상태머신·한계·안전 동작) → 0x210 20 ms → 차량. lift_cmd 는 버스에
+아무것도 보내지 않는다 — 차로 나가는 프레임은 전부 can_guard 가 만든다.
+
+### 전제 조건 (하나라도 X 면 송신하지 않는다 — `answers.md` C절에 체크)
+- [ ] 아침 확인 리허설 FAIL 0
+- [ ] **업체 송신 허락**(누가, 몇 시)
+- [ ] 구동륜이 공중(리프트), 차량 주변 사람 없음
+- [ ] 업체 담당 입회, **E-stop 위치와 누를 사람** 정함
+- [ ] 원격조종 송신기 꺼짐(다른 0x210 송신자 없음 — C0 에서 자동 확인)
+- [ ] 비트레이트 확정, 녹화(`candump -l`) 중, `m` 준비
+
+### C0. 듣기 상태에서 확인 (2분)
+```bash
+m "C0 시작"
+timeout 3 candump can0 | awk '{print $2}' | sort | uniq -c     # 210 이 없어야 함. 200·201 은 있어야 함
+```
+`210` 이 보이면 누가 보내는지 확인하고 끌 때까지 진행하지 않는다.
+
+### C1. listen-only 해제 + can_guard 시작 (3분)
+```bash
+m "C1 listen-only 해제"
+sudo ip link set can0 down
+sudo ip link set can0 type can bitrate <확정값> listen-only off
+sudo ip link set can0 up
+ip -details link show can0 | grep -o 'LISTEN-ONLY' || echo "정상 모드 OK"
+
+# 터미널 3 — can_guard (리프트 한계, 1초마다 상태 표시). 이 터미널이 차로 나가는 유일한 송신자.
+cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/can_guard.py --channel can0 \
+    --steer-limit-deg 30 --brake-limit-pct 60 --acc-limit-pct 10 --status-interval-s 1 2>&1 | tee -a can_guard.log
+```
+- 시작하면 1초 동안 듣고 **다른 0x210 이 있으면 스스로 거부**(종료 코드 3)한다.
+- 그 뒤 `INIT` 상태로 **auto 0·명령 0** 을 20 ms 마다 보낸다 — 차량은 반응이 없어야 한다.
+- 확인: `ip -details -statistics link show can0` 의 `berr-counter`·state 가 그대로(ERROR-ACTIVE)인지, 1분 뒤 다시.
+
+### C2~C5. 명령 (12분)
+```bash
+# 터미널 4 — lift_cmd (가짜 제어 노드). 명령은 한 줄씩. 여러 줄 붙여넣어도 됨.
+cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/lift_cmd.py --channel can0
+```
+| 단계 | 입력 | 확인 (can_guard 1초 상태 줄 또는 `status`) |
+|---|---|---|
+| C2 | `auto on` | 차량 0x200 auto 비트가 `111` 로, 핸들은 그대로 |
+| C3 | `steer 5` → `steer 0` → `steer -5` → `steer 0`, 이어서 ±15, ±30 | 차량 **조향 위치 ≈ 명령**(같은 크기). 10배로 움직이면 즉시 `zero` |
+| C4 | `brake 20` → `brake 50` → `brake 0` | 브레이크 위치가 따라감 |
+| C5 | `acc 5` (2초 뒤 자동 0) → `acc 10` → `brake 20` | 바퀴 속도 상승·하강(0x201) |
+
+- 입력 한계는 조향 ±30°, 브레이크 60 %, 가속 10 % — 넘는 값은 **거부**(자르지 않음). can_guard 도 같은 한계로
+  한 번 더 자른다(이중).
+- **자동 원위치**: 가속 2초, 조향·브레이크 5초가 지나면 0. 계속 유지하려면 다시 입력.
+- 가속과 브레이크는 동시에 못 건다(브레이크 우선).
+- 단계마다 `m "C3 시작"` / `m "C3 끝"`, 숫자는 `answers.md` C절 표에.
+
+### C6. 안전 동작 (6분) — 체크리스트 §7.1·§9.1 B5·B6·P-6 를 실차에서 처음 확인
+| | 하는 것 | 기대 동작 |
+|---|---|---|
+| (a) | `steer 10` 건 상태에서 **lift_cmd 창에서 Ctrl+C** (제어 노드 죽음) | 50 ms 뒤 can_guard: 조향 10° 고정, 가속 0, 브레이크 30 % 까지 서서히 → STOPPED(바퀴가 서 있으면 바로 STOPPED). **STOPPED 는 can_guard 재시작으로만 풀림** |
+| (b) | can_guard 재시작(Ctrl+C 후 C1 명령 다시) → lift_cmd 재시작 → `auto on` → `perception off` | 0.5초 뒤 DEGRADED(또는 정지 상태면 바로 STOPPED), 같은 안전 동작 |
+| (c) | can_guard 재시작 → `auto on`, `steer 10`, `brake 10` → **다른 터미널에서 `pkill -9 -f can_guard.py`** | 우리 0x210 이 끊긴다 → **차량 자체 타임아웃 동작 관측**(몇 초 뒤 무엇을 하나, auto 가 풀리나). 시간은 나중에 로그로 잰다 |
+| (d) | (업체 동의 시) can_guard 송신 중 **E-stop** | can_guard 로그에 "송신 실패"가 뜨면 전원 차단형, 안 뜨면 차량 쪽 처리. 버스에 새 ID 가 뜨는지 |
+
+### C7. 복귀 (2분)
+```bash
+# lift_cmd 에서: auto off → (1초 기다림) → q        ← auto 0 을 먼저 보내 수동으로 돌려놓고 끈다
+# can_guard 창: Ctrl+C
+sudo ip link set can0 down
+sudo ip link set can0 type can bitrate <확정값> listen-only on
+sudo ip link set can0 up
+ip -details link show can0 | grep -o 'LISTEN-ONLY'      # 반드시 출력
+m "C7 listen-only 복귀"
+```
+
+### 문제가 생기면
+| 증상 | 할 일 |
+|---|---|
+| can_guard 가 "다른 0x210 송신자" 로 시작 거부 | 원격조종 송신기 끄기. 그래도 보이면 업체에 문의, C단계 중단 |
+| 송신 실패 / berr-counter 증가 / bus-off | 비트레이트·배선 재확인. can_guard 중단 후 listen-only 복귀 |
+| `auto on` 해도 0x200 auto 비트가 안 바뀜 | 차량 쪽 다른 조건(키·스위치·모드)이 있는지 업체에 질문 — 우리 쪽 강제 시도 금지 |
+| 조향이 명령의 10배 등 크기가 다르게 움직임 | 즉시 `zero` → `auto off`. 실제 배율을 `answers.md` 에 기록하고 중단 |
+| can_guard 에 문제가 있을 때(비상용) | `tools/race_day/lift_tx.py --channel can0` — 가드 없이 0x210 을 직접 보내는 단독 도구(같은 한계·자동 원위치·시작 전 점검, 상태머신 없음). **can_guard 와 동시에 띄우지 말 것** |
 
 ## 체크리스트 대응표 — 내일 무엇으로 확인하나
 
@@ -358,9 +461,10 @@ sudo cat /dev/ttyUSBx | while IFS= read -r l; do echo "$(date +%s.%N) $l"; done 
 
 ## 하지 말 것
 
-- listen-only를 끄는 것(정상 모드로 버스에 붙는 것)
-- `can_guard.py` 실행 — 아직 옛 프로토콜(0x156/0x157)로 송신한다
-- `cansend` 등 어떤 송신도
+- C단계 밖에서 listen-only를 끄는 것(정상 모드로 버스에 붙는 것)
+- C단계 전제 조건을 다 채우기 전에 `can_guard.py` / `lift_tx.py` 실행
+- `cansend` 등 손으로 하는 송신, **SYS 계열(0x100·0x110~0x114·0x301) 송신** — 특히 0x301 은 엔코더 설정을 바꾼다
+- `can_guard.py` 와 `lift_tx.py` 동시 실행(둘 다 0x210 을 보낸다)
 - `collect.sh` — 2단계의 알려진 문제 때문
 - 녹화 중 PC 전원 강제 차단
 - S7a·S7b를 대회 측 동의 없이, 또는 주행 중에 하는 것

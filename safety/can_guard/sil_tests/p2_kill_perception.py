@@ -14,12 +14,12 @@ import sys
 import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from sil_tests._common import (FrameRecorder, check_alive_cnt_continuous,  # noqa: E402
+from sil_tests._common import (FrameRecorder, check_tx_continuous,  # noqa: E402
                                start_can_guard, start_fake_control_node,
                                start_fake_perception, wait_for_shm)
 
 
-def inter_frame_gaps(frames, frame_id=0x156):
+def inter_frame_gaps(frames, frame_id=0x210):
     ts = [t for t, fid, _ in frames if fid == frame_id]
     return [b - a for a, b in zip(ts, ts[1:])]
 
@@ -36,7 +36,7 @@ def dmesg_bug_count():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--channel', default='vcan0')
-    ap.add_argument('--period', type=float, default=0.01)
+    ap.add_argument('--period', type=float, default=0.02)
     ap.add_argument('--perception-timeout', type=float, default=0.5)
     a = ap.parse_args()
 
@@ -83,15 +83,15 @@ def main():
         degraded_lines = [ln for ln in stderr.splitlines() if 'DEGRADED' in ln]
         print('[P-2] can_guard 로그 중 DEGRADED 전이:', degraded_lines or '(없음)')
 
-        ok, gaps = check_alive_cnt_continuous(rec.frames)
+        ok, gaps = check_tx_continuous(rec.frames, a.period)
         bugs_after = dmesg_bug_count()
 
         max_before = max(before_gaps) if before_gaps else 0.0
         max_after = max(after_gaps) if after_gaps else 0.0
-        print(f'[P-2] 0x156 간격: kill 전 평균/최대 {sum(before_gaps)/len(before_gaps)*1000:.2f}'
+        print(f'[P-2] 0x210 간격: kill 전 평균/최대 {sum(before_gaps)/len(before_gaps)*1000:.2f}'
               f'/{max_before*1000:.2f}ms, kill 후 평균/최대 '
               f'{sum(after_gaps)/len(after_gaps)*1000:.2f}/{max_after*1000:.2f}ms (목표 주기 {a.period*1000:.0f}ms)')
-        print(f'[P-2] Aliv_Cnt 연속 여부: {ok} (끊긴 지점 {len(gaps)}개)')
+        print(f'[P-2] 0x210 송신 연속 여부: {ok} (주기 2.5배 넘은 간격 {len(gaps)}개)')
         print(f'[P-2] dmesg BUG류: kill 전 {bugs_before} → kill 후 {bugs_after}')
 
         # 주기가 흔들리지 않았다는 기준: 최대 간격이 목표 주기의 3배를 넘지 않음(SIL, RT 우선순위 없이도)
@@ -99,7 +99,7 @@ def main():
         no_new_bugs = (bugs_before is None or bugs_after is None or bugs_after <= bugs_before)
         passed = ok and period_ok and no_new_bugs and bool(degraded_lines)
         print(f'\n[P-2] {"PASS" if passed else "FAIL"}'
-              f' (주기 유지={period_ok}, Aliv_Cnt 연속={ok}, 새 BUG 없음={no_new_bugs}, '
+              f' (주기 유지={period_ok}, 송신 연속={ok}, 새 BUG 없음={no_new_bugs}, '
               f'DEGRADED 전이={bool(degraded_lines)})')
         sys.exit(0 if passed else 1)
     finally:

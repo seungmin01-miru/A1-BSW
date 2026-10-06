@@ -1,86 +1,110 @@
-"""상태별 명령 생성 로직 — 실제 클램프·인코딩 없이 "무엇을 만들어내는가"만 확인."""
+"""상태별 명령 생성 로직 — 실제 클램프·인코딩 없이 "무엇을 만들어내는가"만 확인. (2026-10-06 실차 0x210 기준)"""
+import pytest
+
 from command_policy import command_for_state
 from plausibility import RateLimiter
 from protocol import Command
 from state_machine import State
 
+AUTO = dict(steer_auto=True, brake_auto=True, acc_auto=True)
 
-def test_init_is_all_off():
-    out = command_for_state(State.INIT, Command(eps_cmd=99), held_eps_cmd=0.0,
-                            eps_limiter=RateLimiter(), acc_limiter=RateLimiter(), dt_s=0.01)
-    assert out == Command()   # 완전 기본값(En=0 등)
+
+def _run(state, last, held=0.0, steer=None, acc=None, brake=None, dt=0.02, **kw):
+    return command_for_state(state, last, held, steer or RateLimiter(), acc or RateLimiter(),
+                             brake or RateLimiter(30.0), dt, **kw)
+
+
+def test_init_is_manual_and_zero():
+    out = _run(State.INIT, Command(steer_cmd_deg=99, acc_cmd_pct=50, **AUTO))
+    assert out == Command()   # auto 전부 0, 명령 0
 
 
 def test_active_passes_through_last_valid_cmd():
-    last = Command(eps_en=True, acc_en=True, eps_cmd=10.0, acc_cmd=0.5)
-    out = command_for_state(State.ACTIVE, last, held_eps_cmd=0.0,
-                            eps_limiter=RateLimiter(), acc_limiter=RateLimiter(), dt_s=0.01)
-    assert out.eps_en is True and out.acc_en is True
-    assert out.eps_cmd == 10.0 and out.acc_cmd == 0.5
+    last = Command(steer_cmd_deg=10.0, brake_cmd_pct=0.0, acc_cmd_pct=5.0, **AUTO)
+    out = _run(State.ACTIVE, last)
+    assert out == last
 
 
-def test_active_applies_rate_limit():
-    eps_rl = RateLimiter(max_delta_per_s=10.0)
-    eps_rl.step(0.0, dt_s=0.01)   # 기준값 확립
-    last = Command(eps_cmd=1000.0)   # 극단적으로 큰 다음 요청
-    out = command_for_state(State.ACTIVE, last, held_eps_cmd=0.0,
-                            eps_limiter=eps_rl, acc_limiter=RateLimiter(), dt_s=0.1)
-    assert out.eps_cmd == 1.0   # 0.1s * 10/s 만큼만 이동
+def test_active_applies_steer_rate_limit():
+    rl = RateLimiter(max_delta_per_s=10.0)
+    rl.step(0.0, dt_s=0.02)
+    out = _run(State.ACTIVE, Command(steer_cmd_deg=100.0, **AUTO), steer=rl, dt=0.1)
+    assert out.steer_cmd_deg == 1.0   # 0.1 s × 10 deg/s
 
 
-def test_holding_freezes_steering_and_ramps_accel_to_zero():
-    acc_rl = RateLimiter(max_delta_per_s=10.0)
-    acc_rl.step(5.0, dt_s=0.01)   # 직전에 5.0 이었다고 가정
-    last = Command(eps_en=True, acc_en=True, eps_cmd=20.0, acc_cmd=5.0)
-    out = command_for_state(State.HOLDING, last, held_eps_cmd=20.0,
-                            eps_limiter=RateLimiter(), acc_limiter=acc_rl, dt_s=0.1)
-    assert out.eps_cmd == 20.0   # 얼린 값 그대로(변화율 제한 없어 즉시 도달)
-    assert out.acc_cmd == 4.0    # 5.0 → 0.0 방향으로 0.1*10=1.0 만 이동
+def test_holding_freezes_steer_zeroes_acc_ramps_brake():
+    brake = RateLimiter(30.0)
+    last = Command(steer_cmd_deg=20.0, brake_cmd_pct=0.0, acc_cmd_pct=8.0, **AUTO)
+    _run(State.ACTIVE, last, brake=brake)                       # ACTIVE 에서 브레이크 기준 0 으로 리셋됨
+    out = _run(State.HOLDING, Command(steer_cmd_deg=999.0, acc_cmd_pct=8.0, **AUTO), held=20.0,
+               brake=brake, dt=0.1)
+    assert out.steer_cmd_deg == 20.0       # 진입 순간 값에 고정(last 가 이상해도 held 기준)
+    assert out.acc_cmd_pct == 0.0
+    assert out.brake_cmd_pct == pytest.approx(3.0)   # 0 → 30 % 방향으로 0.1 s × 30 %/s
+    for _ in range(20):
+        out = _run(State.HOLDING, last, held=20.0, brake=brake, dt=0.1)
+    assert out.brake_cmd_pct == pytest.approx(30.0)  # 유지값에서 멈춤
 
 
-def test_holding_freezes_steering_even_if_last_cmd_was_different():
-    """last_valid_cmd 가 그 사이 안 바뀌어도(제어 노드가 죽었으니 당연) held_eps_cmd 가 기준이다."""
-    out = command_for_state(State.HOLDING, Command(eps_cmd=999.0), held_eps_cmd=20.0,
-                            eps_limiter=RateLimiter(), acc_limiter=RateLimiter(), dt_s=0.01)
-    assert out.eps_cmd == 20.0
+def test_holding_never_reduces_a_stronger_brake():
+    brake = RateLimiter(30.0)
+    last = Command(brake_cmd_pct=50.0, **AUTO)
+    _run(State.ACTIVE, last, brake=brake)
+    out = _run(State.HOLDING, last, brake=brake, dt=0.1)
+    assert out.brake_cmd_pct == 50.0       # 유지값 30 보다 세게 밟고 있었으면 줄이지 않는다
 
 
-def test_stopped_cuts_en_flags():
-    last = Command(eps_en=True, acc_en=True, aeb_en=True, eps_speed=180)
-    out = command_for_state(State.STOPPED, last, held_eps_cmd=20.0,
-                            eps_limiter=RateLimiter(), acc_limiter=RateLimiter(), dt_s=0.01)
-    assert out.eps_en is False and out.acc_en is False
-    assert out.aeb_en is True   # AEB 는 안전장치라 끄지 않는다
-    assert out.eps_speed == 180
+def test_holding_keeps_auto_bits_as_given():
+    """can_guard 는 제어 노드가 넘겨주지 않은 축의 제어권을 스스로 가져가지 않는다."""
+    last = Command(steer_auto=True, brake_auto=False, acc_auto=True, steer_cmd_deg=5.0)
+    out = _run(State.HOLDING, last, held=5.0)
+    assert (out.steer_auto, out.brake_auto, out.acc_auto) == (True, False, True)
 
 
-def test_degraded_freezes_steering_and_ramps_accel_to_zero():
-    """2026-09-21 초안: DEGRADED 는 이제 ACTIVE 가 아니라 HOLDING 과 같은 메커니즘(조향 얼림+가감속 0 램프)."""
-    acc_rl = RateLimiter(max_delta_per_s=10.0)
-    acc_rl.step(5.0, dt_s=0.01)
-    last = Command(eps_en=True, acc_en=True, eps_cmd=20.0, acc_cmd=5.0)
-    out = command_for_state(State.DEGRADED, last, held_eps_cmd=20.0,
-                            eps_limiter=RateLimiter(), acc_limiter=acc_rl, dt_s=0.1)
-    assert out.eps_cmd == 20.0
-    assert out.acc_cmd == 4.0
+def test_degraded_same_mechanism_as_holding():
+    last = Command(steer_cmd_deg=15.0, acc_cmd_pct=6.0, **AUTO)
+    d = _run(State.DEGRADED, last, held=15.0)
+    h = _run(State.HOLDING, last, held=15.0)
+    a = _run(State.ACTIVE, last)
+    assert d == h and d != a
+    assert d.acc_cmd_pct == 0.0 and d.steer_cmd_deg == 15.0
 
 
-def test_degraded_differs_from_active():
-    """회귀 방지 — DEGRADED 가 실수로 다시 ACTIVE 와 같아지지 않았는지."""
-    last = Command(eps_cmd=15.0, acc_cmd=0.3)
-    a = command_for_state(State.ACTIVE, last, held_eps_cmd=0.0,
-                          eps_limiter=RateLimiter(), acc_limiter=RateLimiter(), dt_s=0.01)
-    d = command_for_state(State.DEGRADED, last, held_eps_cmd=0.0,
-                          eps_limiter=RateLimiter(), acc_limiter=RateLimiter(), dt_s=0.01)
-    assert a != d
+def test_stopped_hold_mode_keeps_auto_and_brake():
+    brake = RateLimiter(30.0)
+    brake.reset(30.0)
+    last = Command(steer_cmd_deg=7.0, acc_cmd_pct=4.0, **AUTO)
+    out = _run(State.STOPPED, last, held=7.0, brake=brake, stopped_mode='hold')
+    assert (out.steer_auto, out.brake_auto, out.acc_auto) == (True, True, True)
+    assert out.brake_cmd_pct == 30.0 and out.acc_cmd_pct == 0.0 and out.steer_cmd_deg == 7.0
+
+
+def test_stopped_manual_mode_hands_back():
+    out = _run(State.STOPPED, Command(steer_cmd_deg=7.0, **AUTO), stopped_mode='manual')
+    assert out == Command()
 
 
 def test_init_resets_limiters():
-    """INIT 을 지나면 리미터 기준값이 0 으로 리셋돼, 다음 ACTIVE 진입 시 이전 값에서 안 튄다."""
-    eps_rl = RateLimiter(max_delta_per_s=10.0)
-    eps_rl.step(500.0, dt_s=0.01)   # 뭔가 큰 값이 남아 있던 상태
-    command_for_state(State.INIT, Command(), held_eps_cmd=0.0,
-                      eps_limiter=eps_rl, acc_limiter=RateLimiter(), dt_s=0.01)
-    out = command_for_state(State.ACTIVE, Command(eps_cmd=1.0), held_eps_cmd=0.0,
-                            eps_limiter=eps_rl, acc_limiter=RateLimiter(), dt_s=0.1)
-    assert out.eps_cmd == 1.0   # 0 근처에서 시작했으니 0.1*10=1.0 이내인 1.0 은 그대로 통과
+    rl = RateLimiter(max_delta_per_s=10.0)
+    rl.step(140.0, dt_s=0.02)
+    _run(State.INIT, Command(), steer=rl)
+    out = _run(State.ACTIVE, Command(steer_cmd_deg=1.0, **AUTO), steer=rl, dt=0.1)
+    assert out.steer_cmd_deg == 1.0   # 0 근처에서 시작 → 0.1 × 10 = 1.0 이내라 그대로
+
+
+def test_held_steer_captured_on_direct_active_to_stopped():
+    """2026-10-06 리허설 버그: 정지 상태에서 ACTIVE → STOPPED 직행 시에도 그 순간 조향각을 캡처해야 한다."""
+    from command_policy import held_steer_on_transition
+    last = Command(steer_cmd_deg=12.0, **AUTO)
+    assert held_steer_on_transition(State.ACTIVE, State.STOPPED, 0.0, last) == 12.0
+    assert held_steer_on_transition(State.ACTIVE, State.HOLDING, 0.0, last) == 12.0
+    assert held_steer_on_transition(State.INIT, State.DEGRADED, 0.0, last) == 12.0
+
+
+def test_held_steer_kept_between_hold_states():
+    """DEGRADED → HOLDING → STOPPED 사이에는 처음 값 유지(그 사이 들어온 신뢰 못 할 명령으로 갱신 금지)."""
+    from command_policy import held_steer_on_transition
+    later = Command(steer_cmd_deg=-40.0, **AUTO)
+    assert held_steer_on_transition(State.DEGRADED, State.HOLDING, 12.0, later) == 12.0
+    assert held_steer_on_transition(State.HOLDING, State.STOPPED, 12.0, later) == 12.0
+    assert held_steer_on_transition(State.ACTIVE, State.ACTIVE, 12.0, later) == 12.0

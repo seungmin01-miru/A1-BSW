@@ -29,7 +29,7 @@ from sil_tests.p2_kill_perception import dmesg_bug_count  # noqa: E402
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--channel', default='vcan0')
-    ap.add_argument('--period', type=float, default=0.010)
+    ap.add_argument('--period', type=float, default=0.020)
     ap.add_argument('--hours', type=float, default=8.0)
     ap.add_argument('--cpu', default='8', help='격리 코어 (A-3), 빈 문자열이면 미적용')
     ap.add_argument('--rt-priority', type=int, default=90, help='0 이면 RT 미적용(상태머신 안정성만 관찰)')

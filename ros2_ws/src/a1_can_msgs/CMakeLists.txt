@@ -16,6 +16,9 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/EpsStatus.msg"
   "msg/AccStatus.msg"
   "msg/ImuStatus.msg"
+  "msg/ControlInfo.msg"
+  "msg/WheelInfo.msg"
+  "msg/ControlCommand.msg"
   DEPENDENCIES std_msgs
 )
 

@@ -1,4 +1,27 @@
-# tools/race_day — 대회장 데이터 수집 패키지
+# tools/race_day — 실차 테스트·데이터 수집 도구
+
+## ▶ 실차 테스트는 여기서 시작 (2026-10-07 기준)
+
+**절차는 전부 `VEHICLE_MANUAL.md` 한 문서를 위에서부터 따라간다.** 이 README 는 도구 목록·설계 설명이다.
+
+1. 출발 전·아침: `VEHICLE_MANUAL.md` "아침 확인" — 유닛테스트 + 리허설 2개가 `FAIL 0` 인지(가상 버스, 약 3분)
+2. 현장: 질문 → 연결 → **listen-only** 비트레이트 → `candump -l` 녹화 → 원격 판정 → (조건 충족 시) **C. 리프트 송신 시험**
+3. 기준 DBC 는 **`DBC/A1_dbc_fixed.dbc`** — 업체 원본 `A1_dbc.dbc` 의 0x210 조향 배율 ×0.1 은 틀렸다(실제 ×1).
+
+| 파일 | 역할 | 버스에 송신? |
+|---|---|---|
+| `VEHICLE_MANUAL.md` | 당일 절차서(시간표·질문·연결·녹화·원격 판정·DBC 갈래·리프트 송신 시험) | — |
+| `answers_template.md` | 현장 질문·관측 기록 양식(체크리스트 항목 번호 표기) | — |
+| `../../safety/can_guard/can_guard.py` | 차량으로 나가는 0x210 의 **유일한 송신자**(상태머신·한계·안전 동작) | ✅ C단계에서만 |
+| `../../safety/can_guard/lift_cmd.py` | 리프트 시험용 한 줄 명령 → can_guard(가짜 제어 노드 + 하트비트) | ❌ 듣기만 |
+| `lift_tx.py` | **비상용** — can_guard 없이 0x210 을 직접 보내는 단독 도구. can_guard 와 동시 실행 금지 | ✅ 비상시만 |
+| `rehearse_lift_guard.sh` / `rehearse_lift_tx.sh` | 위 두 경로를 vcan0 + 가짜 차량(`sil/vcan/fake_a1_vehicle.py`)으로 자동 리허설 | 가상 버스만 |
+| `a1_proto.py`, `test_lift_tx.py`, `testdata/` | 0x200/0x201/0x210 인코더·디코더, 테스트, 9/17 실차 프레임 샘플 | — |
+| `collect.sh`, `can_csv_logger.py` | 일괄 수집(아래 설명). ⚠️ **현재 실차일에는 쓰지 않는다** — 이 PC 의 `/dev/ttyUSB0~2`(LTE 모뎀)를 GPS 로 착각해 읽고, `sudo` 실행 시 저장 위치가 `/root` 로 바뀌는 문제가 미수정. 매뉴얼의 `candump -l` 직접 녹화를 쓴다 | ❌ |
+
+---
+
+## collect.sh — 일괄 수집 패키지 (위 ⚠️ 문제 수정 전까지 보류)
 
 대회장에서 실차를 인계받았을 때, 정확히 뭐가 돌고 있을지 모르는 상태에서도 **켜기만 하면** 원시 CAN·
 ROS2 토픽·can_guard 흔적·GPS/INS 시리얼·시스템 상태를 전부 모아 하나의 압축 파일로 남기는 도구.
@@ -7,7 +30,7 @@ ROS2 토픽·can_guard 흔적·GPS/INS 시리얼·시스템 상태를 전부 모
 > 실차 CAN 단자를 처음 연결하는 순간부터의 전체 절차(비트레이트 찾기 포함)는 **`VEHICLE_MANUAL.md`** 참고.
 > 이 문서는 `collect.sh` 자체의 사용법·설계만 다룬다.
 
-## 현장에서 할 일 (이게 전부)
+## 사용법 (문제 수정 후)
 
 ```bash
 sudo bash tools/race_day/collect.sh

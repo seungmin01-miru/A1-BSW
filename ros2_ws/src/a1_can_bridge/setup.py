@@ -33,6 +33,7 @@ setup(
             'eps_decoder = a1_can_bridge.eps_decoder:main',
             'acc_decoder = a1_can_bridge.acc_decoder:main',
             'imu_decoder = a1_can_bridge.imu_decoder:main',
+            'a1_status_decoder = a1_can_bridge.a1_status_decoder:main',
         ],
     },
 )

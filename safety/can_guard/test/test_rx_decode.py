@@ -1,54 +1,52 @@
-"""VS(0x711) 디코더를 cantools(DBC 정식 디코드)와 대조 — test_tx_encode.py 와 같은 방식."""
+"""0x200/0x201 디코더 — cantools + DBC/A1_dbc_fixed.dbc + 2026-09-17 실차 프레임과 대조."""
+import csv
 import os
 
 import cantools
 import pytest
 
-from rx_decode import decode_vs_kph
+from rx_decode import (FRAME_ID_CONTROL_INFO, FRAME_ID_WHEEL_INFO, decode_control_info,
+                       decode_vehicle_speed_kph, decode_wheel_speeds_kph)
 
-DBC = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'DBC', 'EAIT_CAN(AVANTE_CN7).dbc')
-
-
-def _encode_0x711(db, vs, **overrides):
-    msg = db.get_message_by_name('EAIT_INFO_ACC')
-    vals = {sg.name: 0 for sg in msg.signals}
-    vals['VS'] = vs
-    vals.update(overrides)
-    return msg.encode(vals, strict=True)
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
+SAMPLES = os.path.join(REPO, 'tools', 'race_day', 'testdata', 'kf1600_20260917_samples.csv')
 
 
-@pytest.mark.skipif(not os.path.exists(DBC), reason='팀 DBC 없음')
-def test_decode_vs_matches_dbc_encode_zero():
-    db = cantools.database.load_file(DBC)
-    data = _encode_0x711(db, vs=0)
-    assert decode_vs_kph(data) == 0.0
+def _real(fid_hex):
+    with open(SAMPLES) as f:
+        next(f)
+        return [bytes.fromhex(r['raw_hex']) for r in csv.DictReader(f) if r['arbitration_id_hex'] == fid_hex]
 
 
-@pytest.mark.skipif(not os.path.exists(DBC), reason='팀 DBC 없음')
-def test_decode_vs_matches_dbc_encode_typical():
-    db = cantools.database.load_file(DBC)
-    data = _encode_0x711(db, vs=42)
-    ref = db.decode_message(0x711, data, decode_choices=False)
-    assert decode_vs_kph(data) == pytest.approx(ref['VS'])
-    assert decode_vs_kph(data) == 42.0
+def test_ids():
+    assert FRAME_ID_CONTROL_INFO == 0x200 and FRAME_ID_WHEEL_INFO == 0x201
 
 
-@pytest.mark.skipif(not os.path.exists(DBC), reason='팀 DBC 없음')
-def test_decode_vs_matches_dbc_encode_max():
-    db = cantools.database.load_file(DBC)
-    data = _encode_0x711(db, vs=255)
-    assert decode_vs_kph(data) == 255.0
+def test_wheel_speeds_match_dbc_on_real_frames():
+    frames = _real('0x201')
+    assert len(frames) >= 100
+    for raw in frames:
+        ref = DB.decode_message(0x201, raw)
+        r, l_ = decode_wheel_speeds_kph(raw)
+        assert r == pytest.approx(ref['right_speed']) and l_ == pytest.approx(ref['left_speed'])
+        assert decode_vehicle_speed_kph(raw) == pytest.approx((ref['right_speed'] + ref['left_speed']) / 2)
 
 
-@pytest.mark.skipif(not os.path.exists(DBC), reason='팀 DBC 없음')
-def test_decode_vs_ignores_other_fields():
-    """VS 이외의 필드(ACC_En_Status, Long_Accel 등)가 뭐든 VS 추출에 영향 없어야 한다."""
-    db = cantools.database.load_file(DBC)
-    data = _encode_0x711(db, vs=17, ACC_En_Status=1, Long_Accel=-5.0, Turn_Left_En=1)
-    assert decode_vs_kph(data) == 17.0
+def test_wheel_speed_above_8bit_range():
+    """9월 말 정정 사례: 25.7 km/h(raw 257)가 8비트 해석이면 깨진다 — 12비트로 읽혀야 한다."""
+    raw = DB.encode_message(0x201, {'right_speed': 25.7, 'right_rpm': 243, 'left_speed': 25.1, 'left_rpm': 238,
+                                    'right_live_counter': 1, 'left_live_counter': 2})
+    assert decode_wheel_speeds_kph(raw) == (pytest.approx(25.7), pytest.approx(25.1))
 
 
-def test_decode_vs_length_independent_of_dbc():
-    """DBC 가 없어도(팀 파일 미제공 환경) 최소한 동작은 해야 한다 — 순수 비트 추출이라 의존성 없음."""
-    assert decode_vs_kph(bytes(8)) == 0.0
-    assert decode_vs_kph((0).to_bytes(8, 'little')) == 0.0
+def test_control_info_matches_dbc_on_real_frames():
+    frames = _real('0x200')
+    assert len(frames) >= 100
+    for raw in frames:
+        ref = DB.decode_message(0x200, raw, decode_choices=False)
+        mine = decode_control_info(raw)
+        assert mine['steer_pos_deg'] == pytest.approx(ref['steer_postion'])
+        assert mine['brake_pos'] == pytest.approx(ref['break_postion'])
+        assert (mine['steer_auto'], mine['brake_auto'], mine['acc_auto']) == \
+            (ref['steer_is_auto'], ref['break_is_auto'], ref['acc_is_auto'])

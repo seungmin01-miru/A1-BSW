@@ -1,69 +1,62 @@
-"""범위 클램프·변화율 제한 단위테스트."""
-from plausibility import (ACC_CMD_MAX, ACC_CMD_MIN, EPS_CMD_MAX, EPS_CMD_MIN, RateLimiter, Violation,
-                          clamp_range)
+"""범위 클램프·운용 한계·가속/브레이크 인터록·RateLimiter — 2026-10-06 실차 0x210 기준."""
+import pytest
+
+from plausibility import DBC_LIMITS, Limits, RateLimiter, clamp_range
 from protocol import Command
 
 
-def test_in_range_untouched():
-    cmd = Command(eps_cmd=10.0, acc_cmd=0.5, eps_speed=100, aeb_decel_value=0.2)
-    out = clamp_range(cmd)
-    assert out == cmd
-
-
-def test_eps_cmd_clamped_both_directions():
-    assert clamp_range(Command(eps_cmd=EPS_CMD_MAX + 100)).eps_cmd == EPS_CMD_MAX
-    assert clamp_range(Command(eps_cmd=EPS_CMD_MIN - 100)).eps_cmd == EPS_CMD_MIN
-
-
-def test_acc_cmd_clamped():
-    assert clamp_range(Command(acc_cmd=ACC_CMD_MAX + 5)).acc_cmd == ACC_CMD_MAX
-    assert clamp_range(Command(acc_cmd=ACC_CMD_MIN - 5)).acc_cmd == ACC_CMD_MIN
-
-
-def test_violations_recorded_only_when_clamped():
+def test_inside_range_untouched():
     v = []
-    clamp_range(Command(eps_cmd=10.0, acc_cmd=0.5), violations_out=v)
+    cmd = Command(steer_auto=True, steer_cmd_deg=-20.0, brake_cmd_pct=0.0, acc_cmd_pct=5.0)
+    assert clamp_range(cmd, violations_out=v) == cmd
     assert v == []
+
+
+def test_dbc_range():
     v = []
-    clamp_range(Command(eps_cmd=999.0), violations_out=v)
-    assert len(v) == 1
-    assert isinstance(v[0], Violation)
-    assert v[0].field == 'eps_cmd' and v[0].requested == 999.0 and v[0].clamped == EPS_CMD_MAX
+    out = clamp_range(Command(steer_cmd_deg=-999.0, brake_cmd_pct=150.0), violations_out=v)
+    assert out.steer_cmd_deg == -150.0 and out.brake_cmd_pct == 100.0
+    assert {x.field for x in v} == {'steer_cmd_deg', 'brake_cmd_pct'}
 
 
-def test_original_command_not_mutated():
-    cmd = Command(eps_cmd=999.0)
-    clamp_range(cmd)
-    assert cmd.eps_cmd == 999.0   # clamp_range 는 새 객체를 돌려준다 — 원본은 그대로
+def test_operating_limits_lift_test():
+    lim = Limits(steer_abs_deg=30, brake_max_pct=60, acc_max_pct=10)
+    v = []
+    out = clamp_range(Command(steer_cmd_deg=45.0, acc_cmd_pct=50.0), limits=lim, violations_out=v)
+    assert out.steer_cmd_deg == 30.0 and out.acc_cmd_pct == 10.0
+    out = clamp_range(Command(steer_cmd_deg=-45.0, brake_cmd_pct=90.0), limits=lim)
+    assert out.steer_cmd_deg == -30.0 and out.brake_cmd_pct == 60.0
 
 
-def test_rate_limiter_unlimited_by_default():
+def test_limits_cannot_exceed_dbc():
+    with pytest.raises(ValueError):
+        Limits(steer_abs_deg=151)
+    with pytest.raises(ValueError):
+        Limits(acc_max_pct=101)
+    assert DBC_LIMITS == Limits(150, 100, 100)
+
+
+def test_acc_and_brake_together_brake_wins():
+    v = []
+    out = clamp_range(Command(brake_cmd_pct=20.0, acc_cmd_pct=8.0), violations_out=v)
+    assert out.brake_cmd_pct == 20.0 and out.acc_cmd_pct == 0.0
+    assert [x.field for x in v] == ['acc_with_brake']
+
+
+def test_negative_pct_clamped_to_zero():
+    out = clamp_range(Command(brake_cmd_pct=-3.0, acc_cmd_pct=-1.0))
+    assert out.brake_cmd_pct == 0.0 and out.acc_cmd_pct == 0.0
+
+
+def test_rate_limiter_default_unlimited():
     rl = RateLimiter()
-    assert rl.step(1000.0, dt_s=0.01) == 1000.0
-    assert rl.step(-1000.0, dt_s=0.01) == -1000.0   # 다음 주기에 아무리 크게 바뀌어도 무제한이면 그대로
+    assert rl.step(0.0, 0.02) == 0.0
+    assert rl.step(150.0, 0.02) == 150.0
 
 
-def test_rate_limiter_first_call_passes_through():
-    rl = RateLimiter(max_delta_per_s=10.0)
-    assert rl.step(500.0, dt_s=0.01) == 500.0   # 기준값이 없어서 첫 호출은 클램프 대상이 아님
-
-
-def test_rate_limiter_clamps_large_step():
-    rl = RateLimiter(max_delta_per_s=10.0)   # 초당 10 만큼만 허용
-    rl.step(0.0, dt_s=0.01)
-    out = rl.step(100.0, dt_s=0.1)            # 0.1s 동안 최대 1.0 만 허용
-    assert out == 1.0
-
-
-def test_rate_limiter_clamps_negative_step():
-    rl = RateLimiter(max_delta_per_s=10.0)
-    rl.step(0.0, dt_s=0.01)
-    out = rl.step(-100.0, dt_s=0.1)
-    assert out == -1.0
-
-
-def test_rate_limiter_reset():
-    rl = RateLimiter(max_delta_per_s=10.0)
-    rl.step(0.0, dt_s=0.01)
-    rl.reset(500.0)
-    assert rl.step(500.0, dt_s=0.01) == 500.0   # reset 직후는 다시 "첫 호출" 취급
+def test_rate_limiter_limits():
+    rl = RateLimiter(max_delta_per_s=30.0)
+    rl.reset(0.0)
+    assert rl.step(30.0, 0.1) == pytest.approx(3.0)
+    assert rl.step(30.0, 0.1) == pytest.approx(6.0)
+    assert rl.step(-100.0, 0.1) == pytest.approx(3.0)

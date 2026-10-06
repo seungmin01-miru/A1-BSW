@@ -1,0 +1,105 @@
+VERSION ""
+
+
+NS_ :
+  CM_
+  BA_DEF_
+  BA_
+  VAL_
+  BA_DEF_DEF_
+  SIG_VALTYPE_
+
+BS_:
+
+BU_: Vector__XXX
+
+
+BO_ 256 SYS_control_command: 8 Vector__XXX
+SG_ steer_command : 0|16@1- (1,0) [-150|150] "degree" Vector__XXX
+SG_ steer_is_auto_command : 40|1@1+ (1,0) [0|1] "" Vector__XXX
+SG_ break_command : 16|16@1+ (1,0) [0|100] "%" Vector__XXX
+SG_ break_is_auto_command : 41|1@1+ (1,0) [0|1] "" Vector__XXX
+SG_ acc_command : 32|8@1+ (1,0) [0|100] "%" Vector__XXX
+SG_ acc_is_auto_command : 42|1@1+ (1,0) [0|1] "" Vector__XXX
+
+BO_ 272 SYS_steer_info: 8 Vector__XXX
+SG_ steer_postion : 0|16@1- (0.1,0) [-200|200] "" Vector__XXX
+SG_ is_auto : 16|1@1+ (1,0) [0|1] "" Vector__XXX
+SG_ live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 273 SYS_break_info: 8 Vector__XXX
+SG_ break_postion : 0|16@1- (0.1,0) [0|300] "" Vector__XXX
+SG_ is_auto : 16|1@1+ (1,0) [0|1] "" Vector__XXX
+SG_ live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 274 SYS_right_wheel_info: 8 Vector__XXX
+SG_ right_speed : 0|12@1+ (0.1,0) [0|409.5] "km/h" Vector__XXX
+SG_ right_rpm : 12|12@1+ (1,0) [0|4095] "rpm" Vector__XXX
+SG_ enc_right_side : 40|2@1+ (1,0) [0|3] "" Vector__XXX
+SG_ wheel_right_size : 48|8@1+ (1,0) [0|255] "cm" Vector__XXX
+SG_ live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 275 SYS_left_wheel_info: 8 Vector__XXX
+SG_ left_speed : 0|12@1+ (0.1,0) [0|409.5] "km/h" Vector__XXX
+SG_ left_rpm : 12|12@1+ (1,0) [0|4095] "rpm" Vector__XXX
+SG_ enc_left_side : 40|2@1+ (1,0) [0|3] "" Vector__XXX
+SG_ wheel_right_size : 48|8@1+ (1,0) [0|255] "cm" Vector__XXX
+SG_ live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 276 SYS_acc_info: 2 Vector__XXX
+SG_ live_counter : 8|8@1+ (1,0) [0|255] "" Vector__XXX
+SG_ is_auto : 0|1@1+ (1,0) [0|1] "" Vector__XXX
+
+BO_ 769 SYS_ENCODER_SETTINGS: 2 Vector__XXX
+SG_ set_wheel_size : 8|8@1+ (1,0) [0|255] "cm" Vector__XXX
+SG_ set_left_right_side : 0|2@1+ (1,0) [0|3] "" Vector__XXX
+
+BO_ 512 USER_control_info: 8 Vector__XXX
+SG_ steer_postion : 0|16@1- (0.1,0) [-200|200] "" Vector__XXX
+SG_ break_postion : 16|16@1- (0.1,0) [0|300] "" Vector__XXX
+SG_ steer_is_auto : 32|1@1+ (1,0) [0|1] "" Vector__XXX
+SG_ break_is_auto : 33|1@1+ (1,0) [0|1] "" Vector__XXX
+SG_ acc_is_auto : 34|1@1+ (1,0) [0|1] "" Vector__XXX
+SG_ steer_live_counter : 40|8@1+ (1,0) [0|255] "" Vector__XXX
+SG_ break_live_counter : 48|8@1+ (1,0) [0|255] "" Vector__XXX
+SG_ acc_live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 513 USER_right_wheel_info: 8 Vector__XXX
+SG_ right_speed : 0|12@1+ (0.1,0) [0|409.5] "km/h" Vector__XXX
+SG_ right_rpm : 12|12@1+ (1,0) [0|4095] "rpm" Vector__XXX
+SG_ left_speed : 24|12@1+ (0.1,0) [0|409.5] "km/h" Vector__XXX
+SG_ left_rpm : 36|12@1+ (1,0) [0|4095] "rpm" Vector__XXX
+SG_ right_live_counter : 48|8@1+ (1,0) [0|255] "" Vector__XXX
+SG_ left_live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 528 USER_control_command: 8 Vector__XXX
+SG_ steer_command : 0|16@1- (1,0) [-150|150] "degree" Vector__XXX
+SG_ steer_is_auto_command : 40|1@1+ (1,0) [0|1] "" Vector__XXX
+SG_ break_command : 16|16@1+ (1,0) [0|100] "%" Vector__XXX
+SG_ break_is_auto_command : 41|1@1+ (1,0) [0|1] "" Vector__XXX
+SG_ acc_command : 32|8@1+ (1,0) [0|100] "%" Vector__XXX
+SG_ acc_is_auto_command : 42|1@1+ (1,0) [0|1] "" Vector__XXX
+
+CM_ SG_ 528 steer_command "A1-BSW fix 2026-10-06: factor 0.1 -> 1. KF-1600 log 2026-09-17: settled steer_postion / raw command ratio median 1.000 over 1354 segments.";
+CM_ SG_ 512 steer_is_auto "A1-BSW fix 2026-10-06: 1-bit flag, factor 0.1 -> 1.";
+
+BA_DEF_  "BusType" STRING ;
+
+BA_DEF_DEF_  "BusType" "CAN";
+
+BA_ "BusType" "CAN";
+VAL_ 256 steer_is_auto_command 0 "Manual" 1 "Auto";
+VAL_ 256 break_is_auto_command 0 "Manual" 1 "Auto";
+VAL_ 256 acc_is_auto_command 0 "Manual" 1 "Auto";
+VAL_ 272 is_auto 0 "Manual" 1 "Auto";
+VAL_ 273 is_auto 0 "Manual" 1 "Auto";
+VAL_ 274 enc_right_side 1 "Right" 2 "Left";
+VAL_ 275 enc_left_side 1 "Right" 2 "Left";
+VAL_ 276 is_auto 0 "Manual" 1 "Auto";
+VAL_ 769 set_left_right_side 1 "Right" 2 "Left";
+VAL_ 512 steer_is_auto 0 "Manual" 1 "Auto";
+VAL_ 512 break_is_auto 0 "Manual" 1 "Auto";
+VAL_ 512 acc_is_auto 0 "Manual" 1 "Auto";
+VAL_ 528 steer_is_auto_command 0 "Manual" 1 "Auto";
+VAL_ 528 break_is_auto_command 0 "Manual" 1 "Auto";
+VAL_ 528 acc_is_auto_command 0 "Manual" 1 "Auto";

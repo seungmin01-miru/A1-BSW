@@ -15,7 +15,7 @@ seqlock 프로토콜:
                                                           # 세그먼트도 guard 가 만든다(재시작 때마다 새로 =
                                                           # 항상 안전 상태에서 시작, §7.2 Startup 규칙).
   ctrl = CommandChannel.open('a1_can_guard_cmd')        # 제어 노드 쪽, 기존 세그먼트 열기(재시작해도 재사용)
-  ctrl.write(Command(eps_en=True, eps_cmd=1.5, ...))
+  ctrl.write(Command(steer_auto=True, steer_cmd_deg=1.5, ...))
   cmd, age_s = guard.read()                             # age_s 는 monotonic 기준 나이(초) — staleness 판정용
 
 `HeartbeatChannel` 도 같은 seqlock 패턴이지만 페이로드가 없다(살아있다는 사실 자체가 정보) — 인지 프로세스가
@@ -52,30 +52,26 @@ class _Payload(ctypes.Structure):
     _fields_ = [
         ('seq', ctypes.c_uint64),            # 홀수=쓰는 중, 짝수=완료. 0 = 아직 한 번도 안 씀(초기값)
         ('timestamp_ns', ctypes.c_int64),    # time.monotonic_ns() — 벽시계 아님(NTP 점프에 안전)
-        ('eps_en', ctypes.c_uint8),
-        ('eps_override_ignore', ctypes.c_uint8),
-        ('acc_en', ctypes.c_uint8),
-        ('aeb_en', ctypes.c_uint8),
-        ('eps_speed', ctypes.c_uint8),       # 10~250 (DBC EPS_Speed 그대로)
-        ('turn_signal', ctypes.c_uint8),     # 0(없음)/1/2/4 (DBC 값 그대로, 비트마스크 아님)
-        ('aeb_decel_value', ctypes.c_float),  # 0~1 g
-        ('eps_cmd', ctypes.c_float),          # -500~500 deg (부호 있음)
-        ('acc_cmd', ctypes.c_float),          # -3~1 m/s^2
+        # 실차 USER_control_command(0x210) 기준 — DBC/A1_dbc_fixed.dbc (2026-10-06 EAIT 0x156/0x157 에서 전환)
+        ('steer_auto', ctypes.c_uint8),       # 축별 auto(1) / manual(0) — 0x210 bit40
+        ('brake_auto', ctypes.c_uint8),       # bit41
+        ('acc_auto', ctypes.c_uint8),         # bit42
+        ('_pad', ctypes.c_uint8),
+        ('steer_cmd_deg', ctypes.c_float),    # -150~150 deg (배율 1 deg/raw — 업체 DBC 의 0.1 은 오류)
+        ('brake_cmd_pct', ctypes.c_float),    # 0~100 %
+        ('acc_cmd_pct', ctypes.c_float),      # 0~100 %
     ]
 
 
 @dataclass
 class Command:
     """`_Payload` 의 파이썬 쪽 값 객체(공유메모리 세부사항을 몰라도 되게)."""
-    eps_en: bool = False
-    eps_override_ignore: bool = False
-    acc_en: bool = False
-    aeb_en: bool = False
-    eps_speed: int = 10
-    turn_signal: int = 0
-    aeb_decel_value: float = 0.0
-    eps_cmd: float = 0.0
-    acc_cmd: float = 0.0
+    steer_auto: bool = False
+    brake_auto: bool = False
+    acc_auto: bool = False
+    steer_cmd_deg: float = 0.0
+    brake_cmd_pct: float = 0.0
+    acc_cmd_pct: float = 0.0
 
 
 class CommandChannel:
@@ -112,15 +108,12 @@ class CommandChannel:
         seq = p.seq if p.seq % 2 == 0 else p.seq + 1   # 혹시 이전 쓰기가 중간에 죽었으면 홀수를 짝수로 보정
         p.seq = seq + 1                                  # 홀수 — "쓰는 중"
         p.timestamp_ns = time.monotonic_ns()
-        p.eps_en = int(cmd.eps_en)
-        p.eps_override_ignore = int(cmd.eps_override_ignore)
-        p.acc_en = int(cmd.acc_en)
-        p.aeb_en = int(cmd.aeb_en)
-        p.eps_speed = cmd.eps_speed
-        p.turn_signal = cmd.turn_signal
-        p.aeb_decel_value = cmd.aeb_decel_value
-        p.eps_cmd = cmd.eps_cmd
-        p.acc_cmd = cmd.acc_cmd
+        p.steer_auto = int(cmd.steer_auto)
+        p.brake_auto = int(cmd.brake_auto)
+        p.acc_auto = int(cmd.acc_auto)
+        p.steer_cmd_deg = cmd.steer_cmd_deg
+        p.brake_cmd_pct = cmd.brake_cmd_pct
+        p.acc_cmd_pct = cmd.acc_cmd_pct
         p.seq = seq + 2                                   # 짝수 — "완료"
 
     def read(self, max_retries=1000):
@@ -139,10 +132,8 @@ class CommandChannel:
             if seq1 % 2 != 0:
                 continue   # 쓰는 중 — 바로 재시도
             cmd = Command(
-                eps_en=bool(p.eps_en), eps_override_ignore=bool(p.eps_override_ignore),
-                acc_en=bool(p.acc_en), aeb_en=bool(p.aeb_en), eps_speed=p.eps_speed,
-                turn_signal=p.turn_signal, aeb_decel_value=p.aeb_decel_value,
-                eps_cmd=p.eps_cmd, acc_cmd=p.acc_cmd,
+                steer_auto=bool(p.steer_auto), brake_auto=bool(p.brake_auto), acc_auto=bool(p.acc_auto),
+                steer_cmd_deg=p.steer_cmd_deg, brake_cmd_pct=p.brake_cmd_pct, acc_cmd_pct=p.acc_cmd_pct,
             )
             ts = p.timestamp_ns
             seq2 = p.seq

@@ -1,93 +1,73 @@
-"""0x156/0x157 인코더를 cantools(DBC 정식 디코드)와 대조 — RX 디코더 때와 같은 방식(직접 파싱 vs DBC 대조)."""
+"""0x210 인코더 — cantools + DBC/A1_dbc_fixed.dbc + 2026-09-17 실차 프레임(다른 팀 PC 가 실제로 보낸 0x210)과 대조."""
+import csv
 import os
 
 import cantools
 import pytest
 
 from protocol import Command
-from tx_encode import encode_0x156, encode_0x157
+from tx_encode import FRAME_ID_CONTROL_COMMAND, encode_0x210
 
-DBC = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'DBC', 'EAIT_CAN(AVANTE_CN7).dbc')
-
-
-def test_encode_0x156_length():
-    assert len(encode_0x156(Command(), aliv_cnt=0)) == 8
-
-
-def test_encode_0x157_length():
-    assert len(encode_0x157(Command())) == 8
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
+DB_VENDOR = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc.dbc'), strict=False)
+SAMPLES = os.path.join(REPO, 'tools', 'race_day', 'testdata', 'kf1600_20260917_samples.csv')
 
 
-@pytest.mark.skipif(not os.path.exists(DBC), reason='팀 DBC 없음')
-def test_encode_0x156_matches_dbc_decode():
-    db = cantools.database.load_file(DBC)
-    cmd = Command(eps_en=True, eps_override_ignore=True, acc_en=True, aeb_en=True,
-                  eps_speed=150, turn_signal=2, aeb_decel_value=0.42)
-    data = encode_0x156(cmd, aliv_cnt=77)
-    ref = db.decode_message(0x156, data, decode_choices=False)
-    assert ref['EPS_En'] == 1
-    assert ref['EPS_Override_Ignore'] == 1
-    assert ref['ACC_En'] == 1
-    assert ref['AEB_En'] == 1
-    assert ref['EPS_Speed'] == 150
-    assert ref['Turn_Signal'] == 2
-    assert ref['AEB_decel_value'] == pytest.approx(0.42)
-    assert ref['Aliv_Cnt'] == 77
+def _real_0x210():
+    with open(SAMPLES) as f:
+        next(f)
+        return [bytes.fromhex(r['raw_hex']) for r in csv.DictReader(f) if r['arbitration_id_hex'] == '0x210']
 
 
-@pytest.mark.skipif(not os.path.exists(DBC), reason='팀 DBC 없음')
-def test_encode_0x156_all_flags_off():
-    db = cantools.database.load_file(DBC)
-    data = encode_0x156(Command(), aliv_cnt=0)
-    ref = db.decode_message(0x156, data, decode_choices=False)
-    assert ref['EPS_En'] == 0
-    assert ref['ACC_En'] == 0
-    assert ref['AEB_En'] == 0
-    assert ref['Turn_Signal'] == 0
+def test_frame_id():
+    assert FRAME_ID_CONTROL_COMMAND == 0x210 == DB.get_message_by_name('USER_control_command').frame_id
 
 
-@pytest.mark.skipif(not os.path.exists(DBC), reason='팀 DBC 없음')
-def test_encode_0x156_aliv_cnt_rollover_byte():
-    db = cantools.database.load_file(DBC)
-    for n in (0, 1, 254, 255):
-        ref = db.decode_message(0x156, encode_0x156(Command(), aliv_cnt=n), decode_choices=False)
-        assert ref['Aliv_Cnt'] == n
+@pytest.mark.parametrize('cmd', [
+    Command(),
+    Command(steer_auto=True, brake_auto=True, acc_auto=True),
+    Command(steer_auto=True, steer_cmd_deg=-30.0, brake_cmd_pct=60.0),
+    Command(acc_auto=True, acc_cmd_pct=10.0),
+    Command(steer_auto=True, brake_auto=True, acc_auto=True, steer_cmd_deg=150.0, brake_cmd_pct=100.0,
+            acc_cmd_pct=100.0),
+    Command(steer_cmd_deg=-150.0),
+    Command(steer_cmd_deg=12.4),   # 반올림 → 12
+])
+def test_matches_fixed_dbc(cmd):
+    d = DB.decode_message(0x210, encode_0x210(cmd), decode_choices=False)
+    assert d['steer_command'] == round(cmd.steer_cmd_deg)
+    assert d['break_command'] == round(cmd.brake_cmd_pct)
+    assert d['acc_command'] == round(cmd.acc_cmd_pct)
+    assert (d['steer_is_auto_command'], d['break_is_auto_command'], d['acc_is_auto_command']) == \
+        (int(cmd.steer_auto), int(cmd.brake_auto), int(cmd.acc_auto))
 
 
-@pytest.mark.skipif(not os.path.exists(DBC), reason='팀 DBC 없음')
-def test_encode_0x157_matches_dbc_decode_positive():
-    db = cantools.database.load_file(DBC)
-    cmd = Command(eps_cmd=45.0, acc_cmd=0.8)
-    ref = db.decode_message(0x157, encode_0x157(cmd), decode_choices=False)
-    assert ref['EPS_Cmd'] == pytest.approx(45.0)
-    assert ref['ACC_Cmd'] == pytest.approx(0.8)
+def test_steer_scale_is_1_deg_not_vendor_0p1():
+    data = encode_0x210(Command(steer_cmd_deg=15.0))
+    assert DB.decode_message(0x210, data)['steer_command'] == 15
+    assert DB_VENDOR.decode_message(0x210, data)['steer_command'] == pytest.approx(1.5)
 
 
-@pytest.mark.skipif(not os.path.exists(DBC), reason='팀 DBC 없음')
-def test_encode_0x157_matches_dbc_decode_negative():
-    """음수 EPS_Cmd(부호 있는 필드) 와 ACC_Cmd 의 감속 쪽(offset 으로 음수를 표현하는 부호 없는 필드) 둘 다 확인."""
-    db = cantools.database.load_file(DBC)
-    cmd = Command(eps_cmd=-123.4, acc_cmd=-2.5)
-    ref = db.decode_message(0x157, encode_0x157(cmd), decode_choices=False)
-    assert ref['EPS_Cmd'] == pytest.approx(-123.4, abs=0.1)
-    assert ref['ACC_Cmd'] == pytest.approx(-2.5, abs=0.01)
+def test_reproduces_real_frames_bit_exact():
+    frames = _real_0x210()
+    assert len(frames) >= 100
+    for raw in frames:
+        d = DB.decode_message(0x210, raw, decode_choices=False)
+        cmd = Command(steer_auto=bool(d['steer_is_auto_command']), brake_auto=bool(d['break_is_auto_command']),
+                      acc_auto=bool(d['acc_is_auto_command']), steer_cmd_deg=d['steer_command'],
+                      brake_cmd_pct=d['break_command'], acc_cmd_pct=d['acc_command'])
+        assert encode_0x210(cmd) == raw, raw.hex()
 
 
-@pytest.mark.skipif(not os.path.exists(DBC), reason='팀 DBC 없음')
-def test_encode_0x157_range_boundaries():
-    db = cantools.database.load_file(DBC)
-    cmd = Command(eps_cmd=-500.0, acc_cmd=-3.0)
-    ref = db.decode_message(0x157, encode_0x157(cmd), decode_choices=False)
-    assert ref['EPS_Cmd'] == pytest.approx(-500.0, abs=0.1)
-    assert ref['ACC_Cmd'] == pytest.approx(-3.0, abs=0.01)
-
-    cmd = Command(eps_cmd=500.0, acc_cmd=1.0)
-    ref = db.decode_message(0x157, encode_0x157(cmd), decode_choices=False)
-    assert ref['EPS_Cmd'] == pytest.approx(500.0, abs=0.1)
-    assert ref['ACC_Cmd'] == pytest.approx(1.0, abs=0.01)
+def test_out_of_range_is_clipped_not_raised():
+    """메인 루프에서 예외로 죽는 것보다 안전한 값으로 자르는 쪽이 낫다(방어적 2차 클램프)."""
+    d = DB.decode_message(0x210, encode_0x210(Command(steer_cmd_deg=999, brake_cmd_pct=-5, acc_cmd_pct=500)),
+                          decode_choices=False)
+    assert (d['steer_command'], d['break_command'], d['acc_command']) == (150, 0, 100)
 
 
-def test_encode_0x157_defends_out_of_range_input():
-    """plausibility.clamp_range 를 거치지 않은 값이 실수로 들어와도(방어적 이중 클램프) 죽지 않고 잘린다."""
-    data = encode_0x157(Command(eps_cmd=99999.0, acc_cmd=-999.0))
-    assert len(data) == 8   # 예외 없이 인코딩됨(값은 tx_encode 내부에서 한 번 더 클램프됨)
+def test_unused_bits_zero():
+    data = encode_0x210(Command(steer_auto=True, brake_auto=True, acc_auto=True, steer_cmd_deg=-1,
+                                brake_cmd_pct=100, acc_cmd_pct=100))
+    assert data[3] == 0 and data[6] == 0 and data[7] == 0 and data[5] & 0xF8 == 0
