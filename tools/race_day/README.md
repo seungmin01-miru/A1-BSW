@@ -47,7 +47,7 @@ python3 can_guard.py --channel can0 --cpu 8 --rt-priority 90 2>~/a1_race_capture
 ## 나오는 결과물
 
 ```
-~/a1_race_capture_<타임스탬프>.tar.gz
+~/a1_race_capture/a1_race_capture_<타임스탬프>.tar.gz
   <타임스탬프>/
     MANIFEST.md          # 뭐가 잡혔는지 요약(파일별 줄 수/용량)
     system/start.txt, end.txt, journal_kernel.log
@@ -94,5 +94,5 @@ python3 can_guard.py --channel can0 --cpu 8 --rt-priority 90 2>~/a1_race_capture
 sudo ip link show vcan0 || sudo bash ~/git/A1-BSW/sil/vcan/vcan_up.sh
 python3 ~/git/A1-BSW/sil/vcan/eait_tx.py --channel vcan0 &   # 트래픽 흘려주기(선택)
 sudo bash tools/race_day/collect.sh
-# 10초 정도 기다렸다가 Ctrl+C, 결과 tar.gz 를 풀어서 can/vcan0.log 에 프레임이 찍혔는지 확인
+# 10초 정도 기다렸다가 Ctrl+C, 결과 tar.gz 를 풀어서 can/vcan0/candump-*.log 와 can/vcan0.csv 에 프레임이 찍혔는지 확인
 ```
