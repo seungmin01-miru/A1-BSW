@@ -9,7 +9,8 @@
 ## 0. 범위와 전제
 
 - **하드웨어 부재**: 안전 MCU·실차 CAN 게이트웨이 아직 없음 → 메인 PC(Ubuntu 22.04)가 [8.1 연산보드 계층](can_status_parameters_full.md#81-권장-2계층-아키텍처)을 **단독으로** 구현하는 첫 마일스톤.
-- **PREEMPT_RT 설치 진행 중.**
+- **RT 커널 확정·설치·격리 튜닝·30분 실측 완료 (2026-09-12)**: Ubuntu 22.04.5 LTS + `6.8.1-1059-realtime` (Ubuntu Pro `linux-realtime-hwe-22.04`) + 격리 코어 8–15. 실측: 평균 4 µs, 99.9995 % 50 µs 이내, **최악 0.47 ms/30분** → CAN 스택 데드라인(10 ms)에는 충분, §7의 100 µs 최악값 목표는 미달(예산 재정의 필요) → §5.A.
+- **CAN 어댑터는 이미 장착됨**: PEAK PCAN-PCIe FD 2채널(`can0`/`can1`, 커널 내장 드라이버 `peak_pciefd`). 실차 연결 전이라 개발은 계속 `vcan0` SIL로 진행.
 - **개발 방식 = SIL(Software-in-the-Loop)**: 실물 CAN 대신 `vcan0` 가상 인터페이스 + 기록된 rosbag 재생으로 검증. 대회 DBC·실차 미수령.
 - **대회 미수령 항목**: CAN ID 배치, 정수값→의미 매핑표(`enable`/`state`/`error*`/`gear`/`drive_mode`) — 확정 전까지 TODO로 명시하며 진행.
 
@@ -19,18 +20,18 @@
 
 ```mermaid
 flowchart TB
-  subgraph A["[A] RT 커널 기반 (PREEMPT_RT) — 진행중"]
-    K["Ubuntu 22.04 + PREEMPT_RT<br/>isolcpus · mlockall · SCHED_FIFO"]
+  subgraph A["[A] RT 커널 기반 (PREEMPT_RT) — 실측 완료(조건부), A-3/A-4 남음"]
+    K["Ubuntu 22.04.5 + 6.8.1-1059-realtime<br/>isolcpus=8-15 · 최악 0.47 ms/30분<br/>mlockall · SCHED_FIFO (A-3/A-4 예정)"]
   end
-  subgraph B["[B] CAN 인터페이스 — 예정"]
-    VCAN["vcan0 (SIL: rosbag 재생 주입)"]
-    RCAN["실 CAN 어댑터 (HW 확보 후)"]
+  subgraph B["[B] CAN 인터페이스 — vcan0 SIL 가동 (2026-09-12)"]
+    VCAN["vcan0 (SIL) · sil/vcan/eait_tx.py<br/>DBC 기반 0x712 10 ms 송신 ✅"]
+    RCAN["실 CAN 어댑터: PEAK PCAN-PCIe FD 2ch<br/>(장착됨 · can0/can1, 실차 연결 전)"]
   end
-  subgraph C["[C] ROS2 브리지 · 디코더 — 예정"]
-    DEC["CanRawMsgs → Status* 디코더<br/>alive_count E2E 체크"]
+  subgraph C["[C] ROS2 브리지 · 디코더 — EAIT 수신 4종 전부 완료(2026-09-18)"]
+    DEC["can_raw_bridge → CanFrame<br/>spd/eps/acc/imu_decoder(0x712/710/711/713)<br/>EPS·ACC: Alive_Cnt E2E → /diagnostics<br/>A-3(격리+FIFO) 재측정: ROS2 슬라이스엔 무효과 확정<br/>ros2_ws/src/a1_can_bridge"]
   end
-  subgraph D["[D] 안전 SW (MCU 대체) — 예정"]
-    WD["헬스 슈퍼바이저<br/>stale 타임아웃 → safe-state"]
+  subgraph D["[D] 안전 SW (MCU 대체) — P-1/P-2 실측 PASS(2026-09-19)"]
+    WD["can_guard: 상태머신+plausibility+TX(0x156/0x157)<br/>safety/can_guard/, raw SocketCAN, ROS2 밖<br/>P-1(제어 kill) · P-2(인지 kill) 실제 SIL 통과<br/>격리 코어+SCHED_FIFO 90(A-3 효과 실측된 경로) 미적용 상태로 검증"]
   end
   MCU["안전 MCU<br/>(미정 · 추후 하드웨어 확보 시 통합)"]
   GW["대회 게이트웨이 → 액추에이터<br/>(EPS · ACC · 기어)"]
@@ -52,10 +53,10 @@ flowchart TB
 
 | ID | 카테고리 | 책임 범위 | 상태 | 상세 섹션 |
 |---|---|---|---|---|
-| A | RT 커널 기반 | PREEMPT_RT 설치·튜닝(`isolcpus`/`mlockall`/`SCHED_FIFO`), `cyclictest` 측정 | 🟡 진행중 | §5.A (추후 작성) |
-| B | CAN 인터페이스 | 어댑터/SocketCAN, `vcan0` SIL 환경, rosbag→CAN 주입 | ⚪ 예정 | §5.B (추후 작성) |
-| C | ROS2 브리지·디코더 | `CanRawMsgs`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | ⚪ 예정 | §5.C (추후 작성) |
-| D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | ⚪ 예정 | §5.D (추후 작성) |
+| A | RT 커널 기반 | PREEMPT_RT 설치·튜닝(`isolcpus`/`mlockall`/`SCHED_FIFO`), `cyclictest` 측정 | 🟡 조건부 완료 (커널·격리 튜닝·30분 실측 완료. 남음: 예산 재정의 결정, generic 비교, A-3/A-4) | §5.A |
+| B | CAN 인터페이스 | 어댑터/SocketCAN, `vcan0` SIL 환경, rosbag→CAN 주입 | 🟡 진행중 (vcan0 영속화·왕복·DBC 기반 0x712 주기 송신·디코드 완료. 남음: ROS2 raw 퍼블리시=Phase C, 실 can0 전환) | §5.B |
+| C | ROS2 브리지·디코더 | `CanFrame`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | 🟡 진행중 (EAIT 수신 메시지 4종 전부 디코더 완료: 0x712/710/711/713. EPS/ACC 는 E2E(alive_count) 체크·`/diagnostics` 연동까지. A-3 레시피 재측정 완료 — ROS2 슬라이스엔 무효과 확정. 남음: 실 can0, TX 방향(can_guard)) | §5.C |
+| D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | 🟡 메인 루프 구현·P-1/P-2 SIL 실측 PASS·A-3 지연 실측 완료·**SIL 8시간 PASS**(스푸리어스 전이 0, 자체측정 최대 44.6µs, D4 예산 4.46%) (`can_guard`, `safety/can_guard/`). 남음: 진짜 제어/인지 노드 결선, 변화율 값, 벤치 시험(실 하드웨어) | §5.D |
 | E | 검증/테스트 (V-model) | 좌/우 대응 검증 계획, 고장주입 시험 | 🟢 초안 완료 | §3 |
 | F | 안전등급 레퍼런스 (ASIL) | 41개 파라미터 ASIL 등급, 근거 | 🟢 초안 완료 | §4 |
 
@@ -184,12 +185,47 @@ flowchart LR
 - `mlockall(MCL_CURRENT|MCL_FUTURE)`로 페이지폴트(=디스크 I/O=수 ms 지연) 원천 차단
 - `cyclictest`로 반드시 실측 — "커널 깔았다"가 완료가 아니라 "쟀더니 목표치 이내였다"가 완료
 
+**커널 결정 (2026-09-12 확정)**
+
+| 항목 | 값 |
+|---|---|
+| OS | **Ubuntu 22.04.5 LTS (jammy)** — 24.04 아님. ROS2 Humble 유지, Jazzy 이전 불필요 |
+| RT 커널 | **`6.8.1-1059-realtime`** (`uname -v`: `#60~22.04.1-Ubuntu SMP PREEMPT_RT`) |
+| 패키지 | `linux-realtime-hwe-22.04` = `6.8.1-1059.60~22.04.1`, 출처 `esm.ubuntu.com/realtime jammy` (Ubuntu Pro) |
+| 비RT 커널 | `6.8.0-138-generic` (HWE) — 기본 부팅·롤백용으로 유지 |
+| 하드웨어 | i7-12700 (P코어 8개 = CPU 0–15 하이퍼스레드, E코어 4개 = CPU 16–19), 62 GB, RTX A5000, PEAK PCAN-PCIe FD 2ch, WiFi = USB 동글 RTL8822BU |
+
+선정 경위 — "왜 이 커널인가"를 다시 파헤치지 않도록 남긴다.
+- **기존 RT 커널 `5.15.0-1114-realtime`은 폐기.** WiFi 동글 드라이버 `rtw88_8822bu`가 Linux 6.2부터 들어가서 5.15에는 코드가 없고(펌웨어·rfkill 문제 아님), NVIDIA 470 DKMS가 PREEMPT_RT 커널 빌드를 거부해 GPU도 쓸 수 없었다. (인수인계 문서의 "5.11-rt / 6.11"은 실제 장비와 달랐다 — 실측 결과는 5.15-rt / 6.8 generic.)
+- **"같은 OS면 드라이버도 같이 해결된다"는 가설은 기각.** userspace(펌웨어 파일, NetworkManager)는 공유되지만 드라이버 본체는 커널 버전별 별도 코드다. 해결책은 "무선이 되는 커널 세대에서 RT를 구성하는 것".
+- **6.12 LTS 자체 빌드(메인라인 PREEMPT_RT) 대신 6.8.1-rt를 택한 이유**: 무선이 되던 6.8 generic과 같은 기반이고, 배포판이 빌드·보안패치를 제공하며, 22.04에서 바로 설치된다(24.04 업그레이드 불필요). 대회 일정 리스크 최소화가 최신성보다 우선. 6.12 계열 이관은 대회 후 재검토하며, 아래 측정표가 비교 기준이 된다.
+- **블루투스는 해당 없음**: 이 PC에는 BT 하드웨어 자체가 없다(6.8 generic에서도 `/sys/class/bluetooth` 없음). 필요하면 USB BT 동글 구매 — `btusb`는 모든 커널에 내장.
+
+**이행 호환성 판정 (2026-09-12, 6.8.1-1059-realtime 실부팅 기준)**
+
+| 항목 | 결과 | 비고 |
+|---|---|---|
+| WiFi (RTL8822BU, `rtw88_8822bu`) | ✅ 연결 | generic에서도 `firmware failed to leave lps state` 반복(절전 버그) → 주행 중 무선 비활성 권고 |
+| CAN (`peak_pciefd`) | ✅ `can0`/`can1` | 커널 내장 드라이버, out-of-tree 없음 |
+| GPU (RTX A5000, NVIDIA 470.256.02-server) | ⚠️ 동작 — 잠재 결함 | NVIDIA는 PREEMPT_RT **공식 미지원**. DKMS에 `IGNORE_PREEMPT_RT_PRESENCE=1` 우회 빌드(`/etc/dkms/framework.conf`). 정상 운용(GPU 83% 부하 30분 포함 57분)에서는 커널 경고 0건. **GPU 프로세스 비정상 종료 상황에서 `BUG: scheduling while atomic: irq/219-s-nvidia` 10회** 관측(아래 참조). 커널 업데이트 때마다 재빌드 확인 필요 |
+| 유선 NIC(e1000e·ixgbe·igc·atlantic), LTE 모뎀 | ✅ | 커널 내장 |
+| Secure Boot / 루트 FS | 비활성 / ext4 | 서명·부팅 문제 없음 |
+| 하드웨어 지연 (`hwlatdetect`, 20 µs 기준) | ✅ 0건 (2회) | BIOS SMI 원인 없음 → 소프트웨어 튜닝이 유효 |
+| Bluetooth | 해당 없음 | 하드웨어 없음 |
+
+**부팅 구성·롤백 경로**
+- GRUB 메뉴를 매 부팅 **10초 표시**, 서브메뉴 없이 커널 나열, **아무것도 안 누르면 `6.8.0-138-generic`**. 무한 대기는 차량에서 무인 재부팅 시 멈추면 안 되므로 쓰지 않는다. (드롭인 `/etc/default/grub.d/99z-a1-bsw-safe-default.cfg`)
+- 메뉴 항목: generic(기본) / `6.8.1-1059-realtime` / **`A1-BSW: … + RT 튜닝`**(`/etc/grub.d/11_a1_bsw_rt_tuned`, id `a1-bsw-rt-tuned`) / `5.15.0-1114-realtime`(구, 정리 예정)
+- 튜닝 항목으로 1회만 부팅: `sudo grub-reboot a1-bsw-rt-tuned && sudo reboot` — 부팅이 멈추면 전원 재시작만으로 generic 복귀
+- 이행·측정 스크립트: 메인 PC `tools/rt/a1_rt.sh` (`pin`/`install`/`verify`/`hwlat`/`tune`/`bench`/`soak`/`rollback`), 모든 출력은 `tools/rt/logs/` (git 추적 제외; 2026-09-12 핵심 로그는 `measurements/2026-09-12_rt/`)
+
 **검증 방법**
 - `uname -a`에 `PREEMPT_RT` 표기 확인, `cat /sys/kernel/realtime` → `1`
-- `cyclictest -p 99 -m -N -i 1000 -l 100000` 등으로 **무부하 상태 + 부하 상태(카메라/LiDAR 처리 흉내로 CPU/메모리 스트레스)** 양쪽에서 최댓값 비교
+- `cyclictest -p 99 -m -i 1000 -l 100000` 등으로 **무부하 + CPU 부하 + CPU+GPU 부하** 세 조건에서 최댓값 비교 (GPU 부하 조건은 2026-09-12 추가 — NVIDIA 비공개 드라이버가 RT 지연의 주요 위험원이므로)
+- `hwlatdetect --duration=60 --threshold=20`으로 BIOS/SMI 하드웨어 지연 배제
 - §3 V-model "시스템 요구사항 ↔ 시스템 시험" 행과 직결
 
-**완료 기준**: PREEMPT_RT 부팅 확인 + 무부하/부하 상태 `cyclictest` 최댓값을 기록하고 §7(can_status_parameters_full.md) 데드라인과 대조해 여유가 있음을 확인.
+**완료 기준**: PREEMPT_RT 부팅 확인 + 무부하/부하 상태 `cyclictest` 최댓값을 기록하고 §7(can_status_parameters_full.md) 데드라인과 대조해 여유가 있음을 확인. **짧은 측정(수십~100초)은 드문 스파이크를 놓치므로, 격리 코어 튜닝 상태에서 CPU+GPU 부하 30분 이상 장시간 측정까지 통과해야 완료로 본다** (2026-09-12 추가).
 
 **cyclictest 실측 절차 (2026-09-11 수정: before/after 비교 생략, PREEMPT_RT 설치 후 절대 기준(§7 예산) 통과 여부만 확인)**
 
@@ -212,24 +248,133 @@ sudo cyclictest
 ```
 
 **Step 3 — 실제로 판단에 쓸 측정** (8코어, 약 100초)
+
+> ⚠️ **2026-09-12 수정: `-N` 제거.** `-N`(ns 출력)을 쓰면 값과 히스토그램 단위가 ns가 되어 `-h 400`이 0–400 **ns**만 추적한다(거의 모든 샘플이 범위 초과). µs 단위로 재야 `-h 400` = 0–400 µs가 된다.
+
 ```bash
-sudo cyclictest -p 99 -m -N -i 1000 -l 100000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_$(date +%Y%m%d).log
+sudo cyclictest -p 99 -m -i 1000 -l 100000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_$(date +%Y%m%d).log
 tail -n 20 ~/cyclictest_rt_floor_*.log
+```
+
+> ⚠️ **격리 코어(`isolcpus`)에서 잴 때는 반드시 `taskset`으로 감싼다** (2026-09-12 실측 중 발견). `isolcpus`가 켜지면 새 프로세스의 허용 CPU가 격리 코어 밖(`0-7,16-19`)으로 제한되고, cyclictest는 `-a` 목록을 그 허용 범위 안에서만 해석해 `FATAL: No allowable cpus to run on`으로 즉시 죽는다. `-a`의 인자는 붙여 쓴다(선택 인자).
+
+```bash
+# 격리 코어 8-15 측정: 허용 범위를 전체 CPU로 넓히고, 관리(main) 스레드는 하우스키핑 코어에
+sudo taskset -c 0-19 cyclictest -p 99 -m -i 1000 -l 100000 -t 8 -a8-15 --mainaffinity=0-7,16-19 -q -h 400
 ```
 
 **Step 4 — 부하 상태에서도 확인** (카메라/LiDAR 처리 흉내)
 ```bash
 sudo apt install -y stress-ng
 sudo stress-ng --cpu 8 --io 4 --vm 2 --vm-bytes 1G --timeout 70s &
-sudo cyclictest -p 99 -m -N -i 1000 -l 60000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_load_$(date +%Y%m%d).log
+sleep 3
+sudo cyclictest -p 99 -m -i 1000 -l 60000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_load_$(date +%Y%m%d).log
 ```
+
+**Step 5 — CPU + GPU 부하** (2026-09-12 추가 — 인지 파이프라인 흉내. CUDA 툴킷이 없어 OpenGL 벤치마크로 GPU 부하)
+```bash
+sudo apt install -y glmark2
+glmark2 --off-screen --run-forever -s 3840x2160 -b refract &   # 데스크톱 세션에서 일반 사용자로 실행
+# ⚠️ -b refract 필수: 기본 장면 순환의 terrain 장면은 NVIDIA 470 이 셰이더를 컴파일하지 못해
+#    (error C0502: syntax error at token "highp") glmark2 가 segfault 한다 — RT 커널과 무관한 도구 문제.
+#    refract 한 장면 반복 시 GPU 사용률 ~87%, 안정적 (2026-09-12 확인)
+sudo stress-ng --cpu 8 --io 4 --vm 2 --vm-bytes 1G --timeout 70s &
+sleep 5
+sudo cyclictest -p 99 -m -i 1000 -l 60000 -t 8 -a -q -h 400 > ~/cyclictest_rt_floor_gpu_$(date +%Y%m%d).log
+```
+Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash tools/rt/a1_rt.sh bench` (약 5분, 격리 코어가 있으면 자동으로 그 코어에서 측정). 장시간 측정은 `sudo bash tools/rt/a1_rt.sh soak 30`.
 
 - 판단 기준은 각 스레드의 `Max`(최악 지연) — `Avg` 아님. 사고는 꼬리(tail)에서 남.
 - 8개 스레드 중 **가장 큰 Max**가 "이 컴퓨터+이 커널이 보장하는 실시간성의 바닥선".
 
-| 상태 | 무부하 Max | 부하상태 Max | 측정일 | 커널 |
-|---|---|---|---|---|
-| RT 커널 (§7 목표: 수십~100µs 급) | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
+**측정 결과 (§7 목표: 최악 지연 수십~100 µs 급)**
+
+| 구분 | 무부하 Max | CPU 부하 Max | CPU+GPU 부하 Max | 측정 CPU | 측정일시 | 커널 |
+|---|---|---|---|---|---|---|
+| RT, 튜닝 전 — 1차 | 116 µs (CPU 6) | **882 µs (CPU 6, 1회)** | 미측정 | 0–7 | 2026-09-12 15:18 | `6.8.1-1059-realtime` |
+| RT, 튜닝 전 — 2차 | 65 µs (CPU 6) | 23 µs | 20 µs (GPU 83%) | 0–7 | 2026-09-12 16:01 | `6.8.1-1059-realtime` |
+| RT + 격리 튜닝, 30분 — **1차(참고용, 부하 불안정)** | — | 839 µs | (GPU 도구 3.5분 뒤 크래시, 코어덤프·병행 시험·NVIDIA BUG 10회 겹침) | 8–15 | 2026-09-12 16:52–17:23 | `6.8.1-1059-realtime` |
+| RT + 격리 튜닝, 5분 (ftrace 추적 중) | — | — | **33 µs** (GPU+CPU 부하 안정) | 8–15 | 2026-09-12 17:36–17:41 | `6.8.1-1059-realtime` |
+| **RT + 격리 튜닝, 30분 — 2차(정식)** | — | — | **467 µs** (GPU 83% 유지 + CPU·메모리·I/O 부하) | 8–15 | 2026-09-12 17:47–18:17 | `6.8.1-1059-realtime` |
+| **RT + 격리 튜닝, 8시간 야간 (합성 상한 부하)** | — | — | **828 µs** (GPU 81 % + CPU·메모리·I/O; 400 µs 초과 231회 = 65 에피소드, **전부 CPU 12·13**; 1 ms 초과 0; 스로틀 0) | 8–15 | 2026-09-14 21:20–09-15 05:21 | `6.8.1-1059-realtime` |
+| **RT + 격리 튜닝 + 전원관리 차단(idle=poll, pstate off), 30분** | — | — | **43 µs** (GPU 78 % + CPU·메모리·I/O; 50 µs 초과 0회, 8코어 16~43 µs) | 8–15 | 2026-09-15 14:52–15:22 | `6.8.1-1059-realtime` |
+| **generic + 격리 튜닝 + `preempt=full`, 30분 (대조군)** | — | — | **935 µs** (GPU 80 % 유지 + CPU·메모리·I/O; 400 µs 초과 9회, 100 µs 초과 324회, 50–100 µs 748회) | 8–15 | 2026-09-14 12:00–12:30 | `6.8.0-138-generic` |
+
+- 평균(Avg)은 모든 조건에서 1–5 µs. 판단은 항상 Max 기준.
+- `hwlatdetect`(20 µs 기준) 2회 모두 초과 0건 → 하드웨어·BIOS 요인 배제.
+- 측정 중 커널 경고(`BUG:`/`scheduling while atomic`/`Call Trace`/NVRM 오류) 0건 — NVIDIA×RT 충돌 징후 없음.
+
+**판정 (2026-09-12, 정식 30분 측정 후): 조건부 통과 — 꼬리(tail) 0.5 ms 🟡**
+
+정식 2차 30분 측정(GPU 83% + CPU·메모리·I/O 부하, 격리 코어 8–15, 1,440만 샘플):
+
+| 구간 | 횟수 | 비율 |
+|---|---|---|
+| 50 µs 미만 | 14,399,898 | 99.9993 % |
+| 50–100 µs | 29 | |
+| 100–200 µs | 47 | |
+| 200–400 µs | 24 | |
+| 400 µs 초과 | 2 (최악 467 µs) | 30분에 1사건 — 스레드 1·7이 **같은 사이클**에 기록 → 시스템 전체에 걸린 단일 사건 |
+
+- 평균 3.9 µs. §7 목표(수십~100 µs)를 **99.9995 %의 주기에서 만족**하지만, 최악값 기준으로는 미달(0.47 ms). 약 18초에 한 번 50 µs를 넘고, 30분에 한 번 0.4 ms를 넘는다.
+- 1차 30분의 839 µs·93회는 **측정 환경이 오염된 결과**다: GPU 부하 도구(glmark2)가 3.5분 만에 크래시(NVIDIA 470의 셰이더 컴파일 실패 — RT와 무관)하며 21 MB 코어덤프·크래시 보고가 돌았고, 같은 시간대에 원인 조사용 시험이 병행됐으며 NVIDIA BUG 10회가 겹쳤다. 참고용으로만 남긴다.
+- 정식 2차 부팅(57분 가동, 그중 30분 GPU 부하)에서는 **NVIDIA BUG 0회**. BUG는 GPU 프로세스가 비정상 종료되는 상황에서 나타난 것으로 보이며, 정상 운용에서는 재현되지 않았다. 다만 잠재 결함이므로 대회 중 GPU 프로세스 크래시는 지연 사건으로 간주해야 한다.
+- 원인 후보: 격리 코어에 장치 인터럽트는 0건. GPU 활동 시 격리 코어에 CPU 간 호출 인터럽트(IPI)가 유입(1080p 5회/초, 4K 83% 부하 시 ~20회/초)하며 이는 `isolcpus`로 막을 수 없다. stress-ng(CPU·메모리·I/O)는 IPI 0회. 5분 ftrace 추적(`trace 5 300`)은 임계 초과가 없어 발동하지 않았다 — 0.4 ms 사건은 30분에 1회 수준이라 **`trace 30 300`**으로 잡아야 한다.
+- BIOS/SMI: `hwlatdetect` 60초 2회 0건.
+
+**결론**: 이 하드웨어(NVIDIA GPU 동거) + RT 커널 + 격리 튜닝으로 얻을 수 있는 실시간성은 **"평균 4 µs, 99.9995 % 50 µs 이내, 최악 ~0.5 ms/30분"**이다. CAN 스택 데드라인(제어 10 ms, 0x156 TX 10 ms, 차량측 타임아웃 1000 ms) 대비 0.5 ms는 주기의 5 %로, **CAN 스택 구현(Phase B 이후)을 진행하는 데 지장이 없다**. §7의 "수십~100 µs" 목표는 이 구성에서 최악값으로는 달성 불가하므로 **팀이 예산을 "최악 1 ms 이내, 99.99 % 100 µs 이내"로 재정의하거나, 100 µs급 보장이 정말 필요한 루프는 MCU로 이관**해야 한다.
+
+**참고 — 1차(튜닝 전)의 882 µs 스파이크 1회 조사:**
+- WiFi 오류 로그와 시각 불일치(스파이크 15:20:34 전후, WiFi 오류 15:21:40), CPU 6에는 WiFi(CPU 9)·GPU(CPU 13)·NVMe 등 주요 장치 IRQ 없음, 측정 직전 apt 설치는 측정 시작 전(15:18:17) 종료, `hwlatdetect` 0건 → 알려진 후보는 모두 배제됨.
+- 2차 60초 측정에서 재현되지 않음. 10 ms 제어 주기 기준 882 µs는 주기의 9%로 데드라인 위반은 아니지만, §7 목표선은 넘는다.
+- → **장시간 측정(soak 30분+)에서 재발하지 않는 것을 확인하기 전까지 "통과"로 확정하지 않는다.**
+
+**⚠️ NVIDIA × PREEMPT_RT 커널 BUG (2026-09-12 17:00~17:18, 1차 30분 측정 중 10회 — 정식 2차 측정에서는 0회)**
+- 메시지: `BUG: scheduling while atomic: irq/219-s-nvidi` (CPU 3 — 하우스키핑 코어), 2쌍 4회. 시스템은 계속 동작.
+- 경로: `nvidia_isr_kthread_bh` → `rm_isr_bh` → `nv_post_event` → `kmalloc` → `___slab_alloc` → `rt_spin_lock` → `schedule_rtlock`. NVIDIA 드라이버가 선점을 막은 상태에서 메모리를 할당하는데, PREEMPT_RT에서는 할당기의 잠금이 **잠들 수 있는 잠금**이라 "잠들면 안 되는 곳에서 잠듦" BUG가 난다. NVIDIA가 RT를 지원하지 않는 이유가 바로 이것.
+- 튜닝 전 RT 부팅 2회(60초 GPU 부하 포함)에서는 0회. 할당기가 느린 경로(잠금 필요)로 빠질 때만 드러나는 잠재 결함으로, 장시간 메모리 부하에서 확률적으로 나타나는 것으로 판단.
+- 촉발 요인: GPU 부하 도구(glmark2)가 크래시로 비정상 종료된 직후 시간대에 집중. 정상 운용(GPU 83% 부하 30분)에서는 0회 → **GPU 프로세스 비정상 종료·컨텍스트 정리 경로**에서 나타나는 것으로 추정.
+- 의미: 격리 코어 밖에서 났지만 커널 수준 잠금 규칙 위반이라 드물게 지연 스파이크·멈춤으로 번질 수 있다. **운용 규칙**: 대회 중 GPU 프로세스(인지 노드)가 크래시하면 그 시점을 실시간성 상실로 간주하고 안전 SW(§5.D)가 감지·대응해야 한다. 근본 해소는 NVIDIA 최신 브랜치 재시험 또는 RT 포기(generic+preempt=full) — 비교 측정 항목으로 유지.
+
+**튜닝 파라미터 (A-1/A-2) — `A1-BSW: … + RT 튜닝` 부팅 항목**
+
+| 파라미터 | 의도 |
+|---|---|
+| `isolcpus=managed_irq,domain,8-15` | 물리 P코어 4–7(하이퍼스레드 양쪽)을 RT 전용으로 격리 |
+| `nohz_full=8-15` `rcu_nocbs=8-15` `rcu_nocb_poll` | 격리 코어의 주기 타이머·RCU 콜백 제거 |
+| `irqaffinity=0-7,16-19` | 인터럽트를 격리 코어 밖(나머지 P코어 + E코어)으로 |
+| `intel_idle.max_cstate=1` `processor.max_cstate=1` | 깊은 절전 복귀 지연 제거 (유휴 전력·발열 증가는 감수) |
+| `nmi_watchdog=0` `nosoftlockup` `skew_tick=1` | 주기적 감시·틱 동시성에서 오는 지터 감소 |
+
+> ⚠️ **격리 코어에는 명시적으로 배치한 태스크만 실행된다.** ROS2 제어 노드를 `taskset -c 8-15` + `chrt -f`로 띄우지 않으면 격리 코어는 그냥 놀게 되고 지연 개선 효과도 없다(A-3). 위 cyclictest 실패와 같은 이유다 — 격리 코어 밖에서 시작한 프로세스는 `taskset`/`sched_setaffinity`로 옮겨야만 격리 코어를 쓴다. 가장 결정적인 구성이 필요하면 물리 코어당 한 스레드만 사용(예: 8·10·12·14)하고 형제 스레드는 비워 둔다.
+>
+> **격리 코어에 남는 인터럽트 (A-2 확인 결과)**: NVMe 디스크의 CPU별 큐 8개(`nvme0q5`~`q12`, IRQ 163~170)가 CPU 8~15에 하나씩 배정돼 있다. 커널이 관리하는 인터럽트라 사용자가 옮길 수 없지만, **그 CPU에서 디스크 I/O를 할 때만 발생**하므로 튜닝 부팅 후 발생 0회였다. → **격리 코어의 RT 태스크는 디스크 I/O를 하지 않는다** (로그는 하우스키핑 스레드로 넘겨 기록).
+
+**남은 작업 (Phase A 잔여)**
+1. ✅ 튜닝 항목 부팅 확인 (2026-09-12 16:36) — `/proc/cmdline`에 튜닝 파라미터 반영, `isolated` = `nohz_full` = `8-15` (A-1). 격리 코어의 장치 인터럽트는 NVMe CPU별 큐뿐이며 발생 0회 (A-2)
+2. ✅ `soak 30` 2회 완료 (2026-09-12) — 정식 2차: 최악 467 µs, 99.9995 % 50 µs 이내 (위 판정 참조)
+3. ✅ 비교·원인 측정 완료 (2026-09-14~15): generic 대조군 30분(D1 = RT 유지), trace 30 300 포착(패키지 단위 깨어남 지연), 8시간 야간(최악 828 µs, 1 ms 초과 0), 장치 IRQ 계수(격리 코어 0건), 스레드별 분해(200 µs+ 공통 사건 8코어 균등, 코어 6은 증폭기). 상세는 `2026-09-14_can_verification_checklist.md` 1-1~1-6 과 `measurements/2026-09-1{4,5}_*/README.md`.
+   - **팀 결정 D4**: §7 실시간 예산을 "최악 1 ms, 99.99 % 100 µs"로 재정의 — 8시간 실측이 이를 충족(최악 0.83 ms, 99.9985 % < 50 µs). 회의 안건.
+   - **1-6b~1-6f 전원관리 실험 (2026-09-15~16) — 결론과 정정.** 9/15 에 "원인 = C-state·주파수 전이 확정"으로 썼던 판정은 **과했다.** 이후 실험으로 밝혀진 것:
+     - 튜닝 부팅의 cpuidle 은 원래 **POLL 하나뿐**(C-state 는 처음부터 원인 아님, C3), 클럭 고정은 무효(C2 899 / C3 837 µs), HWP 끔 단독 무효(B1 640), `idle=poll` 단독 무효(B2 813), **둘을 함께** 쓴 B 만 43 µs 이고 재현됨(157 µs, 200 µs 초과 0).
+     - 정확한 표현: **`idle=poll` 과 `intel_pstate=disable` 의 조합이 필요조건** — cpuidle 프레임워크 경로와 intel_pstate/HWP 경로가 함께 작용해 수백 µs 사건을 만든다. 기전은 가설, 운용 결정에는 불필요.
+     - generic 에 같은 두 옵션을 줘도 514 µs / 50 µs 초과 1,889회(1-1b) → **D1 최종: RT 유지.** RT 의 NVIDIA 비공식 빌드 위험은 운용 규칙으로 안는다.
+     - 폴링 비용: 격리 SMT 짝 offline 은 스파이크를 되살림(498 µs, offline 스레드가 깊은 C-state 로 들어가기 때문으로 추정) → 기각. **격리 코어 800 MHz 고정(`iso_pm.sh eco 800`)은 67 µs / 50 µs 초과 1** → 채택.
+     - 유휴 전력: `performance` + `idle=poll` 은 부하 없이도 **패키지가 PL1 35 W 한도에 걸린다**(20스레드 터보 폴링). `schedutil` 은 PREEMPT_RT 에서 IRQ 스레드(FIFO)를 보고 항상 최대를 골라 무효. **하우스키핑 `ondemand`(`iso_pm.sh hk ondemand`)로 유휴 35 → 14 W, 45 → 37 °C**, 30분 soak **최악 27 µs, 50 µs 초과 0** — 전 실험 최선. 하우스키핑 클럭 전이는 격리 지연과 무관(C3 + 이번).
+   - ✅ **운용 설정 확정 (2026-09-16)**: 부팅 **`a1-bsw-rt-poll`** (RT 튜닝 + `idle=poll intel_idle.max_cstate=0 processor.max_cstate=0 intel_pstate=disable cpufreq.default_governor=performance`) + 부팅 후 **`tools/rt/iso_pm.sh eco 800`** + **`tools/rt/iso_pm.sh hk ondemand`**. 런타임 두 줄은 A-3 systemd 유닛에 넣어 자동화한다(승인 후). GRUB 기본은 여전히 generic. 상세: `measurements/2026-09-16_{bisect,generic_poll,eco}/README.md`, 체크리스트 1-6e/1-6f/1-1b.
+   - ✅ **운용 설정 8시간 무인 (9/16 22:22~06:22)**: 최악 **920 µs**, 100 µs 초과 51건(0.000022 %), 200 µs 초과 31, 400 µs 초과 26 = **전역 동시 에피소드 3개**(00:07, 06:12 ×2). 9/14 8h 대비 200 µs 초과 46배 감소(1,424 → 31). **D4 충족**(최악 ≤ 1 ms 여유 8 %, 100 µs 초과 ≤ 0.01 % 450배 여유). 에피소드 2·3은 WiFi 재연결 + PackageKit 저장소 갱신과 5초 안에 겹침, 1은 USB WiFi(rtw88) LPS 메시지 근처. `measurements/2026-09-17_8h_prod/`.
+   - **9/17 후속**: 양성 대조(운용 설정 + WiFi off/on·pkcon 유발, 30분) → **에피소드 130개**(조용히 30분 = 0) → 네트워크·패키지 활동이 스톨의 증폭 인자임을 확정. 그러나 **재부팅 뒤** 같은 유발을 걸면 어떤 설정(순정/ondemand만/eco만/운용)에서도 3분에 0개 → 필요조건은 **장시간 가동 중 누적되는 상태**(미확인; 같은 부팅의 8h 는 3개뿐, 06:22~14:08 사이 발생). IPI·IRQ·SMI·커널 이벤트·전력 과도(ondemand 4.1 GHz·72 W·EDP 제한 비트 찍혀도 0)는 전부 아님. `measurements/2026-09-17_{provoke,hw_quick}/`.
+   - **9/18 결론 — 스톨 조건 = 디스플레이 활성.** 대회 조건(WiFi·서비스 끔) 8h 가 오히려 70 에피소드(화면을 밤새 켜 둔 실행) → 네트워크는 원인이 아니라 증폭 인자. 스톨 상태에서 조건을 하나씩 끄는 3분 실험: snapd 루프 종료 → 여전히 482 µs, **화면 잠금 + DPMS 끔 → 최악 19 µs, 0건**. 9/16 8h(화면 잠김, 3개) vs 9/17 8h(켜짐, 70개)와 정합. 기전(NVIDIA 470 비공식 RT 빌드의 컴포지터·스캔아웃 경로가 커널에 보이지 않게 8코어를 세움)은 미확인 → 관찰로 기록. `measurements/2026-09-18_{8h_race,switch}/`.
+   - ✅ **Phase A 종료 — 운용 설정·규칙 확정**: 부팅 `a1-bsw-rt-poll` + `iso_pm.sh eco 800` + `iso_pm.sh hk ondemand`; **주행 중 디스플레이 비활성**(잠금+DPMS 또는 헤드리스) + 주행 전 새 부팅 + WiFi/WWAN 끔 + 백그라운드 갱신 정지(`soak_guard on race`). 실측: 30분 최악 27 µs·유휴 14 W, 디스플레이 꺼짐 3분 최악 19 µs, 8h(D4 충족) 최악 920 µs.
+   - ✅ **영구화 (`a1_rt.sh finalize`, 2026-09-18)**: GRUB 기본 부팅 = `a1-bsw-rt-poll`(메뉴 10초 유지, generic 은 선택 가능; 마커 `/etc/a1-bsw/grub_default`), systemd 유닛 `a1-bsw-rt-tune.service`(isolcpus 부팅에서만 동작, 부팅마다 `eco 800` + `hk ondemand`, 스크립트 사본 `/usr/local/lib/a1-bsw/`). `verify` 가 유닛·governor 적용 여부를 자가진단. 원복 `finalize undo`.
+   - 대회 운용 메모: 디스플레이는 원격 노트북으로 봄 → 로컬 화면 꺼짐 조건과 같을 것으로 기대하되, **원격 세션(VNC 등)이 컴포지터를 깨우는지는 실제 원격 구성으로 3분 1회 확인** 필요. 원격 연결에 WiFi 를 쓰면 증폭 인자가 되살아나므로 유선 권장.
+   - 잔여(Phase C 와 병행): 위 규칙으로 8h 최종 1회(무인), rfkill/서비스 정지/DPMS 자동화는 유닛에 추가 후보, A-4 mlockall, 2-1 인지 처리량(부하 중 하우스키핑 지속 클럭 2.1~2.6 GHz @ 35 W).
+   - (이전 계획 기록) 1-6 (b) 절차: RT 튜닝 항목에 `idle=poll intel_pstate=disable processor.max_cstate=0 intel_idle.max_cstate=0` 을 더한 부팅 항목을 추가 → 그 항목으로 부팅 → `soak 30` → 200 µs 초과 합계가 8코어에서 사라지는지 비교. 사라지면 원인 = 전원관리 → 발열·전력 비용 감수 여부 결정. — 실행됨(위 결론).
+   - 코어 6 제외(`isolcpus=8-11,14-15`)는 불필요해짐(운용 설정에서 8코어 모두 20~27 µs).
+4. A-3: 제어 노드를 격리 코어에 `taskset`+`chrt -f`로 띄우는 실행 스크립트 또는 systemd 유닛
+5. A-4: `mlockall(MCL_CURRENT|MCL_FUTURE)` 적용 확인용 테스트 프로그램
+6. 운영 규칙: 주행 중 WiFi/BT 비활성(`rfkill block all`), 대회 기간 커널·NVIDIA 드라이버 동결(`apt-mark hold`) — RT용 NVIDIA 모듈은 우회 빌드라 업데이트 때 깨질 수 있음
+7. ✅ 정리 (2026-09-16, `a1_rt.sh prune`): 실험용 GRUB 항목 5개 삭제(운용 `a1-bsw-rt-poll` 만 유지), `5.15.0-1114-realtime` 계열 패키지 purge. 메뉴 = generic(기본) / 6.8.1-rt(순정) / a1-bsw-rt-poll(운용)
 
 ---
 
@@ -245,6 +390,9 @@ sudo modprobe vcan
 sudo ip link add dev vcan0 type vcan
 sudo ip link set up vcan0
 ```
+**→ 스크립트화·영속화 완료 (2026-09-12, B-1)**: `sil/vcan/vcan_up.sh` (멱등). `sudo bash sil/vcan/vcan_up.sh --install` 이
+systemd oneshot 유닛 `vcan0.service` 를 설치·활성화해 부팅마다 자동 생성한다. 이 PC는 NetworkManager 환경(systemd-networkd 비활성)이라
+`.netdev` 방식 대신 유닛을 택했다. 왕복 확인은 `bash sil/vcan/roundtrip_check.sh` (B-2, 자동 ✅/❌ 판정) — 2026-09-12 ✅.
 
 **왜 지금 쓰는가 (HW 부재 단계)**
 1. CAN 어댑터·실차 없이 ROS2↔CAN 브리지, 디코더 노드, E2E(`alive_count`) 체크, 헬스 슈퍼바이저를 개발·테스트 가능 (SIL, Software-in-the-Loop)
@@ -257,9 +405,9 @@ sudo ip link set up vcan0
 - 에러 프레임·버스-오프(bus-off)·전기적 결함(단선, 노이즈) 시뮬레이션 안 됨 → 이런 고장은 애플리케이션 레이어에서 소프트웨어적으로만 흉내 가능
 - 여러 노드 간 ID 기반 우선순위 경쟁이 실제로 일어나지 않음 (모든 프레임이 즉시 전달됨)
 
-**~~현재 막힌 지점~~ → 2026-09-11 해소**: `merged_0.mcap` 원본은 여전히 미보유지만, **실제 대회/차량 DBC를 확보함** — `can_protocol/00. CAN 프로토콜/EAIT_CAN(AVANTE_CN7).dbc` (+ 동일 폴더의 PDF 비트맵 스펙, PPTX 운용 매뉴얼). 합성 프레임 단계를 건너뛰고 바로 실제 프로토콜로 vcan0 개발 가능.
+**~~현재 막힌 지점~~ → 2026-09-11 해소**: `merged_0.mcap` 원본은 여전히 미보유지만, **실제 대회/차량 DBC를 확보함** — 저장소 `DBC/EAIT_CAN(AVANTE_CN7).dbc` (2026-09-12 반입; PDF 비트맵 스펙·PPTX 운용 매뉴얼은 `can_protocol/00. CAN 프로토콜/` 팀 폴더). 합성 프레임 단계를 건너뛰고 바로 실제 프로토콜로 vcan0 개발 가능.
 
-**완료 기준**: `vcan0` 기동 + `candump vcan0`/`cansend vcan0` 왕복 확인 + (아래 DBC 기반) 재생 스크립트로 `/interface/can/read/raw` 퍼블리시 확인.
+**완료 기준**: `vcan0` 기동 ✅ + `candump vcan0`/`cansend vcan0` 왕복 확인 ✅ + DBC 기반 재생 스크립트가 vcan0 에 스펙 주기로 송신 ✅ (2026-09-12) + `/interface/can/read/raw` 퍼블리시 확인 ✅ (2026-09-18, `ros2_ws/src/a1_can_bridge` — §5.C).
 
 ---
 
@@ -287,33 +435,328 @@ sudo ip link set up vcan0
 5. 고아 신호에 **레이더**(`RAD_ObjRelSpd`/`Dist`/`LatPos`/`State`) 존재 — 기존 문서엔 카메라·LiDAR만 언급, 실제 장착 여부 확인 필요
 6. `KIAPI_1~6`(0x124~0x129) 용도 불명 — 대회 게이트웨이/조직위 예약 가능성
 
-**vcan0 실전 스크립트 (cantools + python-can, 합성 데이터 아닌 실제 프로토콜)**
+**vcan0 실전 도구 — `sil/vcan/` (2026-09-12 구현·실측 완료, cantools 44 + python-can 4.6)**
+
+| 파일 | 역할 | 보드 |
+|---|---|---|
+| `vcan_up.sh` | vcan0 생성·기동(멱등), `--install` 로 부팅 자동 생성 유닛 설치 | B-1 |
+| `roundtrip_check.sh` | cansend→candump 왕복 자동 판정 | B-2 |
+| `eait_tx.py` | DBC 메시지 1종을 스펙 주기로 송신. 사인파/상수, `--range LO HI`(물리 범위), `--set 신호=값`(신호별 고정), 카운터(`*Cnt`) 자동 롤오버, enum 기본 0. 종료 시 송신 주기 편차 통계 | B-3/B-4/B-5/B-6 |
+| `eait_rx.py` | 수신 프레임 디코드 + 메시지별 Hz·주기 편차·카운터 건너뜀(프레임 손실) 집계 | B-4 검증, E2E 전신 |
+
 ```bash
-pip install --user cantools python-can
+python3 -m pip install --user cantools python-can          # 설치됨
+python3 sil/vcan/eait_tx.py --range 0 60                    # 0x712 EAIT_INFO_SPD, 10 ms, 0~60 kph 사인파
+python3 sil/vcan/eait_rx.py --msg EAIT_INFO_SPD             # 다른 터미널: 디코드 + 100 Hz 확인
+python3 sil/vcan/eait_tx.py --msg EAIT_Control_01 --pattern const --value 0 --set EPS_En=1 --set ACC_En=1 --set EPS_Speed=150
 ```
-```python
-import cantools, can, time
+- python-can 4.x 에서는 `bustype=` 대신 `interface=` 를 쓴다(구 예제의 `bustype`는 폐기 예정 인자).
+- **실측 (2026-09-12, 실제 DBC, vcan0)**: 0x712 송신 1001프레임/10초 = **100.0 Hz**, 카운터 건너뜀 0, 4개 휠속 물리값 디코드 일치. 0x156 인코딩 바이트 검증 `01 96 01 00 00 00 00 <Aliv_Cnt>` (EPS_En=1, EPS_Speed=150, ACC_En=1).
+- **실행 위치별 주기 정밀도** (실제 운용 조건인 격리 코어에서 검증):
 
-db = cantools.database.load_file("can_protocol/00. CAN 프로토콜/EAIT_CAN(AVANTE_CN7).dbc")
-bus = can.interface.Bus(channel="vcan0", bustype="socketcan")
+  | 조건 | 송신 주기 편차 평균/최대 | 수신 주기 최대 |
+  |---|---|---|
+  | 비격리 코어, 일반 우선순위 | 61 / 88 µs | 10.19 ms |
+  | 격리 코어(8/10), 일반 우선순위 | 57 / 63 µs | 10.04 ms |
+  | 격리 코어 + 타이머 여유 1 µs (`--cpu 8`) | **17 / 27 µs** | 10.04 ms |
+  | 격리 코어 + SCHED_FIFO 80 (`sudo chrt -f 80 sudo -u ailab …`, 2026-09-12) | **5 / 9 µs** | (송신만 측정) |
 
-msg_def = db.get_message_by_name("EAIT_INFO_SPD")   # 0x712 — 가장 단순, 걷기골격 1번 타겟
-data = msg_def.encode({"WHEEL_SPD_FL": 12.3, "WHEEL_SPD_FR": 12.1, "WHEEL_SPD_RL": 12.0, "WHEEL_SPD_RR": 12.2})
-frame = can.Message(arbitration_id=msg_def.frame_id, data=data, is_extended_id=False)
+  **8시간 실측 (2026-09-15, 4-3/4-4)**: 2.3억 샘플, 평균 4.1 µs, 99.9985 % < 50 µs, 최악 828 µs, **1 ms 초과 0회**, 커널 경고 0, 열 스로틀 0(패키지 42~47 °C). 400 µs 초과 231회가 **모두 물리 코어 6(CPU 12·13)** 에서 발생 — 나머지 격리 6코어는 8시간 내내 375 µs 이하. IPI·IRQ 카운터는 8코어 균등이라 소프트웨어 유입이 아니라 **코어 고유 하드웨어/전원 도메인 사건**으로 추정. 10분 주행당 기대 1.35개(0.4~0.83 ms). **코어 편중의 원인 = CPU 전원관리(1-6b 로 확정, 코어 6 은 복귀가 가장 느린 코어일 뿐)**. 장치 IRQ 유입 아님(2026-09-15 계수: GPU 93 % 부하 60초 동안 격리 코어 장치 IRQ 0건, NVIDIA IRQ 219 는 전량 CPU 6, NVMe q9/q10 발생 0, IPI 균등) → 물리 코어 6 고유 하드웨어/전원 도메인 사건으로 판정(A)**, `measurements/2026-09-15_irq/`. 다음 조치 = `isolcpus=8-11,14-15` 로 코어 6 제외 후 재측정(사용자 승인 후). D4 근거: "최악 1 ms, 99.99 % 100 µs" 예산은 현 구성에서도 충족(99.9985 % < 50 µs, 최악 0.83 ms).
 
-while True:
-    bus.send(frame)
-    time.sleep(0.01)   # 10ms, 스펙과 동일
-```
-받는 쪽에서 `db.decode_message(0x712, data)`로 역디코딩해 물리값이 나오면 검증 완료.
+**대조군 판정 (2026-09-14, D1)**: 같은 격리 튜닝·같은 부하에서 generic+`preempt=full`은 최악 935 µs·100 µs 초과 324회로 RT(467 µs·73회)보다 뚜렷이 나쁨 — 50 µs 초과 사건 10배(1,072 vs 102). **RT 유지** (인지 처리량 손실 ≤ 10 % 확인 조건부). 두 커널 모두 400 µs 초과가 여러 코어에서 같은 사이클에 동시에 발생 → 시스템 전체 사건(IPI 류), 1-2 추적 대상.
+
+**결론: 격리 코어 + 타이머 여유 제거 + SCHED_FIFO 조합으로 Python 송신기도 주기 편차 최대 9 µs.** 이것이 Phase C 노드의 실행 조건(레시피)이다. 일반 우선순위 태스크의 기본 타이머 여유(50 µs)가 편차의 대부분이었다. `eait_tx.py` 가 `--cpu`(격리 배치)·`--rt`(SCHED_FIFO+mlockall)·타이머 여유 1 µs 를 적용한다 — **A-3/A-4 의 최소 구현**이며 Phase C 노드에 같은 방식을 적용한다. RT 우선순위: 이 PC는 다른 작업이 같은 계정으로 돌아 **계정에 rtprio 를 영구 부여하지 않는다**(2026-09-12 결정). 측정은 `sudo chrt -f 80 sudo -u ailab python3 …` 로 우선순위만 상속시켜 실행(설정 변경 없음). 운용 단계에서는 대회 스택 전용 계정 + systemd 서비스에만 `rtprio`/`memlock` 을 주는 구조를 권장 — A-3 설계 항목.
+- **걷기골격 진행**: §6 순서 2(vcan0)·3(0x712 최소 재생) 완료 → 다음은 4(Phase C: `/interface/can/read/raw` 브리지 + `EAIT_INFO_SPD` 디코더 노드).
+
+**DBC 실제 내용 확인 결과 (2026-09-12, `cantools` 로 파싱 — 보드 Phase 0-2~0-7 답변)**
+
+| 보드 | 확인 결과 |
+|---|---|
+| 0-2 신호 매핑 | 12개 메시지·3노드(EAIT/USER/KIAPI). **0x712 신호 순서는 FR, FL, RR, RL**(문서 표기 FL/FR/RL/RR 과 다름), 각 16bit LE unsigned, **scale 0.03125 kph**, 범위 0~511.97 |
+| 0-3 코멘트(CM_) | **0x157 이 0x156 에 종속된다는 코멘트는 DBC 에 없음** → PDF 근거만. 있는 코멘트: `EPS_Speed` "Default 150", `AEB_decel_value` "0x54→0.84 G **but 0x00→1.0 G**"(비선형 특례!), `Override_Status` "발생 시 1초간 1", `BRK_CYLINDER` "maybe %", `Aliv_Cnt` 코멘트는 EUC-KR 인코딩 깨짐(내용 추정: 샘플마다 1 증가) |
+| 0-4 속성(BA_) | **주기·타임아웃 속성(`GenMsgCycleTime` 등) 전혀 없음** → 주기 10/20 ms 와 타임아웃 1000 ms 는 PDF 출처. 코드에서는 `eait_tx.py` 의 `SPEC_PERIOD_MS` 표로 관리 |
+| 0-5 VAL_(enum) | `Turn_Signal` {1:Hazard, **2:Turn_left, 4:Turn_right**} — 불일치 #1 의 DBC 쪽 값 확정. `EPS/ACC_Control_Status` 는 0~4 외에 **7:Override(ACC), 8:BRK_Override, 9:EPS_Override** 도 정의(문서의 "그외:error" 수정 필요; DBC 에 `BRK_Overrdie` 오타). `G_SEL_DISP` P=0,R=7,N=6,D=5 확인 |
+| 0-6 KIAPI | `0x124~0x129 KIAPI_1~6` 은 **BO_ 로 존재하지만 신호 0개**, 송신노드 KIAPI → 대회 측 질의 큐 등록 |
+| 0-7 0x157 명령 스펙 | `EPS_Cmd` bit0+16, ×0.1 deg, [-500\|500] / `ACC_Cmd` **bit24+16**, ×0.01, offset −10.23 m/s², [-3\|1] (바이트 2, 5~7 미사용) |
+| 기타 | 0x156 카운터 신호명은 **`Aliv_Cnt`(DBC 오타)** — 코드는 DBC 이름을 그대로 써야 함(0x710/0x711 은 `EPS_Alive_Cnt`/`ACC_Alive_Cnt`). 고아 신호 19개(`RAD_*` 레이더 4종, `Gear_Sel`, `ACC_Override_Ignore`, 크루즈 버튼 등) — 불일치 #4·#5 재확인 |
 
 ---
 
 ### 5.C ROS2 브리지·디코더
-_(추후 작성 — 노드/패키지 구조, 토픽 인터페이스, 정수→의미 매핑표 확정본)_
 
-### 5.D 안전 SW (MCU 대체)
-_(추후 작성 — 헬스 슈퍼바이저 상태머신, 타임아웃 값, safe-state 진입 로직)_
+**위치**: `ros2_ws/src/`(colcon 워크스페이스, 빌드 산출물은 `.gitignore`). ROS2 Humble. 빌드·실행은 `ros2_ws/README.md` 참조.
+
+**패키지 구조**
+
+| 패키지 | 종류 | 내용 |
+|---|---|---|
+| `a1_can_msgs` | ament_cmake (msg only) | `CanFrame.msg`(원시 프레임), `WheelSpeeds.msg`(0x712), `EpsStatus.msg`(0x710), `AccStatus.msg`(0x711), `ImuStatus.msg`(0x713) — 전부 header + DBC 신호 1:1 |
+| `a1_can_bridge` | ament_python | `can_raw_bridge`(SocketCAN → `/interface/can/read/raw`), `spd_decoder`(0x712), `eps_decoder`(0x710), `acc_decoder`(0x711), `imu_decoder`(0x713), `dbc_bits.py`(비트필드 공용 추출기), `e2e.py`(`AliveCounter`, Alive_Cnt 연속성), `rt_utils.py`(A-3/A-4 레시피 공용 모듈), `launch/spd_slice.launch.py`(최소 재현용), `launch/status_bridge.launch.py`(전체 상태 브리지, EAIT 수신 메시지 4종 전부) |
+
+**토픽 인터페이스**
+
+| 토픽 | 타입 | 퍼블리셔 | QoS |
+|---|---|---|---|
+| `/interface/can/read/raw` | `a1_can_msgs/CanFrame` | `can_raw_bridge` | BEST_EFFORT, depth 100 |
+| `/control/status/wheel` | `a1_can_msgs/WheelSpeeds` | `spd_decoder` | BEST_EFFORT, depth 100 |
+| `/control/status/eps` | `a1_can_msgs/EpsStatus` | `eps_decoder` | BEST_EFFORT, depth 100 |
+| `/control/status/acc` | `a1_can_msgs/AccStatus` | `acc_decoder` | BEST_EFFORT, depth 100 |
+| `/control/status/imu` | `a1_can_msgs/ImuStatus` | `imu_decoder` | BEST_EFFORT, depth 100 |
+| `/diagnostics` | `diagnostic_msgs/DiagnosticArray` | `eps_decoder`, `acc_decoder` | 표준, 1 Hz |
+
+이로써 **EAIT 가 보내는 상태 메시지 4종(0x710~0x713) 전부** ROS2 토픽으로 나온다. `EAIT_INFO_IMU`(0x713)는 4 신호가
+8바이트를 정확히 채워 `Alive_Cnt` 가 없다 — E2E 체크 대상이 아니며(§2), 0x712 처럼 전부 바이트 정렬돼 있어 `struct`로 직접 푼다.
+
+BEST_EFFORT 를 고른 이유: 차량 상태는 계속 갱신되는 스트림이라 재전송보다 최신값 유지가 우선(§3 콜백그룹/QoS 설계 행).
+구독 쪽도 반드시 BEST_EFFORT 로 맞춰야 한다 — RELIABLE 구독은 BEST_EFFORT 퍼블리셔와 DDS QoS 가 호환되지 않아 디스커버리는
+되어도 메시지가 조용히 안 온다(걷기골격에서 겪은 함정, `spd_decoder` 코드 주석에도 남김).
+
+**파싱 규칙**: 디코더는 런타임에 DBC 파일을 읽지 않는다 — 상세설계 산출물(파싱 규칙)을 코드로 고정해 성능·결정성을 우선한다.
+0x712 는 바이트 정렬돼 있어 `struct`(`<HHHH`)로 직접 풀고, 0x710/0x711 은 1~16비트 필드가 바이트 경계 없이 섞여 있어
+`dbc_bits.unpack()`(전체 페이로드를 64비트 리틀엔디언 정수로 보고 [start, start+length) 비트를 뽑는 일반 함수, Vector DBC
+little_endian 관례)로 푼다. 정확성은 `test/test_decode_spd.py`·`test/test_eps_acc_decode.py`·`test/test_dbc_bits.py` 가
+`cantools` 정식 DBC 디코드와 다수의 합성 값(0·0xFF·바이트별 단일비트·교대패턴·순차값)을 대조해 검증한다.
+
+**E2E(alive_count) 체크**: `EpsStatus`/`AccStatus` 는 DBC 의 `EPS_Alive_Cnt`/`ACC_Alive_Cnt`(0~255 롤오버)를 `e2e.AliveCounter`
+로 추적해 `alive_ok` 필드로 매 메시지에 싣고, 1 Hz 로 `/diagnostics`(건너뛴 프레임 수·누적 스킵)를 낸다. 이 계층은 **감지만**
+한다 — stale 판정 후 safe-state 로 전이하는 것은 §5.D 헬스 슈퍼바이저(Phase D, 미착수)의 몫이다.
+
+**can_guard(Phase D)와의 경계**: 이 워크스페이스의 노드는 상태 퍼블리시(모니터링·로깅·인지 융합용)까지만 담당한다.
+차량으로 나가는 TX(`EAIT_Control_01/02`, 0x156/0x157)는 `can_guard` 가 raw SocketCAN 으로 직접 가져가며
+**ROS2/DDS 를 hot loop 에 절대 넣지 않는다**(§7.2). 이 경계를 넘어 ROS2 제어 노드가 직접 CAN 에 쓰지 않도록 설계·리뷰에서 지킨다.
+
+**`/control/status/*` 허용 지연 — 감시(monitoring) 등급, 제어(control) 등급이 아니다.** A-3 재측정(위)으로 이 지연
+(1~2 ms)이 격리 코어·SCHED_FIFO 로 줄지 않는다는 게 확정됐으므로, "언젠가 튜닝해서 줄이면 된다"가 아니라 **애초에
+이 경로에 그 정도 지연을 감수 못 하는 소비자를 올리면 안 된다**는 것을 설계 규칙으로 못 박는다.
+- **허용 기준**: 한 CAN 메시지 주기(10~20 ms) 수준까지는 이 경로를 그대로 쓴다 — 인지 융합, 로깅, 대시보드, 헬스 슈퍼바이저(§5.D)의 상태 판단(수십~수백 ms 타임아웃) 전부 해당.
+- **금지**: 빠른 피드백 루프(예: 제어 주기 10 ms 대에서 매 주기 최신값이 필요한 로직)가 이 토픽을 **직접** 구독해 그 루프의 일부로 쓰는 것. 그런 소비자는 `can_guard`처럼 raw SocketCAN 을 직접 읽어야 한다 — DDS 를 거치는 순간 A-3 로도 못 줄이는 지연이 붙는다(위 실측).
+- **왜 지금 안 줄이는가**: 이 지연은 안전 경로(TX)와 완전히 분리돼 있어 지금 최적화할 이유가 없다. 나중에 정말 필요해지면(예: 위 "금지"에 해당하는 소비자가 생기면) 손잡이는 싼 것부터 — ① 그 소비자만 `/interface/can/read/raw` 를 직접 구독해 DDS 홉 하나 줄이기 → ② RMW 를 CycloneDDS 로 교체해 A/B 측정(`ros-humble-rmw-fastrtps-cpp` 만 설치돼 있고 CycloneDDS 는 미설치 — `apt install ros-humble-rmw-cyclonedds-cpp` 후 `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` 로 비교) → ③ 브리지+디코더를 한 프로세스로 묶어 intra-process 통신(rclpy 는 rclcpp 대비 지원이 제한적) → ④ 그래도 부족하면 `can_guard` 처럼 아예 raw SocketCAN 전용 프로세스로 분리.
+
+**실측 (2026-09-18, SIL·vcan0, 일반 우선순위·격리 코어 미배치)**
+
+| 항목 | 값 |
+|---|---|
+| `/interface/can/read/raw` hz | 99.97~100.02 Hz (목표 100, 0x712 주기 10 ms) |
+| `/control/status/wheel` hz | 99.98 Hz |
+| `/control/status/eps` hz | 49.99 Hz (0x710 주기 20 ms) |
+| `/control/status/acc` hz | 99.98 Hz (0x711 주기 10 ms) |
+| `/control/status/imu` hz | 99.97 Hz (0x713 주기 10 ms) |
+| 종단 지연(`ros2 topic delay`, header.stamp=수신 시각 기준) | 평균 2 ms, 최대 2~4 ms |
+| 디코드 정확성 | 실시간 프레임 대조 + 단위테스트, `cantools` 대비 **불일치 0**(28개 테스트 전부 통과) |
+| `/diagnostics` (정상 vcan0 루프백) | 0x710/0x711 모두 level=OK, total_skips=0 |
+| lint | `colcon test`(flake8·pep257·copyright·xmllint) 전부 통과 |
+
+**A-3 레시피 재측정 (2026-09-18) — 결론 확정: 이 슬라이스의 1~2 ms 지연에 격리 코어·SCHED_FIFO 는 기여하지 않는다.**
+
+| 조건 | wheel 지연 | eps 지연 | acc 지연 |
+|---|---|---|---|
+| 격리 없음(기본, 위 표) | 평균 2 / 최대 2~3 ms | 평균 2 / 최대 2 ms | 평균 2 / 최대 2~3 ms |
+| `cpu_affinity=8`(격리 코어, FIFO 없음) | 평균 1 / 최대 2 ms | 평균 2 / 최대 2 ms | 평균 2 / 최대 3 ms |
+| `cpu_affinity=8` + `rt_priority=80`(권한 없어 FIFO 미적용, `mlockall`만 성공) | 평균 1 / 최대 2 ms | 평균 2 / 최대 2 ms | (재실행 중 종료, 미측정) |
+| **`cpu_affinity=8` + 진짜 `SCHED_FIFO 80`(사용자가 `sudo chrt -f 80 sudo -u ailab ros2 launch ...` 실행, `chrt -p` 로 정책·우선순위 확인)** | **평균 1 / 최대 2 ms** | **평균 2 / 최대 2 ms** | **평균 1 / 최대 2 ms** |
+
+네 조건이 사실상 같다 — 마지막 줄은 `chrt -p <pid>`로 `SCHED_FIFO`·우선순위 80을 실제로 확인한 뒤 잰 값이라, **추정이
+아니라 확정**이다. `taskset -c 8`로 프로세스가 실제로 CPU 8에서 도는 것도 `/proc/<pid>/stat`로 확인했지만 지연은 안 줄
+었다. 해석: `eait_tx.py`/`eait_rx.py` 가 5~9 µs 를 낸 건 **커널 타이머(sleep) 정밀도** 문제였고, 그건 SCHED_FIFO·타이머
+여유·격리로 직접 고쳐진다. 반면 이 ROS2 슬라이스의 1~2 ms 는 자릿수가 다른 지연(수백 배)이라 **DDS 퍼블리시·구독 경로
+(RMW 직렬화, rclpy 콜백 디스패치, 프로세스 간 IPC)** 가 지배적이다 — 그 구간은 코어 배치·우선순위로 줄어드는 종류가
+아니다. `ros2 run ... -p cpu_affinity:=8` 처럼 `ros2 run`/`--ros-args -p` 로 직접 줄 때는 숫자로 보이는 문자열이 YAML
+상 정수로 해석돼 타입 오류가 난다 — **`ros2 launch`(이 프로젝트의 launch 파일들, `ParameterValue` 로 타입 고정)로만
+`cpu_affinity`/`rt_priority` 를 넘긴다.**
+
+이 결과는 A-3(격리 코어+FIFO)가 무의미하다는 뜻이 아니라, **그 레시피가 효과 있는 지점은 "커널이 sleep 에서 깨는 시각의
+정밀도"이지 "ROS2 메시지가 프로세스 경계를 넘는 시간"이 아니다**라는 뜻이다. `can_guard`(Phase D)가 ROS2/DDS 를 hot
+loop 에서 뺀 이유(§7.2)가 바로 이것과 같은 맥락 — 안전 임계 경로는 DDS 를 거치지 않아야 이 격차를 피한다. **결론: 이
+ROS2 상태 브리지 슬라이스에는 A-3 레시피를 상시 적용할 필요가 없다** — `can_raw_bridge`를 격리 코어에 상시 배치하면
+오히려 CAN 스택 전용 코어 예산(§5.A eco 800 의 취지)을 인지/디코더 작업이 아닌 곳에 쓰게 된다. A-3 는 `can_guard`
+(Phase D, raw SocketCAN 직접 TX)에 적용하는 것이 맞다.
+
+**개발 중 잡은 버그(기록)**: 단위테스트 안에서 assert 메시지 변수명을 `msg`로 지어 바깥 스코프의 `cantools.Message`
+객체(같은 이름 `msg`)를 겹쳐 썼다가, 두 번째 데이터 패턴부터 `'str' object has no attribute 'signals'`로 터진 것을 발견·수정
+(`test_dbc_bits.py`) — 파일명이 아니라 **변수명 섀도잉**이라 처음엔 cantools API 문제로 오인했다. lint 자동수정 과정에서
+넣은 변수명이 원인이었다는 점만 기록해 둔다.
+
+**남은 작업**: 실 `can0` 전환(5-1), `can_guard` 설계 착수(§7) — TX 방향(0x156/0x157)은 이 워크스페이스가 아니라
+raw SocketCAN 직접 + 격리 코어 + 진짜 SCHED_FIFO(`eait_tx.py`/`eait_rx.py` 에서 그 레시피가 실제로 효과 있었던
+바로 그 방식)로 만든다 — ROS2/DDS 를 거치는 순간 A-3 는 효과가 없다는 것이 이번 재측정으로 확인됐다.
+
+### 5.D 안전 SW (MCU 대체) — `can_guard` (2026-09-19, 설계+메인 루프 구현+P-1/P-2 실측 통과)
+
+§7 의 결정(MCU 없음, PC 가 안전계층)·§7.2 설계 규칙을 구체 아키텍처로 옮긴 것. 위치는 `safety/can_guard/` —
+**`ros2_ws/` 밖**이다(§7.2 "ROS2/DDS 를 hot loop 에 절대 넣지 않는다"를 디렉터리 경계로도 강제 — 이 프로세스는
+`rclpy`·`cantools` 등 어떤 무거운 런타임 의존도 없이 표준 라이브러리 + `python-can` 만으로 돈다).
+
+**구현 언어 = Python (잠정, 근거 명시)**: C 로 다시 쓰면 워커 스레드 지연의 최악값 예측이 더 좋아지지만,
+`sil/vcan/eait_tx.py` 가 **같은 레시피**(격리 코어+SCHED_FIFO+mlockall, A-3 로 root 권한까지 확인된 방식)로
+주기 편차 5~9 µs 를 이미 실측했고, D4 예산(최악 ≤1 ms)에 100배 넘는 여유가 있다 — 지금 C 로 새로 쓸 근거가
+없다. 8시간 벤치(P-9)에서 GC 정지·인터프리터 지터가 문제로 나오면 그때 재검토한다.
+
+```mermaid
+flowchart LR
+  CTRL["ROS2 제어 노드<br/>(MPC/판단, ros2_ws)"] -->|"1. 공유메모리 CommandChannel<br/>(seqlock, seq+timestamp)"| GUARD
+  PERC["인지 프로세스<br/>(heartbeat)"] -->|"2. 같은 방식, 별도 채널"| GUARD
+  subgraph GUARD["can_guard (safety/can_guard/, 격리 코어, SCHED_FIFO 90, mlockall)"]
+    direction TB
+    SM["상태머신<br/>INIT→ACTIVE→HOLDING/DEGRADED→STOPPED"]
+    PL["Plausibility<br/>범위·변화율 클램프, 위반 카운트"]
+    ENC["0x156/0x157 인코더<br/>Aliv_Cnt 소유"]
+    SM --> PL --> ENC
+  end
+  ENC -->|"raw SocketCAN, can0"| VEH["차량(EAIT 보드)"]
+  GUARD -.->|"sd_notify 하트비트"| SYSTEMD["systemd<br/>Restart=always, WatchdogSec"]
+```
+
+**1) IPC — `CommandChannel`(`protocol.py`).** §7.2 원문은 "작은 공유메모리 ring"이라고 했지만, 실제로 필요한 건
+**최신값 하나**뿐이다(제어 명령은 새 값이 오면 이전 값이 의미가 없다 — 큐가 아니다) → **seqlock 단일 슬롯**으로
+구현(설계 변경 사유를 여기 남긴다). `multiprocessing.shared_memory.SharedMemory` 위에 `ctypes.Structure` 를 얹는다.
+
+```
+seq: uint64          # 쓰기 시작 시 홀수, 끝나면 +1(짝수) — 리더가 홀수/불일치를 보면 재시도
+timestamp_ns: int64   # time.monotonic_ns() — 벽시계 아님(NTP 점프에 안전), 나이 계산 기준
+eps_en, eps_override_ignore, acc_en, aeb_en: uint8(bool)
+eps_speed: uint8       # 10~250 (DBC EPS_Speed)
+turn_signal: uint8     # 0(없음)/1/2/4 (DBC 값 그대로, 비트마스크 아님)
+aeb_decel_value: float32   # 0~1 g
+eps_cmd: float32           # -500~500 deg (부호 있음)
+acc_cmd: float32           # -3~1 m/s^2
+```
+
+리더(can_guard)는 seq 를 읽고 → 페이로드 복사 → seq 를 다시 읽어 두 값이 같고 짝수인지 확인, 아니면 재시도.
+제어 노드가 죽어 있으면 seq 가 안 바뀌므로 `age_ns = now - timestamp_ns` 로 staleness 를 판정한다(§3-6 의
+"50 ms" 제안값을 watchdog T 로 채택 — 팀 확정 필요, 아래 미확정 항목).
+
+**2) Plausibility (`plausibility.py`)** — §3-7 "출력 클램핑"이 최종적으로 여기로 옮겨온다.
+
+| 신호 | 범위 클램프(DBC 그대로) | 변화율(rate) 제한 |
+|---|---|---|
+| `eps_cmd`(조향각) | −500~500 deg | **미확정 — deg/s 상한, 실차/EAIT 사양 필요** |
+| `acc_cmd`(가감속) | −3~1 m/s² | **미확정 — jerk(m/s³) 상한, 실차 사양 필요** |
+| `eps_speed` | 10~250 | 해당 없음(참조값) |
+| `aeb_decel_value` | 0~1 g | 해당 없음(AEB 발동 즉시값) |
+
+범위는 DBC 에서 그대로 가져와 지금 바로 구현·테스트 가능하다. **변화율 제한은 숫자를 임의로 넣지 않는다** —
+`can_status_parameters_full.md`(이 저장소에 없음, 팀 원본 문서로 추정) 나 EAIT 보드 사양에서 받아야 할 값이라
+`RateLimiter` 클래스는 만들되 기본값은 "비활성"으로 두고 실제 숫자가 오면 채운다.
+
+**3) 상태머신 (`state_machine.py`)**
+
+```
+INIT(En=0, safe-state) → 제어 노드 첫 유효 명령 수신 → ACTIVE(명령 클램프해서 전달)
+ACTIVE → 명령 age > T(50ms 잠정) → HOLDING(조향 최종값 유지, 가감속 0 으로 램프)
+HOLDING → 명령 재개 → ACTIVE  |  HOLDING 지속 또는 실측 차속 정지 문턱 이하 → STOPPED(En=0)
+(모든 상태) 인지 하트비트 끊김 → DEGRADED(HOLDING 과 같은 메커니즘, 초안) — §7.2 "GPU-crash rule"
+DEGRADED 지속 또는 실측 차속 정지 문턱 이하 → STOPPED (2026-09-21 초안, 아래 참고)
+(모든 상태) 재시작 → 항상 INIT 부터(안전 상태에서 시작 — §7.2 Startup 규칙)
+```
+
+**4) TX 인코딩 (`tx_encode.py`)** — 0x156/0x157, `struct` 직접 패킹(런타임 DBC 의존 없음, 디코더들과 같은 원칙).
+`Aliv_Cnt`(DBC 오타 그대로 사용)는 **can_guard 가 소유**하고 매 전송마다 +1(0~255 롤오버) — 제어 노드가 보내는
+`seq`(공유메모리 채널 내부용)와는 다른 카운터다, 섞지 않는다.
+
+⚠️ **미확인 사실 (팀 확인 필요)**: `0x157`(EAIT_Control_02, EPS_Cmd/ACC_Cmd)에는 DBC 상 `Alive_Cnt` 가 **없다**
+— `0x156` 의 카운터 하나로 EAIT 보드가 두 메시지 모두의 생존을 판단하는지, 아니면 `0x157` 은 별도 타임아웃
+로직이 있는지 DBC 만으로는 알 수 없다. `can_guard` 는 두 메시지를 항상 같은 주기(10 ms)에 짝지어 보내는 것으로
+설계해 이 불확실성을 흡수하지만, 확정은 EAIT 쪽 확인이 필요하다.
+
+**5) 생존성** — systemd 유닛(`can_guard.service`, 저장소에 파일만 두고 미설치): `Restart=always`,
+`WatchdogSec=`(can_guard 가 `sd_notify(WATCHDOG=1)` 하트비트를 보내지 않으면 systemd 가 강제 재시작),
+`OOMScoreAdjust=-1000`(OOM 이 나면 인지가 먼저 죽는다), 인지는 별도 cgroup 메모리 제한 아래(P-7). 배치는
+A-3 레시피(격리 코어, `SCHED_FIFO 90` — 제어 노드의 80 보다 높음, `mlockall`) 그대로. **이 레시피는 raw
+SocketCAN 경로에서 효과가 실측됐다**(§5.C A-3 재측정: ROS2 슬라이스엔 무효과, `eait_tx.py` 류엔 5~9 µs) —
+can_guard 가 바로 그 "효과 있는" 경로다.
+
+**6) 메인 루프 (`can_guard.py`)** — 위 다섯 모듈을 결선: `CommandChannel.read()`/`HeartbeatChannel.age()`
+→ `state_machine.next_state()` → `command_policy.command_for_state()`(상태별로 실제 뭘 보낼지: HOLDING 은
+진입 순간 조향각을 얼리고 가감속만 0 으로 램프, STOPPED 는 EPS/ACC En 끄고 AEB_En 은 유지) → `plausibility.
+clamp_range()`(방어 이중화) → `tx_encode` → `bus.send()`. `sd_notify.py`(systemd `Type=notify`/`WatchdogSec`,
+외부 의존 없이 유닉스 소켓 직접) 도 결선됨. guard 가 두 공유메모리 세그먼트를 **소유·생성**한다(제어
+노드·인지 프로세스는 `open()` — §7.2 "guard 가 먼저 뜬다"를 세그먼트 소유권으로도 강제, 재시작마다
+새 세그먼트 = 항상 안전 상태에서 시작).
+
+**7) 시험 매핑 (§7.3 체크리스트 P-1~P-11) — 실측 결과**
+
+| # | 시험 | 상태 | 결과 |
+|---|---|---|---|
+| **P-1** 제어 노드 kill | ✅ **완료(2026-09-19, SIL vcan0)** | **PASS** — `sil_tests/p1_kill_control_node.py`, 가짜 제어 노드를 실제 `SIGKILL`. 전이 로그 `ACTIVE → HOLDING` 55ms(예산 T=50ms+한 틱 이내), 0x156 Aliv_Cnt 101프레임 연속(끊김 0), 0x157 ACC_Cmd 가 kill 직후 0.150 → 0.000 으로 실제 램프됨(cantools 대조로 확인) |
+| **P-2** 인지 kill | ✅ **완료(2026-09-19, SIL vcan0)** | **PASS** — `sil_tests/p2_kill_perception.py`, 가짜 인지 프로세스를 실제 `SIGKILL`. 0x156 간격 kill 전/후 평균 10.00ms(최대 10.2~10.4ms, 목표 10ms) — **주기 안 흔들림**. `ACTIVE → DEGRADED` 전이 확인(perception_age 500ms 임계 직후), Aliv_Cnt 연속, 새 dmesg BUG 없음 |
+| P-5 plausibility(범위/변화율/카운터) | 🟡 | 범위는 유닛테스트 완료(`test_plausibility.py`, `test_tx_encode.py`). 변화율은 숫자 확정 후 |
+| P-3/P-4 (guard 자체 kill/hang) | 🟡 | systemd 설치·재시작 시간 측정 필요 — 벤치 |
+| P-6 (CAN 선 절단) | 🔴 | 실 `can0`/`can1` 필요 — 5-1 이후 |
+| P-9 (8h 벤치) | 🟡 | **SIL 근사판 완료(2026-09-18 21:14–09-19 05:14, vcan0)** — `sil_tests/soak_8h.py`, A-3+디스플레이 끔(§5.A S2 조건). 2,880,000주기 전부 완주, 상태 전이 1건(시작 INIT→ACTIVE 뿐, 스푸리어스 0), 자체측정 누적 평균 17.1µs·최대 44.6µs(D4 예산 4.46%), dmesg BUG 없음. 실 하드웨어 벤치는 5-1 이후 |
+| P-10/P-11 (콜드부트/PC 재시작 시간) | 🔴 | 실 하드웨어 |
+
+개발 중 잡은 버그 6건(§5.C 스타일로 기록, 상세는 `safety/can_guard/README.md`): (a) `ctypes.Structure.
+from_buffer()` 가 mmap 익스포트 포인터를 쥐고 있어 `close()` 전 `del` 필요, (b) seqlock 재시도 기본값(8)이
+무휴지 스트레스 테스트에서 부족해 1000으로, (c) P-1/P-2 스크립트 초기 버전이 자원 생성을 `try` 밖에 둬서
+예외 시 자식 프로세스가 실제로 유출된 것을 겪고 수정(생성부터 `try/finally`), (d) **SIGTERM 이 Python
+기본 처리(즉시 종료, `finally` 미실행)라 `Popen.terminate()` 로 끄는 P-1/P-2/A-3 측정 모두 `/dev/shm`
+세그먼트를 실제로 누수시키고 있었음(재현 확인) → SIGTERM/SIGINT 핸들러로 플래그만 세워 정상 종료 경로로
+흡수하도록 수정, (e) A-3 측정 오염 — 아래 참고, (f) **`wait_for_shm(cmd_shm)` 만으로는 부족** — can_guard
+가 `cmd_shm` 을 먼저·`hb_shm` 을 나중에 만드는데 오케스트레이션 스크립트들이 `cmd_shm` 만 보고 바로
+`fake_perception.py` 를 띄워, 그 틈에 걸리면 `HeartbeatChannel.open()` 이 즉사(실제 8h 첫 시도에서 재현
+— 20초 만에 허위 `INIT → DEGRADED` 로 끝남) → 네 스크립트 전부 `hb_shm` 도 같이 기다리도록 수정,
+`soak_8h.py` 는 가짜 노드가 8h 도중 죽어도 자동 재시작하도록 보강.
+
+**8) 남은 작업**
+
+보류(외부 입력 필요, 2026-09-19 기준 이 세션에서 진행 불가 — 나중에):
+1. 진짜 ROS2 제어 노드를 `CommandChannel.open()` 으로 결선 — ros2_ws 에 MPC/판단 노드가 아직 없음
+2. 진짜 인지 프로세스를 `HeartbeatChannel.open()` 으로 결선 — 마찬가지로 아직 없음
+3. 변화율(rate) 상한 값 — 팀/EAIT 사양 확인 필요(`can_status_parameters_full.md` 이 저장소에 없음)
+
+지금 진행 중: `0x157` Alive_Cnt 부재 확인, `can_guard.service` 설치, 벤치 시험(P-3/4/6/9/10/11)은 실
+`can0`/`can1`·팀 확인이 있어야 하는 이후 단계.
+
+**DEGRADED 정책 + STOPPED 차속수렴 초안 완료 (2026-09-21, 팀 확인 대기)**: 둘 다 "팀 결정 필요"로 남겨
+뒀던 항목인데, §7.2 원문 근거("perception-process death is a safety event ... decel per team policy")를
+바탕으로 잠정 초안을 코드로 만들었다 — 최종 확정 전까지지만 지금 이대로도 안전 방향(더 보수적)이라
+바로 쓸 수 있다.
+
+- **DEGRADED**: ACTIVE 그대로 통과시키던 걸 **HOLDING 과 같은 메커니즘**(조향 얼림+가감속 0 램프)으로
+  바꿨다 — 이미 검증된 코드 재사용, 새 로직 최소화. cmd 가 계속 fresh 해서 HOLDING 경로를 안 타는 만큼,
+  DEGRADED 자신의 지속시간 상한(기본 2.0s, HOLDING 과 별도 조정 가능)을 넘으면 STOPPED 로 직접 넘어가게
+  했다 — "인지 없이 무한정 명령을 신뢰하지 않는다"를 실제로 강제.
+- **STOPPED 차속수렴**: `rx_decode.py`(신규) 로 0x711 VS 만 읽는다. **설계 결정**: can_guard 가 이미 열어
+  둔 TX 용 `bus` 를 그대로 RX 에도 재사용(non-blocking `recv(timeout=0)`, 한 주기 최대 16회 드레인) —
+  별도 감시 프로세스+새 IPC 채널 대신 이 방법을 택함(새 실패 지점을 안 늘리고, ROS2/DDS 도 여전히 안 씀).
+  HOLDING/DEGRADED → STOPPED 는 "지속시간 상한" **또는** "실측 차속이 정지 문턱(기본 3km/h) 이하" 중 먼저
+  오는 쪽 — 차속 미확보/오래됨(1초 초과)이면 기존 시간 기반 안전망으로 자동 복귀. **ACTIVE 에서는 차속을
+  절대 참조하지 않는다**(정상 주행 중 서행·정차를 정지로 오판 방지).
+- 잠정값(2.0s, 3km/h)은 `plausibility.py` 변화율처럼 "몰라서 비움" 이 아니라 "합리적 기본값 채움, 팀
+  검토 대상" — `--perception-lost-stopped-after`/`--stop-speed-kph` CLI 인자로 코드 변경 없이 조정 가능.
+- 유닛테스트 13개 추가(51→64, rx_decode 는 cantools 대조), 라이브 vcan0 로 DEGRADED→STOPPED(시간 경로)·
+  차속 조기 정지(VS=1km/h 주입) 둘 다 확인, P-1/P-2 재실행 회귀 없음. TX 루프에 non-blocking recv 가
+  늘었으니 **A-3 지연 재검증은 아직 안 함** — 다음에 재확인 필요(`safety/can_guard/README.md` 참고).
+
+**A-3 레시피 지연 실측 완료 (2026-09-18)**: 외부 관찰(vcan0 프레임 간격) 로는 평균 16.8µs·최대 178.8µs,
+can_guard 자체측정(`late=now-next_t`, `eait_tx.py` 와 동일 정의, `can_guard.py --max-cycles 500` 직접 실행)
+으로는 평균 **17.0µs·최대 29.1µs**(D4 예산 ≤1ms 대비 **2.9%**). 최대값이 29.1 대 178.8 로 6배 차이 나는 게
+핵심 증거 — **외부 관찰자(비격리·일반우선순위 파이썬 프로세스)가 자기 스케줄링 지연을 can_guard 탓으로
+잘못 기록**하고 있었음을 자체측정으로 확인. can_guard 의 진짜 송신 타이밍 판단은 이제부터 자체측정 기준.
+자체측정(17.0/29.1µs)이 `eait_tx.py`(5~9µs)보다 2-3배 큰 건 루프당 일이 많아서(seqlock 읽기 2회+
+`dataclasses.replace()` 2회+`bus.send()` 2회) — 구조적으로 설명되는 정상 범위. 상세 분석·과정에서 잡은
+부수 버그(SIGTERM 이 `finally` 를 안 태워 `/dev/shm` 누수)는 `safety/can_guard/README.md` 참고.
+
+**SIL 8시간 연속 운전 완료 — PASS (2026-09-18 21:14–09-19 05:14)**: `sil_tests/soak_8h.py` — A-3 조건
+(격리 코어+`SCHED_FIFO 90`)으로 can_guard 를 오래 돌리며 지연과 상태머신 안정성을 함께 봤다. `can_guard.py`
+에 `--stats-interval-s`(기본 비활성, 장시간 운전에만 사용) 옵션을 추가해 1분 단위로 자체측정 지연 스냅샷
+(윈도 평균/최대 + 100µs 초과 "스파이크" 횟수, 누적치 동반)을 stderr 로그에 남기도록 했다 — RT 조사 때
+짧은 측정으로는 못 본 드문 이벤트가 8h 관측에서만 드러났던 전례(§5.A)를 참고한 설계. 실행 조건은 그
+전례와 맞춰 **디스플레이도 껐다**(§5.A 의 검증된 S2 조건: idle-delay 60s+화면잠금, dimming 끔).
+
+첫 시도(같은 날 21:08)는 20초 만에 허위 경보로 끝났다 — `wait_for_shm(cmd_shm)` 만 확인하고 `fake_perception.py`
+를 띄우는 경합 버그(can_guard 가 hb_shm 을 cmd_shm 보다 나중에 만드는 그 틈에 걸리면 `HeartbeatChannel.
+open()` 이 즉사, perception_age 가 영원히 None) 때문이었다. p1/p2/measure_a3_latency/soak_8h 네 스크립트
+전부에 있던 잠재 버그로, hb_shm 도 같이 기다리도록 고치고 `soak_8h.py` 에 가짜 노드 자동 재시작까지
+보강한 뒤(상세는 `safety/can_guard/README.md` 버그 6번) 재실행한 게 위 결과다.
+
+**최종 결과**: 목표 2,880,000주기(8h×10ms) **전부 완주**, 상태 전이 **1건**(시작 시 INIT→ACTIVE 뿐 —
+8시간 내내 스푸리어스 전이 0). 자체측정 누적 평균 **17.1µs**, 최대 **44.6µs**(D4 예산 ≤1ms 대비 **4.46%**),
+100µs 초과 스파이크 **0건**. 1분 단위 479개 윈도 최대값도 20.0~44.6µs 범위로 드리프트·이상치 없이 안정
+— RT 커널 조사 때처럼 짧은 측정에서 안 보이던 드문 꼬리 이벤트가 여기선 없었다(디스플레이 끈 조건의
+효과로 보임). dmesg BUG류 없음, 실행 후 `/dev/shm`·프로세스 전부 깨끗이 정리됨 확인. **P-9 SIL 근사판
+완료 — can_guard Phase D 의 핵심 자체 검증 항목은 전부 끝남, 남은 건 실 하드웨어 벤치와 진짜 제어/인지
+노드 결선뿐.**
 
 ---
 
@@ -324,9 +767,9 @@ _(추후 작성 — 헬스 슈퍼바이저 상태머신, 타임아웃 값, safe-
 1. **[A] RT 커널 검증** — §5.A 완료 기준 충족 ("설치함"이 아니라 "쟀음")
 2. **[B] vcan0 환경 구성** — `candump`/`cansend` 왕복 확인
 3. **[B] 최소 재생 스크립트** — `EAIT_CAN(AVANTE_CN7).dbc`를 `cantools`로 로드해 가장 단순한 메시지 `EAIT_INFO_SPD`(0x712, 필드 4개) 1종을 vcan0에 10ms 주기 송신 (2026-09-11: 실 DBC 확보로 `StatusTurn`에서 변경 — Turn 신호는 독립 메시지가 아니라 0x711 안의 비트필드였음)
-4. **[C] 최소 브리지+디코더 1종** — `/interface/can/read/raw` 퍼블리시 → `EAIT_INFO_SPD` 디코더 노드(`cantools.decode_message` 또는 직접 파싱) → `/control/status/wheel` 퍼블리시까지 관통 확인 (여기서 처음으로 "끝까지 됨"이 검증됨)
-5. **[E] 이 슬라이스에 대해 `cyclictest` + ROS2 토픽 hz/지연 측정** — §3 V-model "통합 시험" 행 충족
-6. **[C] 나머지 메시지로 확장** — EPS/ACC(안전 임계, ASIL D) 우선 → Pedal/Wheel/INS/Vehicle 순
+4. ✅ **[C] 최소 브리지+디코더 1종 (2026-09-18)** — `can_raw_bridge` 가 `/interface/can/read/raw` 퍼블리시 → `spd_decoder`(직접 파싱, `cantools` 로 정확성 대조) → `/control/status/wheel` 퍼블리시까지 관통 확인 (처음으로 "끝까지 됨"이 검증됨). `ros2_ws/src/a1_can_bridge`, 상세는 §5.C
+5. 🟡 **[E] 이 슬라이스에 대해 ROS2 토픽 hz/지연 측정** — hz 100 Hz·지연 2~3 ms 확인(§5.C). 남음: 같은 슬라이스를 A-3 레시피(격리 코어+FIFO) 로 재측정, `cyclictest` 병행 측정 — §3 V-model "통합 시험" 행 완전 충족은 이후
+6. ✅ **[C] 나머지 메시지로 확장 — EAIT 수신 4종 전부 완료(2026-09-18)** — `EpsStatus`/`AccStatus`(E2E `alive_count` 체크 첫 적용) + `ImuStatus`(Alive_Cnt 없음, 대상 아님). 다음은 TX 방향(0x156/0x157, `can_guard`)
 7. **[D] E2E(`alive_count`) 체크 + 헬스 슈퍼바이저 최소 버전** — §3 고장주입 시험 착수
 8. **[B] 실 CAN 어댑터 확보 시** — `vcan0`→`can0` 전환, HIL 재측정으로 SIL 결과 재검증
 

@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+# a1_rt.sh 실행 데이터 (이 PC 전용) — 증거 스냅샷은 measurements/ 에 별도 복사
+tools/rt/logs/
+tools/rt/backup_*/
+
+# colcon 빌드 산출물 (소스만 커밋)
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# soak_8h.py 등 SIL 실행 로그 (이 PC 전용 실측 원본 — 요약은 문서에 반영)
+safety/can_guard/sil_tests/*.log
+
+# 대회 PC 배포: survey 결과(호스트별 산출물)
+tools/deploy/survey_*.txt

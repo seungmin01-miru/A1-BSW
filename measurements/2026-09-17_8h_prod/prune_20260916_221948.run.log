@@ -1,0 +1,122 @@
+== [prune] 실험용 GRUB 항목·미사용 커널 정리 — 부팅 중: 6.8.1-1059-realtime, 기본: 6.8.0-138-generic ==
+  ✅ 메뉴 첫 줄도 6.8.0-138-generic — saved_entry가 깨져도 generic (이중 안전)
+  ✅ 기본 부팅 = 6.8.0-138-generic
+Sourcing file `/etc/default/grub'
+Sourcing file `/etc/default/grub.d/99-realtime.cfg'
+Sourcing file `/etc/default/grub.d/99z-a1-bsw-safe-default.cfg'
+Sourcing file `/etc/default/grub.d/init-select.cfg'
+Generating grub configuration file ...
+Found linux image: /boot/vmlinuz-6.8.0-138-generic
+Found initrd image: /boot/initrd.img-6.8.0-138-generic
+Found linux image: /boot/vmlinuz-6.8.1-1059-realtime
+Found initrd image: /boot/initrd.img-6.8.1-1059-realtime
+Found linux image: /boot/vmlinuz-5.15.0-1114-realtime
+Found initrd image: /boot/initrd.img-5.15.0-1114-realtime
+Memtest86+ needs a 16-bit boot, that is not available on EFI, exiting
+Warning: os-prober will not be executed to detect other bootable partitions.
+Systems on them will not be added to the GRUB boot configuration.
+Check GRUB_DISABLE_OS_PROBER documentation entry.
+Adding boot menu entry for UEFI Firmware Settings ...
+done
+  ✅ 운용 항목 유지·제목 갱신: a1-bsw-rt-poll
+   purge 대상: linux-headers-5.15.0-1114-realtime linux-headers-realtime linux-image-5.15.0-1114-realtime linux-image-realtime linux-modules-5.15.0-1114-realtime linux-modules-extra-5.15.0-1114-realtime
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following package was automatically installed and is no longer required:
+  linux-realtime-headers-5.15.0-1114
+Use 'sudo apt autoremove' to remove it.
+The following packages will be REMOVED:
+  linux-headers-5.15.0-1114-realtime* linux-headers-realtime*
+  linux-image-5.15.0-1114-realtime* linux-image-realtime*
+  linux-modules-5.15.0-1114-realtime*
+  linux-modules-extra-5.15.0-1114-realtime* linux-realtime* ubuntu-realtime*
+0 upgraded, 0 newly installed, 8 to remove and 308 not upgraded.
+After this operation, 500 MB disk space will be freed.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 340014 files and directories currently installed.)
+Removing ubuntu-realtime (1.1.2~22.04.1) ...
+Sourcing file `/etc/default/grub'
+Sourcing file `/etc/default/grub.d/99-realtime.cfg'
+Sourcing file `/etc/default/grub.d/99z-a1-bsw-safe-default.cfg'
+Sourcing file `/etc/default/grub.d/init-select.cfg'
+Generating grub configuration file ...
+Found linux image: /boot/vmlinuz-6.8.0-138-generic
+Found initrd image: /boot/initrd.img-6.8.0-138-generic
+Found linux image: /boot/vmlinuz-6.8.1-1059-realtime
+Found initrd image: /boot/initrd.img-6.8.1-1059-realtime
+Found linux image: /boot/vmlinuz-5.15.0-1114-realtime
+Found initrd image: /boot/initrd.img-5.15.0-1114-realtime
+Memtest86+ needs a 16-bit boot, that is not available on EFI, exiting
+Warning: os-prober will not be executed to detect other bootable partitions.
+Systems on them will not be added to the GRUB boot configuration.
+Check GRUB_DISABLE_OS_PROBER documentation entry.
+Adding boot menu entry for UEFI Firmware Settings ...
+done
+Removing linux-realtime (5.15.0.1114.118) ...
+Removing linux-headers-realtime (5.15.0.1114.118) ...
+Removing linux-headers-5.15.0-1114-realtime (5.15.0-1114.123) ...
+Removing linux-image-realtime (5.15.0.1114.118) ...
+Removing linux-modules-extra-5.15.0-1114-realtime (5.15.0-1114.123) ...
+Removing linux-modules-5.15.0-1114-realtime (5.15.0-1114.123) ...
+Removing linux-image-5.15.0-1114-realtime (5.15.0-1114.123) ...
+I: /boot/vmlinuz.old is now a symlink to vmlinuz-6.8.0-138-generic
+I: /boot/initrd.img.old is now a symlink to initrd.img-6.8.0-138-generic
+/etc/kernel/postrm.d/initramfs-tools:
+update-initramfs: Deleting /boot/initrd.img-5.15.0-1114-realtime
+/etc/kernel/postrm.d/zz-update-grub:
+Sourcing file `/etc/default/grub'
+Sourcing file `/etc/default/grub.d/99-realtime.cfg'
+Sourcing file `/etc/default/grub.d/99z-a1-bsw-safe-default.cfg'
+Sourcing file `/etc/default/grub.d/init-select.cfg'
+Generating grub configuration file ...
+Found linux image: /boot/vmlinuz-6.8.0-138-generic
+Found initrd image: /boot/initrd.img-6.8.0-138-generic
+Found linux image: /boot/vmlinuz-6.8.1-1059-realtime
+Found initrd image: /boot/initrd.img-6.8.1-1059-realtime
+Memtest86+ needs a 16-bit boot, that is not available on EFI, exiting
+Warning: os-prober will not be executed to detect other bootable partitions.
+Systems on them will not be added to the GRUB boot configuration.
+Check GRUB_DISABLE_OS_PROBER documentation entry.
+Adding boot menu entry for UEFI Firmware Settings ...
+done
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 323273 files and directories currently installed.)
+Purging configuration files for linux-image-5.15.0-1114-realtime (5.15.0-1114.123) ...
+Purging configuration files for linux-modules-5.15.0-1114-realtime (5.15.0-1114.123) ...
+Purging configuration files for linux-modules-extra-5.15.0-1114-realtime (5.15.0-1114.123) ...
+Purging configuration files for ubuntu-realtime (1.1.2~22.04.1) ...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages will be REMOVED:
+  linux-realtime-headers-5.15.0-1114*
+0 upgraded, 0 newly installed, 1 to remove and 308 not upgraded.
+After this operation, 78.5 MB disk space will be freed.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 323271 files and directories currently installed.)
+Removing linux-realtime-headers-5.15.0-1114 (5.15.0-1114.123) ...
+  ✅ 미사용 커널 패키지 6개 제거
+Sourcing file `/etc/default/grub'
+Sourcing file `/etc/default/grub.d/99z-a1-bsw-safe-default.cfg'
+Sourcing file `/etc/default/grub.d/init-select.cfg'
+Generating grub configuration file ...
+Found linux image: /boot/vmlinuz-6.8.0-138-generic
+Found initrd image: /boot/initrd.img-6.8.0-138-generic
+Found linux image: /boot/vmlinuz-6.8.1-1059-realtime
+Found initrd image: /boot/initrd.img-6.8.1-1059-realtime
+Memtest86+ needs a 16-bit boot, that is not available on EFI, exiting
+Warning: os-prober will not be executed to detect other bootable partitions.
+Systems on them will not be added to the GRUB boot configuration.
+Check GRUB_DISABLE_OS_PROBER documentation entry.
+Adding boot menu entry for UEFI Firmware Settings ...
+done
+  ✅ 메뉴 첫 줄도 6.8.0-138-generic — saved_entry가 깨져도 generic (이중 안전)
+  ✅ 기본 부팅 = 6.8.0-138-generic
+   dkms: nvidia-srv/470.256.02, 6.8.0-138-generic, x86_64: installed
+   dkms: nvidia-srv/470.256.02, 6.8.1-1059-realtime, x86_64: installed
+-- 부팅 메뉴 (위에서부터 순서대로)
+     Ubuntu, with Linux 6.8.0-138-generic
+     Ubuntu, with Linux 6.8.0-138-generic (recovery mode)
+     Ubuntu, with Linux 6.8.1-1059-realtime
+     Ubuntu, with Linux 6.8.1-1059-realtime (recovery mode)
+     A1-BSW 운용: Linux 6.8.1-1059-realtime + 격리 8-15 + idle=poll + intel_pstate=disable (부팅 후 iso_pm.sh eco 800, hk ondemand)
+     UEFI Firmware Settings
+== [prune] 완료 — 메뉴: generic(기본) / 6.8.1-rt(순정) / a1-bsw-rt-poll(운용). 5.15-rt·6.8.0-40 제거 ==

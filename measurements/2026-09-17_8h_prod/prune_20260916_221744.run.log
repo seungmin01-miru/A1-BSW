@@ -1,0 +1,9 @@
+== [prune] 실험용 GRUB 항목·미사용 커널 정리 — 부팅 중: 6.8.1-1059-realtime, 기본: 6.8.0-138-generic ==
+  ✅ 메뉴 첫 줄도 6.8.0-138-generic — saved_entry가 깨져도 generic (이중 안전)
+  ✅ 기본 부팅 = 6.8.0-138-generic
+  ✅ 삭제: /etc/grub.d/11_a1_bsw_rt_tuned
+  ✅ 삭제: /etc/grub.d/12_a1_bsw_generic_tuned
+  ✅ 삭제: /etc/grub.d/14_a1_bsw_rt_nohwp
+  ✅ 삭제: /etc/grub.d/15_a1_bsw_rt_idlepoll
+  ✅ 삭제: /etc/grub.d/16_a1_bsw_generic_poll
+sed: -e expression #1, char 156: unknown option to `s'

@@ -1,0 +1,29 @@
+== [verify] 6.8.0-138-generic — 2026-09-16 17:01:51 ==
+  ⚠️  RT 커널이 아님
+  ⚠️  uname에 PREEMPT_RT 없음
+  ✅ 격리 코어: 8-15 (RT 튜닝 항목으로 부팅됨)
+       IRQ 163: IR-PCI-MSIX-0000:03:00.0 5-edge nvme0q5 — 격리 코어에서 발생 0회
+       IRQ 164: IR-PCI-MSIX-0000:03:00.0 6-edge nvme0q6 — 격리 코어에서 발생 0회
+       IRQ 165: IR-PCI-MSIX-0000:03:00.0 7-edge nvme0q7 — 격리 코어에서 발생 0회
+       IRQ 166: IR-PCI-MSIX-0000:03:00.0 8-edge nvme0q8 — 격리 코어에서 발생 0회
+       IRQ 167: IR-PCI-MSIX-0000:03:00.0 9-edge nvme0q9 — 격리 코어에서 발생 0회
+       IRQ 168: IR-PCI-MSIX-0000:03:00.0 10-edge nvme0q10 — 격리 코어에서 발생 0회
+       IRQ 169: IR-PCI-MSIX-0000:03:00.0 11-edge nvme0q11 — 격리 코어에서 발생 0회
+       IRQ 170: IR-PCI-MSIX-0000:03:00.0 12-edge nvme0q12 — 격리 코어에서 발생 0회
+  ✅ 위 IRQ 8개는 격리 코어에 배정만 됐고 발생 0회 — 격리 코어에서 디스크 I/O를 하지 않으면 발생 안 함 (A-2 충족)
+  ✅ GPU: NVIDIA RTX A5000, 470.256.02
+  ✅ WiFi: wlxb0386cf49ff1:wifi:connected:HY-WiFi
+  ✅ CAN:
+       can0             DOWN           <NOARP,ECHO> 
+       can1             DOWN           <NOARP,ECHO> 
+-- 커널 경고 (NVIDIA×RT 충돌 징후: BUG / scheduling while atomic / Call Trace)
+[    0.260448] ubuntu22 kernel: process: WARNING: polling idle and HT enabled, performance may degrade
+[    3.889526] ubuntu22 kernel: peak_pciefd 0000:07:00.0: enabling device (0000 -> 0002)
+[    3.889724] ubuntu22 kernel: peak_pciefd 0000:07:00.0: 2x CAN-FD PCAN-PCIe FPGA v3.5.7:
+[    3.902557] ubuntu22 kernel: peak_pciefd 0000:07:00.0: can0 at reg_base=0x000000000b60d66e irq=19
+[    3.922057] ubuntu22 kernel: peak_pciefd 0000:07:00.0: can1 at reg_base=0x00000000e5047719 irq=19
+[    4.004377] ubuntu22 kernel: rtw_8822bu 1-7:1.0: Firmware version 27.2.0, H2C version 13
+[    4.232957] ubuntu22 kernel: NVRM: loading NVIDIA UNIX x86_64 Kernel Module  470.256.02  Thu May  2 14:37:44 UTC 2024
+[    4.245900] ubuntu22 kernel: usbcore: registered new interface driver rtw_8822bu
+[    4.247568] ubuntu22 kernel: rtw_8822bu 1-7:1.0 wlxb0386cf49ff1: renamed from wlan0
+== [verify] 끝 — 결과를 Claude 세션에 알려주세요 (로그: /home/ailab/git/A1-BSW/tools/rt/logs/verify_20260916_170151.run.log) ==

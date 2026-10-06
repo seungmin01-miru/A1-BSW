@@ -1,0 +1,15 @@
+== [soak] 부하 상태 장시간 측정 30분 — 6.8.1-1059-realtime ==
+   부팅 파라미터: BOOT_IMAGE=/boot/vmlinuz-6.8.1-1059-realtime root=UUID=3cb4c60d-1e8a-444b-8efc-612a444cc5b6 ro quiet splash vt.handoff=7 isolcpus=managed_irq,domain,8-15 nohz_full=8-15 rcu_nocbs=8-15 rcu_nocb_poll irqaffinity=0-7,16-19 intel_idle.max_cstate=0 processor.max_cstate=0 nmi_watchdog=0 nosoftlockup skew_tick=1 idle=poll intel_pstate=disable cpufreq.default_governor=performance
+  ✅ 격리 코어 8-15 에서 측정 (스레드 8개, 관리 스레드는 0-7,16-19) — 튜닝 적용 상태
+  ✅ GPU 부하(glmark2 refract) 시작
+   전원관리: cpuidle=[] cpufreq=acpi-cpufreq/performance 격리 코어 [min max SMI cpu=MHz…]: 2503 2503 218 cpu8=2503 cpu9=2503 cpu10=2503 cpu11=2503 cpu12=2503 cpu13=2503 cpu14=2503 cpu15=2503
+   측정 시작 14:58:16 — 종료 예정 15:28:16 (중단: Ctrl+C)
+
+== 결과 (30분 부하) ==
+  ⚠️  30분 부하   최악  157 µs (CPU 15) | 평균  4.2 µs | 400µs 초과 0회
+  ✅ GPU 부하 유지: 사용률 평균 79% (최소 0% / 최대 86%), glmark2 중단 0회 (180회 확인)
+  🌡  패키지 46~50°C, GPU 최대 84°C, 격리 코어 클럭 2199~2528 MHz, 스로틀 core=0 pkg=0 (179회 기록)
+  ✅ SMI(MSR 0x34) 측정 중 0회 (누적 218→218)
+-- 측정 중 커널 경고
+  ✅ 없음
+== [soak] 끝 — 원본: /home/ailab/git/A1-BSW/tools/rt/logs/soak_20260916_145810.log ==

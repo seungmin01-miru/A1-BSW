@@ -1,0 +1,15 @@
+15:42:51 추적 시작 150s (격리 8-15)
+격리 코어 CAL 증가 (150s): cpu8=6 cpu9=6 cpu10=6 cpu11=6 cpu12=6 cpu13=6 cpu14=6 cpu15=6
+격리 코어에서 실행된 IPI 함수 (횟수):
+       48  do_sync_core,
+IPI 보낸 쪽 (프로세스, 호출 지점) 상위:
+        8  gnome-shell-2011         on_each_cpu_cond_mask+0x41/0xa0
+        5  mi-scavenger-4289        on_each_cpu_cond_mask+0x41/0xa0
+        5  PK-Backend-5308          on_each_cpu_cond_mask+0x41/0xa0
+        3  kworker/4:0-45           on_each_cpu_cond_mask+0x41/0xa0
+        3  kworker/19:1-300         on_each_cpu_cond_mask+0x41/0xa0
+        2  nm-dispatcher-5207       on_each_cpu_cond_mask+0x41/0xa0
+        2  snapd-1743               on_each_cpu_cond_mask+0x41/0xa0
+        2  deja-dup-monito-5185     on_each_cpu_cond_mask+0x41/0xa0
+        1  snap-3414                on_each_cpu_cond_mask+0x41/0xa0
+        1  canonical-livep-1370     on_each_cpu_cond_mask+0x41/0xa0

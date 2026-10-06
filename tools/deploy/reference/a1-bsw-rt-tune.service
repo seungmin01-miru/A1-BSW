@@ -1,0 +1,16 @@
+[Unit]
+Description=A1-BSW RT runtime tuning (isolated cores 800 MHz pinned, housekeeping ondemand)
+# 튜닝 부팅(isolcpus)에서만 동작 — generic 기본 부팅에서는 아무것도 하지 않음
+ConditionKernelCommandLine=isolcpus
+After=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /usr/local/lib/a1-bsw/iso_pm.sh eco 800
+ExecStart=/bin/bash /usr/local/lib/a1-bsw/iso_pm.sh hk ondemand
+ExecStop=/bin/bash /usr/local/lib/a1-bsw/iso_pm.sh hk restore
+ExecStop=/bin/bash /usr/local/lib/a1-bsw/iso_pm.sh off
+
+[Install]
+WantedBy=multi-user.target

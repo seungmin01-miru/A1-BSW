@@ -1,0 +1,31 @@
+== [verify] 6.8.1-1059-realtime — 2026-09-16 20:25:31 ==
+  ✅ /sys/kernel/realtime = 1
+  ✅ uname: #60~22.04.1-Ubuntu SMP PREEMPT_RT Wed Aug 19 20:08:51 UTC 2026
+  ✅ 격리 코어: 8-15 (RT 튜닝 항목으로 부팅됨)
+       IRQ 163: IR-PCI-MSIX-0000:03:00.0 5-edge nvme0q5 — 격리 코어에서 발생 0회
+       IRQ 164: IR-PCI-MSIX-0000:03:00.0 6-edge nvme0q6 — 격리 코어에서 발생 0회
+       IRQ 165: IR-PCI-MSIX-0000:03:00.0 7-edge nvme0q7 — 격리 코어에서 발생 0회
+       IRQ 166: IR-PCI-MSIX-0000:03:00.0 8-edge nvme0q8 — 격리 코어에서 발생 0회
+       IRQ 167: IR-PCI-MSIX-0000:03:00.0 9-edge nvme0q9 — 격리 코어에서 발생 0회
+       IRQ 168: IR-PCI-MSIX-0000:03:00.0 10-edge nvme0q10 — 격리 코어에서 발생 0회
+       IRQ 169: IR-PCI-MSIX-0000:03:00.0 11-edge nvme0q11 — 격리 코어에서 발생 0회
+       IRQ 170: IR-PCI-MSIX-0000:03:00.0 12-edge nvme0q12 — 격리 코어에서 발생 0회
+  ✅ 위 IRQ 8개는 격리 코어에 배정만 됐고 발생 0회 — 격리 코어에서 디스크 I/O를 하지 않으면 발생 안 함 (A-2 충족)
+  ✅ GPU: NVIDIA RTX A5000, 470.256.02
+  ✅ WiFi: wlxb0386cf49ff1:wifi:connected:HY-WiFi
+  ✅ CAN:
+       can0             DOWN           <NOARP,ECHO> 
+       can1             DOWN           <NOARP,ECHO> 
+-- 커널 경고 (NVIDIA×RT 충돌 징후: BUG / scheduling while atomic / Call Trace)
+[    0.265363] ubuntu22 kernel: process: WARNING: polling idle and HT enabled, performance may degrade
+[    4.239320] ubuntu22 kernel: peak_pciefd 0000:07:00.0: enabling device (0000 -> 0002)
+[    4.239618] ubuntu22 kernel: peak_pciefd 0000:07:00.0: 2x CAN-FD PCAN-PCIe FPGA v3.5.7:
+[    4.240300] ubuntu22 kernel: peak_pciefd 0000:07:00.0: can0 at reg_base=0x00000000490884e1 irq=19
+[    4.240442] ubuntu22 kernel: peak_pciefd 0000:07:00.0: can1 at reg_base=0x000000005e875363 irq=19
+[    4.373317] ubuntu22 kernel: rtw_8822bu 1-7:1.0: Firmware version 27.2.0, H2C version 13
+[    4.534769] ubuntu22 kernel: NVRM: loading NVIDIA UNIX x86_64 Kernel Module  470.256.02  Thu May  2 14:37:44 UTC 2024
+[    4.622632] ubuntu22 kernel: usbcore: registered new interface driver rtw_8822bu
+[    4.624570] ubuntu22 kernel: rtw_8822bu 1-7:1.0 wlxb0386cf49ff1: renamed from wlan0
+[   93.339763] ubuntu22 kernel: warning: `Socket Thread' uses wireless extensions which will stop working for Wi-Fi 7 hardware; use nl80211
+[  465.083821] ubuntu22 kernel: rtw_8822bu 1-7:1.0: firmware failed to leave lps state
+== [verify] 끝 — 결과를 Claude 세션에 알려주세요 (로그: /home/ailab/git/A1-BSW/tools/rt/logs/verify_20260916_202531.run.log) ==
