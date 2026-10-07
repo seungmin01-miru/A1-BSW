@@ -1,5 +1,8 @@
 # A1-BSW 진행 현황 브리핑 — 2026-09-15
 
+> **2026-10-07 안내** — 이 문서는 작성 시점(EAIT DBC 시절) 기록이다. 실차는 A1 DBC(`DBC/A1_dbc_fixed.dbc`)를 쓰고 EAIT DBC 는
+> 저장소에서 삭제했다. 현재 상태는 `can_stack_development.md` 맨 위 "★ 현재 기준"과 루트 `README.md` 참고.
+
 > 대회용 메인 PC(Ubuntu 22.04.5, i7-12700, RTX A5000, PEAK PCAN-PCIe FD)가 안전 MCU·실차 게이트웨이 없이
 > **연산보드 계층을 단독 구현**하는 첫 마일스톤. 상세는 `can_stack_development.md`, 검사 목록은 `2026-09-14_can_verification_checklist.md`.
 

@@ -1,95 +1,71 @@
-# ros2_ws — Phase C (ROS2 브리지·디코더)
+# ros2_ws — Phase C (ROS2 상태 브리지)
 
-`can_stack_development.md` §5.C / §6 걷기골격. `EAIT_INFO_SPD`(0x712) 한 메시지로 `vcan0 → can_raw_bridge →
-spd_decoder → /control/status/wheel` 을 끝까지 관통시킨 첫 슬라이스(2026-09-18)에서 시작해, 같은 날 EAIT 가 보내는
-**상태 메시지 4종 전부**(0x710 EPS / 0x711 ACC / 0x712 SPD / 0x713 IMU) 디코더까지 확장했다.
+실차 A1 프로토콜(`DBC/A1_dbc_fixed.dbc`) 상태 메시지를 ROS2 토픽으로 내보낸다. 2026-10-07 EAIT DBC 시절 디코더
+(spd/eps/acc/imu, 0x710~0x713)와 그 메시지·launch 를 지우고 A1 기준 하나로 정리했다(git 기록).
+
+**이 토픽들은 감시 등급**(§5.C 설계 규칙): 10 ms 대 제어 루프가 직접 구독하지 말 것. 차량으로 명령을 보내는 건
+`safety/can_guard/can_guard.py` 하나뿐이고, 이 워크스페이스의 노드는 아무것도 송신하지 않는다.
 
 ## 패키지
 
 | 패키지 | 종류 | 내용 |
 |---|---|---|
-| `a1_can_msgs` | ament_cmake (msg) | `CanFrame`(원시 프레임), `WheelSpeeds`(0x712), `EpsStatus`(0x710), `AccStatus`(0x711), `ImuStatus`(0x713) |
-| `a1_can_bridge` | ament_python | `can_raw_bridge`(SocketCAN → `/interface/can/read/raw`), `spd_decoder`/`eps_decoder`/`acc_decoder`/`imu_decoder`(각 메시지 필터·디코드), `dbc_bits.py`(비트필드 공용 추출), `e2e.py`(`AliveCounter`), `launch/spd_slice.launch.py`(최소 슬라이스), `launch/status_bridge.launch.py`(전체) |
+| `a1_can_msgs` | ament_cmake (msg) | `CanFrame`(원시 프레임), `ControlInfo`(0x200), `WheelInfo`(0x201), `ControlCommand`(버스 위 0x210) |
+| `a1_can_bridge` | ament_python | `can_raw_bridge`(SocketCAN → `/interface/can/read/raw`), `a1_status_decoder`(raw 1회 구독 → 3토픽 + 축별 카운터 진단), `dbc_bits.py`(비트필드 공용 추출), `e2e.py`(`AliveCounter`), `rt_utils.py`(A-3), `launch/a1_bridge.launch.py` |
 
-## 빌드
+| 토픽 | 타입 | 출처 |
+|---|---|---|
+| `/interface/can/read/raw` | `CanFrame` | 버스의 모든 프레임 |
+| `/control/status/control_info` | `ControlInfo` | 0x200 — 조향 위치(×0.1°)·브레이크 위치, 축별 auto, live_counter 3개 + 축별 `alive_ok` |
+| `/control/status/wheel_info` | `WheelInfo` | 0x201 — 좌우 바퀴 속도(12비트 ×0.1 km/h)·rpm, live_counter 2개 |
+| `/control/status/command_on_bus` | `ControlCommand` | 0x210 을 버스에서 본 그대로(can_guard 든 원격조종 등 다른 송신자든) — 조향 ×1° |
+| `/diagnostics` | `DiagnosticArray` | 1 Hz — 0x200·0x201 카운터 건너뜀, 0x210 송신자 유무 |
+
+QoS 는 전부 BEST_EFFORT depth 100. 구독 쪽도 반드시 BEST_EFFORT 로(RELIABLE 구독은 연결돼도 조용히 0개 수신).
+메시지마다 노드를 따로 두던 EAIT 시절과 달리 노드 **하나**가 raw 를 한 번만 구독한다 — §5.C 실측에서 이 경로의 지연은
+DDS 구독·디스패치가 지배했으므로 구독 수를 줄이는 쪽이 낫다.
+
+## 빌드·시험
 
 ```bash
 cd ~/git/A1-BSW/ros2_ws
 source /opt/ros/humble/setup.bash
 colcon build --symlink-install
 source install/setup.bash
+colcon test && colcon test-result --all       # 2026-10-07: 28개, 실패 0 (수정본 DBC + 9/17 실차 프레임 대조 포함)
 ```
 
-## 실행 (SIL, vcan0)
-
-최소 슬라이스(0x712 하나)만 보려면 `spd_slice.launch.py`, EAIT 수신 메시지 4종 전부 보려면 `status_bridge.launch.py`.
+## 실행
 
 ```bash
-# 터미널 1~4 — 송신기(기존 sil/vcan 도구, 그대로 재사용). EAIT 보드가 네 메시지를 다 보내는 상황을 흉내낸다.
-python3 ~/git/A1-BSW/sil/vcan/eait_tx.py --range 0 60           # EAIT_INFO_SPD, 10 ms
-python3 ~/git/A1-BSW/sil/vcan/eait_tx.py --msg EAIT_INFO_EPS    # 20 ms
-python3 ~/git/A1-BSW/sil/vcan/eait_tx.py --msg EAIT_INFO_ACC    # 10 ms
-python3 ~/git/A1-BSW/sil/vcan/eait_tx.py --msg EAIT_INFO_IMU    # 10 ms
+# SIL — 가짜 실차(0x200/0x201 20 ms)
+python3 ~/git/A1-BSW/sil/vcan/fake_a1_vehicle.py --channel vcan0 &
+ros2 launch a1_can_bridge a1_bridge.launch.py channel:=vcan0
 
-# 터미널 5 — 브리지+디코더 전체
-source /opt/ros/humble/setup.bash && source ~/git/A1-BSW/ros2_ws/install/setup.bash
-ros2 launch a1_can_bridge status_bridge.launch.py channel:=vcan0
-
-# 터미널 6 — 확인
-ros2 topic list                              # .../wheel, .../eps, .../acc, .../imu, /diagnostics
-ros2 topic hz /control/status/eps            # ≈ 50 Hz (0x710 주기 20 ms)
-ros2 topic hz /control/status/acc            # ≈ 100 Hz (0x711 주기 10 ms)
-ros2 topic hz /control/status/imu            # ≈ 100 Hz (0x713 주기 10 ms)
-ros2 topic echo /control/status/eps --once
-ros2 topic echo /diagnostics --once          # level=OK, total_skips=0 이면 Alive_Cnt 연속
+ros2 topic hz /control/status/control_info    # ≈ 50 Hz (0x200 주기 20 ms) — 2026-10-07 실측 50.0
+ros2 topic hz /control/status/wheel_info      # ≈ 50 Hz — 실측 50.0
+ros2 topic echo /diagnostics --once
 ```
 
-## 실차 전환
+- 실차(PEAK 카드): `channel:=can0`(또는 `can1`).
+- 실차(Kvaser Leaf v3): Kvaser 는 이 PC 에서 SocketCAN 인터페이스가 안 생긴다 → `tools/kvaser/kvaser_mirror.py` 로
+  `kv0` 에 복사한 뒤 `channel:=kv0`(tools/kvaser/README.md).
 
-`channel:=can0`(또는 `can1`)만 바꾸면 된다 — SocketCAN이 가상/물리 인터페이스에 같은 API를 주므로 노드 코드는 무수정.
+⚠️ `cpu_affinity`·`rt_priority` 는 반드시 `ros2 launch` 인자로 — `ros2 run ... -p cpu_affinity:=8` 은 YAML 이 정수로
+해석해 `InvalidParameterTypeException`(2026-09-18 실제로 겪음). launch 파일은 `ParameterValue` 로 타입을 고정해 뒀다.
 
-## 실측 (2026-09-18, SIL, RT 우선순위 없이 — 순정 rt-poll 부팅, 일반 우선순위)
+## 지연 실측 (2026-09-18, EAIT 시절 — 결론은 구조에 관한 것이라 지금도 유효)
 
-| 항목 | 값 |
+| 조건 | 지연(평균, ms) |
 |---|---|
-| `/interface/can/read/raw` hz | 99.97~100.02 Hz (목표 100) |
-| `/control/status/wheel` hz | 99.98 Hz |
-| `/control/status/eps` hz | 49.99 Hz (목표 50, 0x710 주기 20 ms) |
-| `/control/status/acc` hz | 99.98 Hz (목표 100, 0x711 주기 10 ms) |
-| `/control/status/imu` hz | 99.97 Hz (목표 100, 0x713 주기 10 ms) |
-| 종단 지연 (`ros2 topic delay`) | 평균 2 ms, 최대 2~4 ms |
-| 디코드 정확성 | 실시간 프레임 대조 + `colcon test` 28개(경계값·`cantools` 대조 포함) — **전부 통과** |
-| `/diagnostics` (정상 vcan0) | 0x710/0x711 둘 다 level=OK, total_skips=0 |
+| 격리 없음 | 2 |
+| `cpu_affinity=8` | 1~2 |
+| `cpu_affinity=8` + 진짜 `SCHED_FIFO 80`(`chrt -p` 로 확인) | 1~2 |
 
-**A-3 재측정 완료 (2026-09-18) — 결론 확정: 격리 코어·SCHED_FIFO 모두 이 지연을 줄이지 않는다.**
+격리 코어·SCHED_FIFO 를 걸어도 줄지 않았다 → 지배 요인은 DDS 퍼블리시/구독 경로(직렬화·rclpy 콜백 디스패치).
+그래서 차량 명령(TX)은 ROS2 를 거치지 않고 can_guard 가 raw SocketCAN(또는 Kvaser CANlib)으로 직접 보낸다(§7.2).
 
-| 조건 | wheel / eps / acc 지연(평균, ms) |
-|---|---|
-| 격리 없음 | 2 / 2 / 2 |
-| `cpu_affinity=8` (FIFO 없음) | 1 / 2 / 2 |
-| `cpu_affinity=8` + `rt_priority=80`(권한 없어 FIFO 미적용, `mlockall`만 성공) | 1 / 2 / (미측정) |
-| **`cpu_affinity=8` + 진짜 `SCHED_FIFO 80`**(`sudo chrt -f 80 sudo -u ailab ros2 launch ...`, `chrt -p`로 확인) | **1 / 2 / 1** |
+## 다음
 
-네 조건이 사실상 같다 — `chrt -p <pid>`로 실제 `SCHED_FIFO`·우선순위 80을 확인한 뒤 잰 값까지 같으니, 추정이 아니라
-**확정**이다. `eait_tx.py`/`eait_rx.py` 가 같은 레시피로 5~9 µs 를 낸 것과는 자릿수가 다르다 → 지배 요인은 DDS
-퍼블리시/구독 경로(RMW 직렬화·rclpy 콜백 디스패치)다 — 코어 배치·우선순위로 줄어드는 종류가 아니다.
-상세: `can_stack_development.md` §5.C.
-
-```bash
-ros2 launch a1_can_bridge status_bridge.launch.py channel:=vcan0 cpu_affinity:=8 rt_priority:=80
-# 또는 계정에 rtprio 영구 부여 없이 우선순위만 상속(A-3 재측정에 실제로 쓴 방식):
-sudo chrt -f 80 sudo -u ailab bash -c 'source /opt/ros/humble/setup.bash && source ~/git/A1-BSW/ros2_ws/install/setup.bash && \
-  ros2 launch a1_can_bridge status_bridge.launch.py channel:=vcan0 cpu_affinity:=8'
-```
-
-⚠️ **`ros2 run ... -p cpu_affinity:=8` 처럼 `--ros-args -p` 로 직접 주면 안 된다** — 숫자로 보이는 문자열이 YAML 상
-정수로 해석돼 `InvalidParameterTypeException` 이 난다(2026-09-18 재측정에서 실제로 겪음). 반드시 `ros2 launch` 로,
-이 프로젝트 launch 파일들은 `ParameterValue` 로 타입을 고정해 뒀다.
-
-## 아직 안 한 것 (다음 단계)
-
-- [x] A-3 레시피 재측정(격리 코어 + 진짜 SCHED_FIFO) — 완료·확정, 위 결과
-- [x] `EAIT_INFO_EPS`(0x710)·`EAIT_INFO_ACC`(0x711) 디코더 — E2E(카운터 연속성) 체크 첫 적용, `/diagnostics` 연동 (2026-09-18)
-- [x] `EAIT_INFO_IMU`(0x713) 디코더 — Alive_Cnt 없음(E2E 대상 아님), 구조는 `spd_decoder`와 동일 (2026-09-18)
-- [ ] 실 `can0` 물리 루프백(체크리스트 5-1)으로 `channel:=can0` 확인 — 이걸로 EAIT 수신 방향은 완결
-- [ ] TX 방향: ROS2 제어 명령(MPC 출력) → `EAIT_Control_01/02`(0x156/0x157) 인코더 — **단, §7.2 설계 규칙대로 이 경로는 `can_guard`(Phase D)가 raw SocketCAN 으로 직접 가져가며 ROS2/DDS 를 hot loop 에 넣지 않는다.** 이 워크스페이스의 노드는 상태 퍼블리시(모니터링·로깅·인지 융합용)까지만. `can_guard` 는 A-3 레시피(격리+FIFO)가 실제로 효과 있는 raw SocketCAN 경로로 별도 구현.
+- [ ] 실 버스로 `channel:=can0`(또는 `kv0`) 확인 — 실차 인수일 녹화 데이터로도 재생 가능
+- [ ] 제어 노드가 can_guard `CommandChannel` 에 명령을 쓰는 쪽(진짜 MPC/판단 노드 — 아직 없음)

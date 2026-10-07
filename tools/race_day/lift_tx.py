@@ -309,7 +309,9 @@ def handle_line(line, cmd, status, lim, log):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--channel', required=True)
+    ap.add_argument('--channel', required=True, help='can0 등(socketcan) 또는 Kvaser CANlib 채널 번호(kvaser)')
+    ap.add_argument('--interface', default='socketcan', choices=('socketcan', 'kvaser'))
+    ap.add_argument('--bitrate', type=int, default=500000, help='kvaser 에서만 사용(socketcan 은 ip link 설정)')
     ap.add_argument('--period-ms', type=float, default=20.0, help='0x210 송신 주기 (9/17 실측 21.5 ms)')
     ap.add_argument('--steer-limit-deg', type=float, default=30.0)
     ap.add_argument('--brake-limit-pct', type=float, default=60.0)
@@ -333,12 +335,17 @@ def main():
         f'브레이크≤{a.brake_limit_pct:g}% 가속≤{a.acc_limit_pct:g}% 원위치 가속{a.acc_hold_s:g}s/'
         f'조향{a.steer_hold_s:g}s/브레이크{a.brake_hold_s:g}s')
 
-    prob = iface_problem(a.channel)
+    prob = iface_problem(a.channel) if a.interface == 'socketcan' else None
     if prob:
         log(f'🛑 {prob}')
         return EXIT_IFACE
     try:
-        bus = can.Bus(channel=a.channel, interface='socketcan', receive_own_messages=False)
+        bus_kw = {} if a.interface == 'socketcan' else {'bitrate': a.bitrate}
+        if a.interface == 'kvaser':
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'safety', 'can_guard'))
+            import kvaser_compat
+            kvaser_compat.apply()
+        bus = can.Bus(channel=a.channel, interface=a.interface, receive_own_messages=False, **bus_kw)
     except Exception as e:  # noqa: BLE001
         log(f'🛑 {a.channel} 열기 실패: {e}')
         return EXIT_IFACE

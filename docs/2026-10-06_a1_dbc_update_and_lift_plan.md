@@ -20,6 +20,10 @@
 | A-3 지연 재측정(격리 + FIFO) | ⏸ | sudo 필요 — 20 ms 주기라 여유 큼, 대회 전 재측정 |
 | 장시간 SIL soak(새 코드) | ⏸ | 밤사이 API 오류로 세션이 멈춰 못 함 |
 
+**2026-10-07 추가**: 9월 EAIT DBC 와 그에 의존하던 코드(옛 브리지 디코더 4종·메시지·launch, `sil/vcan/eait_tx|rx.py`)를
+삭제하고 문서 전체를 A1 기준으로 갱신. Kvaser Leaf v3 지원 추가(`tools/kvaser/` — 설치 스크립트, kv0 미러, 리허설;
+can_guard·lift_cmd·lift_tx·가짜 실차에 `--interface kvaser`). 매뉴얼 v4.
+
 리허설에서 잡아 고친 버그 2건:
 1. **정지 상태에서 명령이 끊기면 조향이 오래된 값(0°)으로 튐** — 상태머신이 ACTIVE→STOPPED 로 직행할 때 조향
    고정값을 캡처하지 않았다(EAIT 시절엔 STOPPED 가 조향을 놓아서 안 드러남). `command_policy.held_steer_on_transition`

@@ -33,12 +33,20 @@ def _on_signal(signum, frame):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--channel', default='vcan0')
+    ap.add_argument('--interface', default='socketcan', choices=('socketcan', 'kvaser'),
+                    help='kvaser = CANlib 가상 채널로 리허설(Kvaser 설치 후, 채널 번호를 --channel 로)')
+    ap.add_argument('--bitrate', type=int, default=500000)
     ap.add_argument('--period-ms', type=float, default=20.0)
     a = ap.parse_args()
     signal.signal(signal.SIGTERM, _on_signal)
     signal.signal(signal.SIGINT, _on_signal)
 
-    bus = can.Bus(channel=a.channel, interface='socketcan')
+    bus_kw = {} if a.interface == 'socketcan' else {'bitrate': a.bitrate}
+    if a.interface == 'kvaser':
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'safety', 'can_guard'))
+        import kvaser_compat
+        kvaser_compat.apply()
+    bus = can.Bus(channel=a.channel, interface=a.interface, **bus_kw)
     dt = a.period_ms / 1000.0
     steer = brake = kph = 0.0
     cmd = None

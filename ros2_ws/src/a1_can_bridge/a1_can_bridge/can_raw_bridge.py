@@ -8,7 +8,7 @@ Bridge vcan0/can0 to /interface/can/read/raw (CanFrame).
   ros2 run a1_can_bridge can_raw_bridge --ros-args -p channel:=can0 \
       -p cpu_affinity:=8 -p rt_priority:=80
 
-디코딩은 하지 않는다(그건 spd_decoder 등 디코더 노드의 몫) — 이 노드는 SocketCAN → CanFrame
+디코딩은 하지 않는다(그건 a1_status_decoder 의 몫) — 이 노드는 SocketCAN → CanFrame
 변환만 한다. 물리값 파싱 규칙이 바뀌어도 이 노드는 재빌드할 필요가 없도록 분리했다
 (§3 상세설계 행).
 """
@@ -62,7 +62,7 @@ class CanRawBridge(Node):
         """
         Drive the node off bus.recv() instead of rclpy.spin().
 
-        구독이 없어 콜백 실행기가 불필요 — eait_rx.py 와 같은 폴링 방식. §7.3 P-6(버스오프)
+        구독이 없어 콜백 실행기가 불필요 — sil/vcan 도구들과 같은 폴링 방식. §7.3 P-6(버스오프)
         에서도 노드가 죽지 않고 재시도하도록 예외를 삼킨다.
         """
         while rclpy.ok():

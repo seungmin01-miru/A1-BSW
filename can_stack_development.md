@@ -6,13 +6,39 @@
 
 ---
 
+## ★ 현재 기준 (2026-10-07) — 실차 A1 DBC
+
+**기준 DBC: `DBC/A1_dbc_fixed.dbc`**(업체 `DBC/A1_dbc.dbc` 를 2026-10-06 수령, 오류 2곳 수정). 9월 내내 쓰던 EAIT DBC
+(`EAIT_CAN(AVANTE_CN7).dbc`, 0x156/0x157 송신·0x710~0x713 수신)는 **2026-10-07 저장소에서 삭제**했고, 코드·문서도 A1
+기준으로 바꿨다. 아래 §0~§5 의 날짜 붙은 기록은 그 시점 사실이다 — 메시지·DBC 이름이 EAIT 로 나오면 역사 기록이고,
+**RT 커널·실시간 실측·설계 결정은 프로토콜과 무관하게 지금도 유효**하다.
+
+| 메시지 | 방향 | 주기(9/17 실측) | 내용 |
+|---|---|---|---|
+| 0x200 USER_control_info | 차량 → PC | 20.8 ms | 조향 위치 int16 ×0.1°, 브레이크 위치 int16 ×0.1, 축별 auto(bit32~34), 카운터 3개 |
+| 0x201 USER_right_wheel_info | 차량 → PC | 20.8 ms | 좌·우 바퀴 각각 12비트 속도 ×0.1 km/h + 12비트 rpm, 카운터 2개 |
+| 0x210 USER_control_command | PC → 차량 | 21.5 ms | 조향 int16 **×1°**, 브레이크 uint16 %, 가속 uint8 %, 축별 auto(bit40~42), **카운터 없음** |
+| SYS 계열 0x100·0x110~0x114·0x301 | (DBC 에만) | — | 9/17 로그에 없음 → 차량 내부 버스로 추정. **0x301(엔코더 설정)은 송신 금지** |
+| 0x004·0x204 | ? | ≈400 / 12 ms | DBC 에 없음, 업체 확인 대기 |
+
+- **업체 DBC 오류**: 0x210 `steer_command` 배율 ×0.1 → 실제 ×1(9/17 로그 1,354구간 위치/명령 비율 1.000 — 원본대로면
+  10배 조향). 0x200 `steer_is_auto` 배율 0.1(1비트 플래그) → 1. 근거·전체 대조: `docs/2026-10-06_a1_dbc_update_and_lift_plan.md` §0.
+- **구현 현황**: can_guard 0x210 송신(20 ms, 시작 전 다른 송신자 거부, HOLDING/STOPPED 브레이크 유지), ROS2
+  `a1_status_decoder`, 리프트 송신 시험 도구(`lift_cmd.py`, 비상용 `lift_tx.py`), 가짜 실차, 자동 리허설 — 전부
+  SIL 검증 통과. 실차 송신은 `tools/race_day/VEHICLE_MANUAL.md` C단계가 처음.
+- **CAN 장치**: PEAK PCAN-PCIe FD(`can0`/`can1`, 기본) + Kvaser Leaf v3(USB, linuxcan/CANlib — 6.8 커널 SocketCAN 미지원,
+  `tools/kvaser/README.md`).
+- **남은 확인**: 실차에서 조향 배율·auto 수락 조건·명령 타임아웃 동작(업체 질문 + C단계), A-3 지연 재측정, 새 코드 장시간 soak.
+
+---
+
 ## 0. 범위와 전제
 
 - **하드웨어 부재**: 안전 MCU·실차 CAN 게이트웨이 아직 없음 → 메인 PC(Ubuntu 22.04)가 [8.1 연산보드 계층](can_status_parameters_full.md#81-권장-2계층-아키텍처)을 **단독으로** 구현하는 첫 마일스톤.
 - **RT 커널 확정·설치·격리 튜닝·30분 실측 완료 (2026-09-12)**: Ubuntu 22.04.5 LTS + `6.8.1-1059-realtime` (Ubuntu Pro `linux-realtime-hwe-22.04`) + 격리 코어 8–15. 실측: 평균 4 µs, 99.9995 % 50 µs 이내, **최악 0.47 ms/30분** → CAN 스택 데드라인(10 ms)에는 충분, §7의 100 µs 최악값 목표는 미달(예산 재정의 필요) → §5.A.
-- **CAN 어댑터는 이미 장착됨**: PEAK PCAN-PCIe FD 2채널(`can0`/`can1`, 커널 내장 드라이버 `peak_pciefd`). 실차 연결 전이라 개발은 계속 `vcan0` SIL로 진행.
-- **개발 방식 = SIL(Software-in-the-Loop)**: 실물 CAN 대신 `vcan0` 가상 인터페이스 + 기록된 rosbag 재생으로 검증. 대회 DBC·실차 미수령.
-- **대회 미수령 항목**: CAN ID 배치, 정수값→의미 매핑표(`enable`/`state`/`error*`/`gear`/`drive_mode`) — 확정 전까지 TODO로 명시하며 진행.
+- **CAN 어댑터**: PEAK PCAN-PCIe FD 2채널(`can0`/`can1`, 커널 내장 `peak_pciefd`) 장착. Kvaser Leaf v3(USB)는 linuxcan 설치 후 CANlib 채널로 사용(`tools/kvaser/`).
+- **개발 방식 = SIL(Software-in-the-Loop)**: 실물 CAN 대신 `vcan0` + 가짜 실차(`sil/vcan/fake_a1_vehicle.py`)로 검증. 실차 첫 연결은 2026-10-07 인수일.
+- **DBC**: 실차 A1 DBC 수령(2026-10-06, 위 "현재 기준"). 남은 미확정: 0x004·0x204 의미, 명령 타임아웃·fail-safe 동작, auto 비트 수락 조건, 브레이크·가속 % 의 물리 의미.
 
 ---
 
@@ -23,15 +49,15 @@ flowchart TB
   subgraph A["[A] RT 커널 기반 (PREEMPT_RT) — 실측 완료(조건부), A-3/A-4 남음"]
     K["Ubuntu 22.04.5 + 6.8.1-1059-realtime<br/>isolcpus=8-15 · 최악 0.47 ms/30분<br/>mlockall · SCHED_FIFO (A-3/A-4 예정)"]
   end
-  subgraph B["[B] CAN 인터페이스 — vcan0 SIL 가동 (2026-09-12)"]
-    VCAN["vcan0 (SIL) · sil/vcan/eait_tx.py<br/>DBC 기반 0x712 10 ms 송신 ✅"]
-    RCAN["실 CAN 어댑터: PEAK PCAN-PCIe FD 2ch<br/>(장착됨 · can0/can1, 실차 연결 전)"]
+  subgraph B["[B] CAN 인터페이스 — A1 DBC (2026-10-07)"]
+    VCAN["vcan0 (SIL) · sil/vcan/fake_a1_vehicle.py<br/>0x200/0x201 20 ms 송신, 0x210 에 반응 ✅"]
+    RCAN["실 CAN: PEAK PCAN-PCIe FD 2ch(can0/can1)<br/>+ Kvaser Leaf v3(CANlib, kv0 미러)"]
   end
-  subgraph C["[C] ROS2 브리지 · 디코더 — EAIT 수신 4종 전부 완료(2026-09-18)"]
-    DEC["can_raw_bridge → CanFrame<br/>spd/eps/acc/imu_decoder(0x712/710/711/713)<br/>EPS·ACC: Alive_Cnt E2E → /diagnostics<br/>A-3(격리+FIFO) 재측정: ROS2 슬라이스엔 무효과 확정<br/>ros2_ws/src/a1_can_bridge"]
+  subgraph C["[C] ROS2 브리지 — a1_status_decoder (2026-10-07)"]
+    DEC["can_raw_bridge → CanFrame<br/>a1_status_decoder: 0x200/0x201/0x210 → 3토픽<br/>축별 live_counter E2E → /diagnostics<br/>A-3(격리+FIFO): ROS2 경로엔 무효과(9/18 확정)<br/>ros2_ws/src/a1_can_bridge"]
   end
-  subgraph D["[D] 안전 SW (MCU 대체) — P-1/P-2 실측 PASS(2026-09-19)"]
-    WD["can_guard: 상태머신+plausibility+TX(0x156/0x157)<br/>safety/can_guard/, raw SocketCAN, ROS2 밖<br/>P-1(제어 kill) · P-2(인지 kill) 실제 SIL 통과<br/>격리 코어+SCHED_FIFO 90(A-3 효과 실측된 경로) 미적용 상태로 검증"]
+  subgraph D["[D] 안전 SW (MCU 대체) — 0x210 전환, P-1/P-2·리허설 PASS(2026-10-07)"]
+    WD["can_guard: 상태머신+plausibility+TX(0x210 20 ms)<br/>safety/can_guard/, raw SocketCAN 또는 Kvaser, ROS2 밖<br/>P-1·P-2 SIL 통과, 리프트 리허설 31/31<br/>EAIT 시절 A-3 자체측정 최대 29 µs, 8h 최대 44.6 µs"]
   end
   MCU["안전 MCU<br/>(미정 · 추후 하드웨어 확보 시 통합)"]
   GW["대회 게이트웨이 → 액추에이터<br/>(EPS · ACC · 기어)"]
@@ -54,9 +80,9 @@ flowchart TB
 | ID | 카테고리 | 책임 범위 | 상태 | 상세 섹션 |
 |---|---|---|---|---|
 | A | RT 커널 기반 | PREEMPT_RT 설치·튜닝(`isolcpus`/`mlockall`/`SCHED_FIFO`), `cyclictest` 측정 | 🟡 조건부 완료 (커널·격리 튜닝·30분 실측 완료. 남음: 예산 재정의 결정, generic 비교, A-3/A-4) | §5.A |
-| B | CAN 인터페이스 | 어댑터/SocketCAN, `vcan0` SIL 환경, rosbag→CAN 주입 | 🟡 진행중 (vcan0 영속화·왕복·DBC 기반 0x712 주기 송신·디코드 완료. 남음: ROS2 raw 퍼블리시=Phase C, 실 can0 전환) | §5.B |
-| C | ROS2 브리지·디코더 | `CanFrame`→`Status*` 파싱, E2E(`alive_count`) 체크, 콜백그룹/QoS | 🟡 진행중 (EAIT 수신 메시지 4종 전부 디코더 완료: 0x712/710/711/713. EPS/ACC 는 E2E(alive_count) 체크·`/diagnostics` 연동까지. A-3 레시피 재측정 완료 — ROS2 슬라이스엔 무효과 확정. 남음: 실 can0, TX 방향(can_guard)) | §5.C |
-| D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | 🟡 메인 루프 구현·P-1/P-2 SIL 실측 PASS·A-3 지연 실측 완료·**SIL 8시간 PASS**(스푸리어스 전이 0, 자체측정 최대 44.6µs, D4 예산 4.46%) (`can_guard`, `safety/can_guard/`). 남음: 진짜 제어/인지 노드 결선, 변화율 값, 벤치 시험(실 하드웨어) | §5.D |
+| B | CAN 인터페이스 | 어댑터/SocketCAN·Kvaser, `vcan0` SIL 환경 | 🟡 A1 기준 SIL 완료(가짜 실차, 수정본 DBC). Kvaser 설치 스크립트·미러 준비. 남음: 실 버스(인수일) | §5.B(EAIT 시절 기록) + 맨 위 "현재 기준" |
+| C | ROS2 브리지 | `CanFrame`→A1 상태 토픽, 축별 E2E 체크, QoS | 🟡 `a1_status_decoder` 완료(colcon test 실패 0, 실동작 50 Hz). 남음: 실 버스 | §5.C(EAIT 시절 기록) + `ros2_ws/README.md` |
+| D | 안전 SW (MCU 대체) | 헬스 슈퍼바이저, stale 타임아웃→safe-state, HW 워치독 대체안 | 🟡 0x210 전환·P-1/P-2 PASS·리프트 리허설 31/31(2026-10-07). EAIT 시절 A-3·8h 실측은 구조 근거로 유효. 남음: 실차 C단계, A-3 재측정, 장시간 soak, 진짜 제어/인지 노드, 변화율 값 | §5.D + `safety/can_guard/README.md` |
 | E | 검증/테스트 (V-model) | 좌/우 대응 검증 계획, 고장주입 시험 | 🟢 초안 완료 | §3 |
 | F | 안전등급 레퍼런스 (ASIL) | 41개 파라미터 ASIL 등급, 근거 | 🟢 초안 완료 | §4 |
 
@@ -380,6 +406,9 @@ Step 3~5 + `hwlatdetect`를 한 번에: 메인 PC에서 `sudo bash tools/rt/a1_r
 
 ### 5.B CAN 인터페이스 (vcan0)
 
+> **2026-10-07 안내** — 이 절의 메시지·DBC·도구 이름(EAIT 0x156/0x157·0x710~0x713, `eait_tx.py`, spd/eps/acc/imu 디코더)은
+> **EAIT 시절 기록**이다. 현재 기준은 맨 위 "★ 현재 기준"과 각 디렉터리 README. 실시간 실측·설계 결정·버그 기록은 그대로 유효.
+
 **vcan0이 뭔가**
 - Linux 커널의 `vcan` 드라이버가 만드는 **순수 소프트웨어 CAN 인터페이스**. 물리 CAN 트랜시버·어댑터 없이 SocketCAN API(AF_CAN 소켓, `candump`/`cansend`, `ip link`)를 실물 인터페이스와 동일하게 사용.
 - 실제 버스가 아니라 **로컬 루프백**: 이 인터페이스에 쓴 프레임은 같은 인터페이스를 구독하는 모든 소켓에 즉시 전달됨. CAN의 브로드캐스트 특성은 흉내 내지만, 물리 버스의 전송지연·비트레이트·중재(arbitration)는 없음.
@@ -484,6 +513,9 @@ python3 sil/vcan/eait_tx.py --msg EAIT_Control_01 --pattern const --value 0 --se
 
 ### 5.C ROS2 브리지·디코더
 
+> **2026-10-07 안내** — 이 절의 메시지·DBC·도구 이름(EAIT 0x156/0x157·0x710~0x713, `eait_tx.py`, spd/eps/acc/imu 디코더)은
+> **EAIT 시절 기록**이다. 현재 기준은 맨 위 "★ 현재 기준"과 각 디렉터리 README. 실시간 실측·설계 결정·버그 기록은 그대로 유효.
+
 **위치**: `ros2_ws/src/`(colcon 워크스페이스, 빌드 산출물은 `.gitignore`). ROS2 Humble. 빌드·실행은 `ros2_ws/README.md` 참조.
 
 **패키지 구조**
@@ -581,6 +613,9 @@ raw SocketCAN 직접 + 격리 코어 + 진짜 SCHED_FIFO(`eait_tx.py`/`eait_rx.p
 바로 그 방식)로 만든다 — ROS2/DDS 를 거치는 순간 A-3 는 효과가 없다는 것이 이번 재측정으로 확인됐다.
 
 ### 5.D 안전 SW (MCU 대체) — `can_guard` (2026-09-19, 설계+메인 루프 구현+P-1/P-2 실측 통과)
+
+> **2026-10-07 안내** — 이 절의 메시지·DBC·도구 이름(EAIT 0x156/0x157·0x710~0x713, `eait_tx.py`, spd/eps/acc/imu 디코더)은
+> **EAIT 시절 기록**이다. 현재 기준은 맨 위 "★ 현재 기준"과 각 디렉터리 README. 실시간 실측·설계 결정·버그 기록은 그대로 유효.
 
 §7 의 결정(MCU 없음, PC 가 안전계층)·§7.2 설계 규칙을 구체 아키텍처로 옮긴 것. 위치는 `safety/can_guard/` —
 **`ros2_ws/` 밖**이다(§7.2 "ROS2/DDS 를 hot loop 에 절대 넣지 않는다"를 디렉터리 경계로도 강제 — 이 프로세스는

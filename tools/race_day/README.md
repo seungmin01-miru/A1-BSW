@@ -7,6 +7,8 @@
 1. 출발 전·아침: `VEHICLE_MANUAL.md` "아침 확인" — 유닛테스트 + 리허설 2개가 `FAIL 0` 인지(가상 버스, 약 3분)
 2. 현장: 질문 → 연결 → **listen-only** 비트레이트 → `candump -l` 녹화 → 원격 판정 → (조건 충족 시) **C. 리프트 송신 시험**
 3. 기준 DBC 는 **`DBC/A1_dbc_fixed.dbc`** — 업체 원본 `A1_dbc.dbc` 의 0x210 조향 배율 ×0.1 은 틀렸다(실제 ×1).
+   9월 EAIT DBC 는 2026-10-07 삭제.
+4. CAN 장치는 PEAK(`can0`, 기본) 또는 Kvaser Leaf v3(`tools/kvaser/README.md` — 미러로 `kv0` 를 만들어 같은 명령 사용).
 
 | 파일 | 역할 | 버스에 송신? |
 |---|---|---|
@@ -16,6 +18,10 @@
 | `../../safety/can_guard/lift_cmd.py` | 리프트 시험용 한 줄 명령 → can_guard(가짜 제어 노드 + 하트비트) | ❌ 듣기만 |
 | `lift_tx.py` | **비상용** — can_guard 없이 0x210 을 직접 보내는 단독 도구. can_guard 와 동시 실행 금지 | ✅ 비상시만 |
 | `rehearse_lift_guard.sh` / `rehearse_lift_tx.sh` | 위 두 경로를 vcan0 + 가짜 차량(`sil/vcan/fake_a1_vehicle.py`)으로 자동 리허설 | 가상 버스만 |
+| `../kvaser/install_kvaser.sh` | Kvaser Leaf v3 드라이버(linuxcan)·CANlib·Python canlib 설치(이 PC 안전판 — dkms 제거 안 함) | — |
+| `../kvaser/kvaser_mirror.py` | Kvaser(CANlib) → `kv0`(vcan) 복사 + 원본 기록. silent(listen-only) 지원 → 매뉴얼 명령을 `kv0` 로 그대로 사용 | ❌ |
+| `../kvaser/rehearse_kvaser.sh` | Kvaser 경로 리허설(CANlib 가상 채널, 장치 불필요) | 가상 채널만 |
+| `04_CAN.pdf`, `Practice_04_CAN.pdf` | 참고 자료 — CAN 일반 강의 / Kvaser 드라이버·CANlib 실습(실습의 `apt remove dkms` 는 이 PC 에서 금지, `tools/kvaser/README.md`) | — |
 | `a1_proto.py`, `test_lift_tx.py`, `testdata/` | 0x200/0x201/0x210 인코더·디코더, 테스트, 9/17 실차 프레임 샘플 | — |
 | `collect.sh`, `can_csv_logger.py` | 일괄 수집(아래 설명). ⚠️ **현재 실차일에는 쓰지 않는다** — 이 PC 의 `/dev/ttyUSB0~2`(LTE 모뎀)를 GPS 로 착각해 읽고, `sudo` 실행 시 저장 위치가 `/root` 로 바뀌는 문제가 미수정. 매뉴얼의 `candump -l` 직접 녹화를 쓴다 | ❌ |
 
@@ -115,7 +121,7 @@ python3 can_guard.py --channel can0 --cpu 8 --rt-priority 90 2>~/a1_race_capture
 ```bash
 # vcan0 로 리허설 — 아무 CAN 트래픽 없이도 안 죽는지, 끝나고 tar.gz 가 제대로 나오는지 확인
 sudo ip link show vcan0 || sudo bash ~/git/A1-BSW/sil/vcan/vcan_up.sh
-python3 ~/git/A1-BSW/sil/vcan/eait_tx.py --channel vcan0 &   # 트래픽 흘려주기(선택)
+python3 ~/git/A1-BSW/sil/vcan/fake_a1_vehicle.py --channel vcan0 &   # 가짜 실차 0x200/0x201 흘려주기(선택)
 sudo bash tools/race_day/collect.sh
 # 10초 정도 기다렸다가 Ctrl+C, 결과 tar.gz 를 풀어서 can/vcan0/candump-*.log 와 can/vcan0.csv 에 프레임이 찍혔는지 확인
 ```

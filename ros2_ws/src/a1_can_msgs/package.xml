@@ -3,7 +3,7 @@
 <package format="3">
   <name>a1_can_msgs</name>
   <version>0.0.0</version>
-  <description>A1-BSW Phase C — CAN 원시 프레임·디코드 메시지 정의 (CanFrame, WheelSpeeds)</description>
+  <description>A1-BSW — CAN 원시 프레임·실차 A1 상태 메시지 정의 (CanFrame, ControlInfo, WheelInfo, ControlCommand)</description>
   <maintainer email="ailab@example.com">ailab</maintainer>
   <license>Apache-2.0</license>
 

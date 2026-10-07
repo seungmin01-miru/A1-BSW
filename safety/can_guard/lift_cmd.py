@@ -72,6 +72,9 @@ def rx_loop(bus, status, last_tx, stop):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--channel', default='', help='상태 표시용으로 들을 CAN 채널(비우면 표시 없음). 송신은 안 함')
+    ap.add_argument('--interface', default='socketcan', choices=('socketcan', 'kvaser'),
+                    help='can_guard 와 같은 값으로(kvaser 면 --channel 은 CANlib 채널 번호)')
+    ap.add_argument('--bitrate', type=int, default=500000, help='kvaser 에서만 사용 — can_guard 와 같은 값')
     ap.add_argument('--cmd-shm', default=SHM_NAME_DEFAULT)
     ap.add_argument('--hb-shm', default=HEARTBEAT_SHM_NAME_DEFAULT)
     ap.add_argument('--period-ms', type=float, default=20.0)
@@ -106,7 +109,14 @@ def main():
     bus = None
     if a.channel:
         import can
-        bus = can.Bus(channel=a.channel, interface='socketcan', receive_own_messages=False)
+        if a.interface == 'socketcan':
+            bus = can.Bus(channel=a.channel, interface='socketcan', receive_own_messages=False)
+        else:
+            # Kvaser: 같은 채널의 다른 핸들(can_guard)이 보낸 0x210 을 보려면 로컬 TX 에코를 켜야 한다
+            # (python-can kvaser 의 receive_own_messages). 이 도구는 송신하지 않는다.
+            import kvaser_compat
+            kvaser_compat.apply()
+            bus = can.Bus(channel=a.channel, interface='kvaser', bitrate=a.bitrate, receive_own_messages=True)
         threading.Thread(target=rx_loop, args=(bus, status, last_tx, stop), daemon=True).start()
     w = threading.Thread(target=writer_loop, args=(ch, hb, cmd, perception_on, period, stop, log), daemon=True)
     w.start()

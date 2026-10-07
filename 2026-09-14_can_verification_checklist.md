@@ -7,6 +7,28 @@
 
 ---
 
+## ★ 2026-10-07 update — real vehicle A1 DBC replaces EAIT
+
+The vehicle uses the **A1 DBC** (`DBC/A1_dbc_fixed.dbc`; vendor `A1_dbc.dbc` received 2026-10-06, two errors fixed).
+The EAIT DBC (0x156/0x157 TX, 0x710–0x713 RX) was **deleted from the repo on 2026-10-07**; code and docs now follow A1.
+Everything below dated before 10-06 is a record of that time — message names there are EAIT. Timing measurements,
+RT decisions (D1, D4) and the `can_guard` design (§7.2) are protocol-independent and still hold.
+
+| Item below (EAIT wording) | A1 equivalent now |
+|---|---|
+| `can_guard` sends 0x156/0x157, owns `Alive_Cnt` (§7.2) | `can_guard` sends **0x210** every 20 ms; **0x210 has no alive counter** (DBC) |
+| Vendor fail-safe "0x156 silent ≥ 1000 ms → AEB" (§7.1, §7.4) | **Unknown for A1** — no AEB signal in the DBC. Measured on the lift: `VEHICLE_MANUAL.md` C6(c) (kill `can_guard`, watch 0x200) |
+| P-3 "gap in 0x156 ≪ 1000 ms" | gap in **0x210**; the vehicle timeout value is still to be learned (C6(c) / vendor V5) |
+| 5-4 "stuck `Alive_Cnt`" | 0x200 has 3 per-axis `live_counter`s, 0x201 has 2 — checked by `a1_status_decoder` → `/diagnostics` |
+| 5-3 / 5-3b / 5-3d decoders 0x710–0x713 | replaced by `a1_status_decoder` (0x200/0x201/0x210), colcon test 0 failures |
+| §9.1 B5 `USER_CAN_ERR` | no such signal in A1 — ask what the vehicle does when 0x210 stops (V5) |
+| §9.1 B7 "EPS_Cmd range/rate, ACC_Cmd limits" | 0x210 steer ±150° (**×1 deg/raw, vendor DBC says ×0.1 — wrong**), brake/acc 0–100 % |
+| §9.1 C11 "who wins when both send 0x156" | same question for **0x210** — `can_guard` refuses to start if another 0x210 sender is present |
+| `EPS_En`/`ACC_En`/`AEB_En` | per-axis `*_is_auto_command` bits 40–42; STOPPED keeps auto + 30 % brake (no AEB) |
+
+Status of the A1 switch (all SIL): can_guard unit tests 67/67, P-1/P-2 PASS, lift rehearsal 31/31, bridge colcon test 0
+failures. Still open: first real-bus test (C stage), A-3 re-measure, long soak, vendor answers (scale, timeout, auto).
+
 ## 0. Where we are (as of 2026-09-12)
 
 - OS/kernel: Ubuntu 22.04.5 + `6.8.1-1059-realtime` (Ubuntu Pro backport). Isolated cores 8–15. Fallback kernel `6.8.0-138-generic` (GRUB default).

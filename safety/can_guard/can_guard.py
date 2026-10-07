@@ -33,6 +33,7 @@ import time
 
 import can
 
+import kvaser_compat
 import sd_notify
 from command_policy import command_for_state
 from command_policy import STOPPED_MODES, held_steer_on_transition
@@ -56,7 +57,10 @@ EXIT_FOREIGN_SENDER = 3      # 시작 전 점검에서 다른 0x210 송신자 �
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--channel', default='vcan0')
-    ap.add_argument('--interface', default='socketcan')
+    ap.add_argument('--interface', default='socketcan',
+                    help='socketcan(PEAK 카드 can0/can1, 기본) 또는 kvaser(Kvaser Leaf v3 — CANlib 채널 번호를 --channel 로)')
+    ap.add_argument('--bitrate', type=int, default=500000,
+                    help='socketcan 이 아닌 인터페이스(kvaser)에서만 사용 — socketcan 은 ip link 로 이미 정해져 있음')
     ap.add_argument('--period', type=float, default=0.020,
                     help='TX 주기(초) — 9/17 실차 로그의 0x210 주기(21.5 ms)에 맞춘 20 ms')
     ap.add_argument('--cpu', default='', help='격리 코어 배치, 예 "8" (A-3)')
@@ -123,7 +127,10 @@ def run(a):
         hb_kwargs = {'name': a.hb_shm} if a.hb_shm else {}
         cmd_ch = CommandChannel.create(**cmd_kwargs)   # guard 가 먼저 뜬다 → 세그먼트도 guard 가 만든다(§7.2)
         hb_ch = HeartbeatChannel.create(**hb_kwargs)
-        bus = can.Bus(channel=a.channel, interface=a.interface, receive_own_messages=False)
+        bus_kw = {} if a.interface == 'socketcan' else {'bitrate': a.bitrate}
+        if a.interface == 'kvaser':
+            kvaser_compat.apply()   # python-can 4.6.1 ↔ CANlib 5.52 LOCAL_TXACK 버퍼 크기 호환
+        bus = can.Bus(channel=a.channel, interface=a.interface, receive_own_messages=False, **bus_kw)
         log(f'[can_guard] 연결: {a.interface}:{a.channel}, 주기 {a.period * 1000:.1f}ms, 운용 한계 {limits}, '
             f'유지 브레이크 {a.hold_brake_pct:g}% ({a.hold_brake_ramp_pct_s:g}%/s), STOPPED={a.stopped_mode}',
             file=sys.stderr)
@@ -177,7 +184,7 @@ def run(a):
             if now < next_t:
                 time.sleep(next_t - now)
                 now = time.monotonic()
-            late = now - next_t   # 자체 측정: eait_tx.py 와 같은 정의(now-next_t), 외부 관찰자 없음
+            late = now - next_t   # 자체 측정: (삭제된) eait_tx.py 와 같은 정의(now-next_t), 외부 관찰자 없음
             tx_err_sum += abs(late)
             tx_worst = max(tx_worst, late)
             if abs(late) > SPIKE_THRESHOLD_S:

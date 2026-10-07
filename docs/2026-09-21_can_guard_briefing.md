@@ -1,5 +1,8 @@
 # can_guard(Phase D, 안전 SW) 진행 브리핑 — 2026-09-21
 
+> **2026-10-07 안내** — 이 문서는 작성 시점(EAIT DBC 시절) 기록이다. 실차는 A1 DBC(`DBC/A1_dbc_fixed.dbc`)를 쓰고 EAIT DBC 는
+> 저장소에서 삭제했다. 현재 상태는 `can_stack_development.md` 맨 위 "★ 현재 기준"과 루트 `README.md` 참고.
+
 > `safety/can_guard/` — MCU 없이 메인 PC가 직접 안전 임계 CAN 송신을 책임지는 계층. 상세 설계·개발 로그는
 > `can_stack_development.md` §5.D, 시험 체크리스트는 `2026-09-14_can_verification_checklist.md`(§7.3 P-1~P-11).
 > 전체 프로젝트 진행 개요는 `docs/2026-09-15_progress_briefing.md` 참고(이 문서는 Phase D 만 깊게 다룸).

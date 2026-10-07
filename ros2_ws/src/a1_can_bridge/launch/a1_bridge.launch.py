@@ -4,8 +4,7 @@ Launch the real-vehicle (USER_ 0x200/0x201/0x210) bridge: can_raw_bridge + a1_st
   ros2 launch a1_can_bridge a1_bridge.launch.py channel:=vcan0
   ros2 launch a1_can_bridge a1_bridge.launch.py channel:=can0 cpu_affinity:=8 rt_priority:=80
 
-2026-10-06 실차 DBC(DBC/A1_dbc_fixed.dbc) 기준.
-이전 EAIT 조합(spd/eps/acc/imu)은 status_bridge.launch.py 에 남아 있다.
+2026-10-06 실차 DBC(DBC/A1_dbc_fixed.dbc) 기준. 이 패키지의 유일한 launch.
 감시 등급 토픽 — 차량으로 명령을 보내는 건 can_guard 하나뿐(이 launch 는 아무것도 송신하지 않는다).
 """
 from launch import LaunchDescription

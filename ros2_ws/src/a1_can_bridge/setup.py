@@ -19,7 +19,7 @@ setup(
     zip_safe=True,
     maintainer='ailab',
     maintainer_email='ailab@example.com',
-    description='A1-BSW Phase C — vcan0/can0 ↔ ROS2 브리지·디코더 (걷기골격: EAIT_INFO_SPD 슬라이스)',
+    description='A1-BSW — CAN ↔ ROS2 상태 브리지 (실차 A1 DBC: 0x200/0x201/0x210, a1_status_decoder)',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -29,10 +29,6 @@ setup(
     entry_points={
         'console_scripts': [
             'can_raw_bridge = a1_can_bridge.can_raw_bridge:main',
-            'spd_decoder = a1_can_bridge.spd_decoder:main',
-            'eps_decoder = a1_can_bridge.eps_decoder:main',
-            'acc_decoder = a1_can_bridge.acc_decoder:main',
-            'imu_decoder = a1_can_bridge.imu_decoder:main',
             'a1_status_decoder = a1_can_bridge.a1_status_decoder:main',
         ],
     },

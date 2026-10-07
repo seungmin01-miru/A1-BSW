@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """can_guard 의 TX 주기 지터를 잰다 — A-3 레시피(격리 코어+SCHED_FIFO) 전/후 비교용.
-eait_tx.py 가 이 레시피로 5~9µs 를 낸 것과 같은 방식의 측정을, can_guard 자체 TX 루프에 대해 한다
+(삭제된) eait_tx.py 가 이 레시피로 5~9µs 를 낸 것과 같은 방식의 측정을, can_guard 자체 TX 루프에 대해 한다
 (§5.C 의 "ROS2 슬라이스엔 A-3 무효과" 결론과 대칭 — can_guard 는 raw SocketCAN 이라 효과가 있어야 정상).
 
 가짜 제어노드+인지로 ACTIVE 상태를 유지시켜(상태 전이 잡음 제거) 0x210 프레임 간격만 순수하게 잰다.
@@ -13,7 +13,7 @@ eait_tx.py 가 이 레시피로 5~9µs 를 낸 것과 같은 방식의 측정을
 일반 우선순위로 남아, 측정 관찰자가 자기 자신도 FIFO 라 경합하는 오염을 피한다. 예전에는 이 스크립트
 전체를 `sudo chrt` 로 감쌌는데, fork() 상속 때문에 관찰자까지 덩달아 FIFO 90 이 돼 측정이 오염됐었다
 (2026-09-18 발견 — README 참고). can_guard.py 종료 시 stderr 에 찍는 "자체측정(late=now-next_t)" 줄이
-eait_tx.py 와 동일한 정의의 진짜 비교 대상이다 — 이 스크립트의 외부 관찰 수치는 참고용으로 같이 본다.
+(삭제된) eait_tx.py 와 동일한 정의의 진짜 비교 대상이다 — 이 스크립트의 외부 관찰 수치는 참고용으로 같이 본다.
 """
 import argparse
 import os
@@ -78,14 +78,14 @@ def main():
         gaps = [b - a_ for a_, b in zip(ts, ts[1:])]
         if not gaps:
             sys.exit('FAIL — 프레임을 못 받음')
-        dev = [abs(g - a.period) for g in gaps]   # 목표 주기로부터의 편차 — eait_tx.py 와 같은 지표
+        dev = [abs(g - a.period) for g in gaps]   # 목표 주기로부터의 편차 — (삭제된) eait_tx.py 와 같은 지표
         print(env_line)
         print(f'채널={a.channel} 목표주기={a.period*1000:.1f}ms 표본={len(gaps)}개({a.duration:.1f}s)')
         print(f'실제 간격    평균={statistics.mean(gaps)*1e6:8.1f}µs  '
               f'표준편차={statistics.pstdev(gaps)*1e6:8.1f}µs  '
               f'최소={min(gaps)*1e6:8.1f}µs  최대={max(gaps)*1e6:8.1f}µs')
         print(f'주기 편차(|실제-목표|)  평균={statistics.mean(dev)*1e6:8.1f}µs  '
-              f'최대={max(dev)*1e6:8.1f}µs   ← eait_tx.py 의 "평균 5 / 최대 9 µs" 와 같은 정의')
+              f'최대={max(dev)*1e6:8.1f}µs   ← (삭제된) eait_tx.py 의 "평균 5 / 최대 9 µs" 와 같은 정의')
     finally:
         if rec is not None:
             rec.close()
