@@ -10,7 +10,7 @@ sudo apt install -y can-utils                       # candump / cansend / cansni
 python3 -m pip install --user cantools python-can   # 설치 확인: python3 -c "import can, cantools"
 ```
 
-**DBC**: `DBC/A1_dbc_fixed.dbc` (업체 원본 `A1_dbc.dbc` 의 0x210 조향 배율 ×0.1 → ×1 등 2곳 수정본, 근거는
+**DBC**: `DBC/A1_dbc_fixed.dbc` (업체 원본 `A1_dbc.dbc` 에서 0x200 `steer_is_auto` 오타 1곳만 고친 사본 — 0x210 조향 ×0.1 은 10-07 실차로 확정, 근거는
 `docs/2026-10-06_a1_dbc_update_and_lift_plan.md` §0). 이 DBC 에도 `GenMsgCycleTime` 이 없어 주기는 9/17 실차 로그
 실측값(0x200·0x201·0x210 ≈ 20 ms)을 쓴다.
 

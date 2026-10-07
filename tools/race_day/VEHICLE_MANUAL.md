@@ -1,4 +1,4 @@
-# 실차 인수 당일 매뉴얼 (v4, 2026-10-07 — 실험 3시간, 리프트 송신 시험, PEAK / Kvaser 둘 다)
+# 실차 인수 당일 매뉴얼 (v5, 2026-10-07 실차 결과 반영 — 리프트 송신 시험, PEAK / Kvaser 둘 다)
 
 내일 목표는 세 가지다.
 
@@ -13,9 +13,20 @@
 
 **송신은 C단계에서만, 전제 조건을 전부 통과한 뒤에만 한다.** 그 외 시간은 끝까지 listen-only.
 
-> ⚠️ **업체 DBC(`DBC/A1_dbc.dbc`)의 0x210 조향 배율 ×0.1 은 틀렸다 — 실제는 ×1 deg**(9/17 로그 1,354구간에서
-> 위치/명령 비율 1.000). 그대로 쓰면 핸들이 10배로 돈다. 우리 코드·현장 디코드는 전부 `DBC/A1_dbc_fixed.dbc` 기준.
-> (9월의 EAIT DBC 는 2026-10-07 저장소에서 지웠다 — 모든 도구·문서는 A1 DBC 기준.)
+> ⚠️ **2026-10-07 실차 결과로 바뀐 것 — 다음 실차 전에 반드시 읽을 것**
+> 1. **0x210 조향 배율은 업체 DBC 의 ×0.1 이 맞다**(raw +80/+100 → 위치 +8.8/+11.0°). 10-06 의 "×1" 판단은 틀렸다.
+>    코드를 고쳐서 **can_guard·lift_cmd·lift_tx 의 조향 숫자는 이제 진짜 도(°)** 다 — 10-07 현장에서 쓰던
+>    `steer 100`(raw 100) 은 이제 **`steer 10`**, `--steer-limit-deg 150` 은 이제 **`--steer-limit-deg 15`** 다.
+>    옛 숫자를 그대로 넣으면 핸들이 10배로 돈다. lift_cmd·lift_tx 기본 한계는 ±15°(10-07 에 시험한 최대).
+> 2. **원격조종 메시지는 0x156/0x157**(EAIT_Control_01/02 형식, 10 ms). 0x210 보다 ID 가 낮아 버스 중재에서 이기고,
+>    차량도 0x156 의 EPS_En/ACC_En 이 1 이면 원격을 우선한다(녹화: En=1 → 차량 auto 111 이 약 20 ms 안에,
+>    0x157 감속 −3.0 m/s² → 브레이크 위치 10.0). 원격 유닛은 켜져 있으면 En=0 으로 계속 보낸다 — 이건 정상.
+> 3. **대회측 확인: 강제 종료 시 자동 브레이크**가 걸린다(실차에서 아직 직접 재 보지 않음 — C6 에서 확인).
+>    반면 **0x210 만 끊기면 차량은 auto 를 풀지 않는다**(10-07: 59.9초 동안 auto 111 유지) → can_guard 를 끌 때는
+>    lift_cmd 에서 `auto off` 를 먼저 보낸다.
+> 4. 브레이크 위치 ≈ 명령 % ÷ 10(20 % → 1.9, 50 % → 5.0). 0x201 바퀴 속도는 10-07 내내 0(미해결).
+> 현장 디코드·코드는 `DBC/A1_dbc_fixed.dbc`(업체 DBC 에서 0x200 `steer_is_auto` 배율 오타 1곳만 고친 사본) 기준.
+> 10-07 결과 전체: `~/a1_race_capture/vehicle_20261007/summary/findings.md`, 요약 도구 `tools/race_day/summarize_session.py`.
 
 ### CAN 장치 — PEAK(기본) 또는 Kvaser
 | | PEAK PCAN-PCIe FD(내장) | Kvaser Leaf v3(USB) |
@@ -146,7 +157,7 @@ m(){ echo "$(date +%s.%N) $(date +%H:%M:%S) $*" | tee -a "$D/notes.txt"; }
 |---|---|---|
 | V1 | ★ | 받은 `A1_dbc.dbc` 가 **이 차량의 최신 버전인가?** 더 새 버전·변경 이력·신호 설명 문서가 있나? |
 | V2 | ★ | 비트레이트(DBC 에 없음), classic CAN인지 CAN-FD인지, 종단저항 위치 |
-| V3 | ★ | **0x210 `steer_command` 배율이 DBC 는 ×0.1 인데 실측은 ×1 이다 — 어느 쪽이 맞나?** 브레이크·가속 % 의 실제 의미(페달 개도? 압력?) |
+| V3 | ☆ | ~~0x210 조향 배율~~ → **10-07 해결: ×0.1 맞음**. 남은 것: 브레이크·가속 % 의 실제 의미(브레이크 위치 = 명령 ÷ 10 은 확인), 0 근처 조향 불감대·오프셋(약 +1°) |
 | V4 | ☆ | auto 비트(0x210 bit40~42, 0x200 bit32~34)를 켜는 데 다른 조건(키·스위치·모드)이 있나? 0 을 보내면 즉시 수동? |
 | V5 | ☆ | 명령이 끊기면 몇 ms 뒤 무엇을 하나? alive counter가 필요한가? 범위·변화율 검증을 하나? |
 | V6 | ☆ | DBC 에 없는 0x004·0x204 는 무엇인가? SYS 계열(0x100·0x110~0x114·0x301)은 어느 버스에 있나, 0x301 은 언제 쓰나? |
@@ -313,7 +324,7 @@ cansniffer -c can0          # 끝내려면 Ctrl+C
 |---|---|---|
 | ★ | 20 | 원격이 PC에 붙는 방식 확인·기록(아래 표) + 대회 측 연동 문서·샘플 코드 요청 |
 | ★ | 30 | 사람이 직접 조작하며 차량 메시지 역추적 — S1(핸들 손으로), S3(페달), S6②(키·모드 전환), 가능하면 S8(수동 주행) |
-| ★ | 20 | 업체에 V3(0x210 조향 배율 ×0.1 vs ×1)·V4·V5 집중 질문 — 원격이 0x210 을 안 보내면 배율은 C단계(C3)에서만 확인 가능 |
+| ★ | 20 | 업체에 V4·V5 집중 질문(조향 배율 V3 는 10-07 에 해결) |
 | ☆ | 20 | 업체가 자기 장비로 차를 움직여 줄 수 있으면 그동안 녹화(0x210 관측 기회) |
 
 | 원격이 PC에 붙는 방식 | 확인 | 기록 |
@@ -332,7 +343,7 @@ cansniffer -c can0          # 끝내려면 Ctrl+C
 
 10-06 에 업체 DBC 를 받았다(`DBC/A1_dbc.dbc`). 9/17 로그와 대조해 이미 아는 것:
 - 0x200·0x201·0x210 비트 배치는 9/17 로그 22만 프레임과 **오류 0**으로 맞음
-- **0x210 `steer_command` 배율 ×0.1 은 틀림 → 실제 ×1**(우리 코드·`A1_dbc_fixed.dbc` 는 ×1), 0x200 `steer_is_auto` 배율 오타
+- 0x210 `steer_command` 배율 ×0.1 은 **맞음**(10-07 실차 확정 — 10-06 의 ×1 판단은 오류), 0x200 `steer_is_auto` 배율 오타
 - DBC 에 **없는 것**: 0x004·0x204(9/17 로그엔 있음), 비트레이트, AEB·방향지시등
 - DBC 에 **있지만 9/17 로그엔 없는 것**: SYS 계열 0x100·0x110~0x114·0x301 → 다른 버스로 추정. **0x301(엔코더 설정)은 절대 송신 금지**
 
@@ -358,12 +369,12 @@ timeout --foreground 5 candump can0 | awk '{print $2}' | grep -E '^(100|11[0-4]|
 | SYS 계열이 보임 | 우리 PC 가 차량 내부 버스에 붙어 있음 | 단자·하네스 확인(사용자용 버스로 옮겨야 할 수 있음), **C단계 보류** |
 
 ### B-2. 조향 배율 확인 (★ 가장 중요, A-직결이면 S1 에서 / C단계면 C3 에서)
-명령(0x210 raw)과 위치(0x200)를 비교한다 — **위치 ≈ 명령 raw** 면 ×1(우리 가설), **위치 ≈ 명령 raw × 0.1** 이면 DBC 가 맞음.
+**10-07 에 판정 끝: 위치 ≈ 명령 raw × 0.1 → 업체 DBC 가 맞다.** 다음 실차에서는 재확인만 한다(명령 도 ≈ 위치 도, 약 +1° 오차).
 ```bash
 candump can0 | python3 -m cantools decode --single-line "$F" | grep -E 'USER_control_command|USER_control_info'
 ```
 원격이 0x210 을 보내는 A-직결이면 S1(조향 좌끝→우끝) 동안 바로 판정된다. 결과와 업체 답(V3)을 `answers.md` 에 기록.
-**×1 이 아니면 C단계를 하지 않는다**(코드는 ×1 로 인코딩한다 — 집에서 수정 후 재시험).
+**위치가 명령의 10배 또는 1/10 이면 C단계를 멈춘다**(코드는 ×0.1 로 인코딩한다 — 집에서 수정 후 재시험).
 
 ### B-3. 업체에 물어볼 것 (V1·V3·V4·V6·V8, 질문 담당)
 - 더 새 DBC·변경 이력·신호 설명 문서가 있으면 **파일로 받기**(USB 로 바로 복사 → `$D/dbc/`, 원본 이름 그대로)
@@ -408,7 +419,7 @@ ip -details link show can0 | grep -o 'LISTEN-ONLY' || echo "정상 모드 OK"
 
 # 터미널 3 — can_guard (리프트 한계, 1초마다 상태 표시). 이 터미널이 차로 나가는 유일한 송신자.
 cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/can_guard.py --channel can0 \
-    --steer-limit-deg 30 --brake-limit-pct 60 --acc-limit-pct 10 --status-interval-s 1 2>&1 | tee -a can_guard.log
+    --steer-limit-deg 15 --brake-limit-pct 60 --acc-limit-pct 10 --status-interval-s 1 2>&1 | tee -a can_guard.log
 ```
 - 시작하면 1초 동안 듣고 **다른 0x210 이 있으면 스스로 거부**(종료 코드 3)한다.
 - 그 뒤 `INIT` 상태로 **auto 0·명령 0** 을 20 ms 마다 보낸다 — 차량은 반응이 없어야 한다.
@@ -420,7 +431,7 @@ cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/can_guard.py --channel can0 \
 python3 ~/git/A1-BSW/tools/kvaser/kvaser_mirror.py --channel 0 --bitrate <확정값> --log "$D/kvaser_ch0_c.log"
 # 터미널 3: can_guard
 cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/can_guard.py --interface kvaser --channel 0 --bitrate <확정값> \
-    --steer-limit-deg 30 --brake-limit-pct 60 --acc-limit-pct 10 --status-interval-s 1 2>&1 | tee -a can_guard.log
+    --steer-limit-deg 15 --brake-limit-pct 60 --acc-limit-pct 10 --status-interval-s 1 2>&1 | tee -a can_guard.log
 ```
 버스 상태는 미러의 1초 줄(에러프레임 수)로 본다.
 
@@ -433,11 +444,11 @@ cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/lift_cmd.py --channel can0
 | 단계 | 입력 | 확인 (can_guard 1초 상태 줄 또는 `status`) |
 |---|---|---|
 | C2 | `auto on` | 차량 0x200 auto 비트가 `111` 로, 핸들은 그대로 |
-| C3 | `steer 5` → `steer 0` → `steer -5` → `steer 0`, 이어서 ±15, ±30 | 차량 **조향 위치 ≈ 명령**(같은 크기). 10배로 움직이면 즉시 `zero` |
-| C4 | `brake 20` → `brake 50` → `brake 0` | 브레이크 위치가 따라감 |
+| C3 | `steer 1` → `steer 0` → `steer -1` → `steer 0`, 이어서 ±5, ±10, ±15 (단위 °) | 차량 **조향 위치 ≈ 명령**(10-07: 8° → 8.8°, 10° → 11.0°, 63 % 응답 약 0.2초). 10배로 움직이면 즉시 `zero` |
+| C4 | `brake 20` → `brake 50` → `brake 0` | 브레이크 위치 ≈ 명령 ÷ 10 (10-07: 1.9 / 5.0 / 0) |
 | C5 | `acc 5` (2초 뒤 자동 0) → `acc 10` → `brake 20` | 바퀴 속도 상승·하강(0x201) |
 
-- 입력 한계는 조향 ±30°, 브레이크 60 %, 가속 10 % — 넘는 값은 **거부**(자르지 않음). can_guard 도 같은 한계로
+- 입력 한계는 조향 ±15°, 브레이크 60 %, 가속 10 % — 넘는 값은 **거부**(자르지 않음). can_guard 도 같은 한계로
   한 번 더 자른다(이중).
 - **자동 원위치**: 가속 2초, 조향·브레이크 5초가 지나면 0. 계속 유지하려면 다시 입력.
 - 가속과 브레이크는 동시에 못 건다(브레이크 우선).
@@ -448,7 +459,7 @@ cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/lift_cmd.py --channel can0
 |---|---|---|
 | (a) | `steer 10` 건 상태에서 **lift_cmd 창에서 Ctrl+C** (제어 노드 죽음) | 50 ms 뒤 can_guard: 조향 10° 고정, 가속 0, 브레이크 30 % 까지 서서히 → STOPPED(바퀴가 서 있으면 바로 STOPPED). **STOPPED 는 can_guard 재시작으로만 풀림** |
 | (b) | can_guard 재시작(Ctrl+C 후 C1 명령 다시) → lift_cmd 재시작 → `auto on` → `perception off` | 0.5초 뒤 DEGRADED(또는 정지 상태면 바로 STOPPED), 같은 안전 동작 |
-| (c) | can_guard 재시작 → `auto on`, `steer 10`, `brake 10` → **다른 터미널에서 `pkill -9 -f can_guard.py`** | 우리 0x210 이 끊긴다 → **차량 자체 타임아웃 동작 관측**(몇 초 뒤 무엇을 하나, auto 가 풀리나). 시간은 나중에 로그로 잰다 |
+| (c) | can_guard 재시작 → `auto on`, `steer 10`, `brake 10` → **다른 터미널에서 `pkill -9 -f can_guard.py`** | 우리 0x210 이 끊긴다 → 10-07 우연 관측: **타임아웃 없음, auto 유지(≥60초)**. 대회측은 "강제 종료 시 자동 브레이크"라고 함 → 브레이크 위치가 오르는지, 몇 초 뒤인지 확인 |
 | (d) | (업체 동의 시) can_guard 송신 중 **E-stop** | can_guard 로그에 "송신 실패"가 뜨면 전원 차단형, 안 뜨면 차량 쪽 처리. 버스에 새 ID 가 뜨는지 |
 
 ### C7. 복귀 (2분)

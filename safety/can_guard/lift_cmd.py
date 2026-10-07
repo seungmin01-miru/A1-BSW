@@ -5,7 +5,7 @@
 쓰고(50 Hz), HeartbeatChannel 에 하트비트도 대신 보낸다. 차량으로 나가는 프레임은 전부 can_guard 가 만든다 —
 이 도구는 버스에 **아무것도 보내지 않는다**(상태 표시용으로 듣기만 함).
 
-  python3 safety/can_guard/can_guard.py --channel can0 --steer-limit-deg 30 --brake-limit-pct 60 \
+  python3 safety/can_guard/can_guard.py --channel can0 --steer-limit-deg 15 --brake-limit-pct 60 \
       --acc-limit-pct 10 --status-interval-s 1          # 터미널 1 (먼저)
   python3 safety/can_guard/lift_cmd.py --channel can0     # 터미널 2
 
@@ -78,7 +78,8 @@ def main():
     ap.add_argument('--cmd-shm', default=SHM_NAME_DEFAULT)
     ap.add_argument('--hb-shm', default=HEARTBEAT_SHM_NAME_DEFAULT)
     ap.add_argument('--period-ms', type=float, default=20.0)
-    ap.add_argument('--steer-limit-deg', type=float, default=30.0)
+    ap.add_argument('--steer-limit-deg', type=float, default=15.0,
+                    help='±deg. 기본 15 = 2026-10-07 리프트에서 시험한 최대(raw 150)')
     ap.add_argument('--brake-limit-pct', type=float, default=60.0)
     ap.add_argument('--acc-limit-pct', type=float, default=10.0)
     ap.add_argument('--acc-hold-s', type=float, default=2.0)
@@ -127,7 +128,7 @@ def main():
         lift_tx.print_status(cmd, status, log)
         if last_tx['d']:
             d = last_tx['d']
-            log(f'can_guard 가 보낸 0x210({time.monotonic() - last_tx["t"]:.2f}초 전): 조향 {d["steer_deg"]:+d}° '
+            log(f'can_guard 가 보낸 0x210({time.monotonic() - last_tx["t"]:.2f}초 전): 조향 {d["steer_deg"]:+.1f}°(raw {d["steer_raw"]:+d}) '
                 f'브레이크 {d["brake_pct"]}% 가속 {d["acc_pct"]}% auto {d["steer_auto"]}{d["brake_auto"]}{d["acc_auto"]}')
         elif bus:
             log('can_guard 의 0x210: 아직 안 보임(can_guard 실행 중인지 확인)')

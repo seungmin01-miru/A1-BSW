@@ -77,7 +77,14 @@ def main():
     n_win = err_win = 0
     try:
         while not _stop:
-            m = src.recv(timeout=0.2)
+            try:
+                m = src.recv(timeout=0.2)
+            except Exception:  # noqa: BLE001
+                # Ctrl+C·SIGTERM 이 CANlib 의 대기 중 읽기를 끊으면 "Interrupted system call" 로 예외가 난다
+                # (2026-10-07 현장에서 종료 때마다 트레이스백). 종료 중이면 정상 종료로 취급한다.
+                if _stop:
+                    break
+                raise
             now = time.monotonic()
             if m is not None:
                 if m.is_error_frame:
@@ -101,8 +108,11 @@ def main():
                 n_win = err_win = 0
                 last_report = now
     finally:
-        src.shutdown()
-        dst.shutdown()
+        for bus in (src, dst):
+            try:
+                bus.shutdown()
+            except Exception:  # noqa: BLE001
+                pass   # 종료 중 드라이버 오류는 무시 — 원본 기록은 이미 줄 단위로 flush 됨
         if logf:
             logf.close()
         print(f'[kvaser_mirror] 종료 — 프레임 {n}, 에러프레임 {n_err}', file=sys.stderr)

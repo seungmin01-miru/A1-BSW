@@ -9,7 +9,7 @@
 
 | 0x210 신호 | 비트 | 형식 |
 |---|---|---|
-| steer_command | 0–15 | int16, **1 deg/raw**(업체 DBC 의 ×0.1 은 오류 — 9/17 로그 1,354구간 위치/명령 비율 1.000) |
+| steer_command | 0–15 | int16, **0.1 deg/raw**(업체 DBC 그대로 — 10-07 실차: raw +80/+100 → 위치 +8.8/+11.0°) |
 | break_command | 16–31 | uint16, 0~100 % |
 | acc_command | 32–39 | uint8, 0~100 % |
 | steer/break/acc_is_auto_command | 40/41/42 | 축별 auto(1) / manual(0) |
@@ -23,7 +23,7 @@
 | `plausibility.py` | DBC 범위 + 운용 한계(`Limits`, CLI) 클램프, 가속·브레이크 동시 명령은 브레이크 우선, `RateLimiter`(숫자 미확정, 기본 무제한) |
 | `state_machine.py` | `next_state()` — INIT/ACTIVE/HOLDING/DEGRADED/STOPPED 순수 전이 함수(프로토콜 무관, 전환 때 무수정) |
 | `command_policy.py` | 상태별 명령 — HOLDING/DEGRADED/STOPPED(hold): 조향 고정, 가속 0, 브레이크 유지값(30 %)까지 램프, auto 비트 유지. `held_steer_on_transition()` |
-| `tx_encode.py` | `Command` → 0x210 8바이트(조향 ×1) |
+| `tx_encode.py` | `Command` → 0x210 8바이트(조향 ×0.1, `Command.steer_cmd_deg` 는 도 단위) |
 | `rx_decode.py` | 0x201 → 차속(좌우 평균, STOPPED 조기 판정), 0x200 → 조향·브레이크 위치·auto(로그용) |
 | `rt_setup.py` | A-3 레시피(timer slack, cpu affinity, SCHED_FIFO, mlockall) |
 | `sd_notify.py` | systemd `Type=notify`/`WatchdogSec` 하트비트 (외부 의존 없이 소켓 직접) |
@@ -43,9 +43,9 @@ python3 sil_tests/p2_kill_perception.py --channel vcan0      # §7.3 P-2
 bash ../../tools/race_day/rehearse_lift_guard.sh             # 리프트 시험 C0~C7 리허설(가짜 실차 상대)
 
 # 실차 — PEAK 카드
-python3 can_guard.py --channel can0 --steer-limit-deg 30 --brake-limit-pct 60 --acc-limit-pct 10 --status-interval-s 1
+python3 can_guard.py --channel can0 --steer-limit-deg 15 --brake-limit-pct 60 --acc-limit-pct 10 --status-interval-s 1
 # 실차 — Kvaser Leaf v3 (tools/kvaser/README.md, CANlib 채널 번호)
-python3 can_guard.py --interface kvaser --channel 0 --bitrate 500000 --steer-limit-deg 30 --brake-limit-pct 60 \
+python3 can_guard.py --interface kvaser --channel 0 --bitrate 500000 --steer-limit-deg 15 --brake-limit-pct 60 \
     --acc-limit-pct 10 --status-interval-s 1
 ```
 
@@ -62,7 +62,7 @@ python3 can_guard.py --interface kvaser --channel 0 --bitrate 500000 --steer-lim
 | 유닛테스트 | 67/67 |
 | **P-1** (제어 노드 kill -9) | **PASS** — 69 ms 뒤 HOLDING(50 ms + 한 주기), 조향 고정, 가속 0, 브레이크 2→19 %(램프 중), 송신 끊김 0 |
 | **P-2** (인지 kill -9) | **PASS** — 0x210 간격 kill 전/후 평균 20.00 ms(최대 20.45), DEGRADED 전이, dmesg BUG 0 |
-| 리프트 리허설(`rehearse_lift_guard.sh`) | **31/31** — 시작 거부, INIT 안전 프레임, auto·조향(배율 1 추종)·이중 한계·브레이크·가속, 하트비트 끊김·제어 노드 죽음 → HOLDING/STOPPED(조향 마지막 값 유지), can_guard kill 시 송신 즉시 중단, 다른 송신자 경고 |
+| 리프트 리허설(`rehearse_lift_guard.sh`) | **31/31** — 시작 거부, INIT 안전 프레임, auto·조향(배율 추종)·이중 한계·브레이크·가속, 하트비트 끊김·제어 노드 죽음 → HOLDING/STOPPED(조향 마지막 값 유지), can_guard kill 시 송신 즉시 중단, 다른 송신자 경고 |
 | A-3 지연(격리 + FIFO) | **미측정** — sudo 필요. 주기 20 ms 라 여유가 크지만 대회 전 재측정 |
 | 장시간 soak | **미실시**(새 코드) |
 
@@ -82,7 +82,10 @@ python3 can_guard.py --interface kvaser --channel 0 --bitrate 500000 --steer-lim
 - [ ] **진짜 ROS2 제어 노드**를 `CommandChannel.open()` 으로 결선(지금은 `lift_cmd.py`·`fake_control_node.py`)
 - [ ] **진짜 인지 프로세스**를 `HeartbeatChannel.open()` 으로 결선
 - [ ] **변화율 상한** — 조향 deg/s, 가속 %/s. 실차 액추에이터 사양 필요. 그 전까지 `RateLimiter` 비활성
-- [ ] **업체 확인**: 0x210 조향 배율(×1 맞나), 명령 타임아웃·fail-safe 동작, auto 비트 수락 조건 — 실차 인수일 C단계로도 확인
+- [x] 0x210 조향 배율 — 10-07 실차로 ×0.1 확정, 코드 수정
+- [x] auto 비트 수락 — 10-07 축별 독립 수락 약 17 ms
+- [ ] 명령 타임아웃·fail-safe — 10-07: 0x210 만 끊기면 타임아웃 없음(≥60초 auto 유지). 대회측: 강제 종료 시 자동 브레이크 → 실차 측정 필요
+- [ ] 원격조종(0x156/0x157, 0x210 보다 우선)과의 중재 — can_guard 는 아직 원격 상태를 보지 않는다
 - [ ] 잠정값 확정: watchdog 50 ms, STOPPED 2.0 s, 인지 0.5 s, 정지 3 km/h, 유지 브레이크 30 %
 
 ## 다음 단계

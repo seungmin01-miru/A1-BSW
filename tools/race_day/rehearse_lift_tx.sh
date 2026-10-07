@@ -69,7 +69,7 @@ if mode == 'session':
     t5 = next(t for t, d in ours if d['acc_command'] == 5)
     t0 = next((t for t, d in ours if t > t5 and d['acc_command'] == 0), None)
     out(t0 is not None and t0 - t5 <= 2.3, f'가속 자동 원위치 {t0 - t5 if t0 else -1:.2f} s (기대 2초대)')
-    # 가짜 차량 조향 위치가 명령 10° 를 같은 배율로 추종했는지(배율 1 확인)
+    # 가짜 차량 조향 위치가 명령 10° 를 같은 배율로 추종했는지(×0.1 인코딩 왕복 확인)
     t10 = next(t for t, d in ours if d['steer_command'] == 10)
     pos = [d['steer_postion'] for t, d in info if t10 + 0.6 < t < t10 + 0.9]
     out(bool(pos) and 8.5 <= max(pos) <= 10.5, f'가짜 차량 조향 위치가 10° 명령을 추종: {max(pos) if pos else None}')

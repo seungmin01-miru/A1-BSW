@@ -6,7 +6,8 @@
 
 1. 출발 전·아침: `VEHICLE_MANUAL.md` "아침 확인" — 유닛테스트 + 리허설 2개가 `FAIL 0` 인지(가상 버스, 약 3분)
 2. 현장: 질문 → 연결 → **listen-only** 비트레이트 → `candump -l` 녹화 → 원격 판정 → (조건 충족 시) **C. 리프트 송신 시험**
-3. 기준 DBC 는 **`DBC/A1_dbc_fixed.dbc`** — 업체 원본 `A1_dbc.dbc` 의 0x210 조향 배율 ×0.1 은 틀렸다(실제 ×1).
+3. 기준 DBC 는 **`DBC/A1_dbc_fixed.dbc`** — 0x210 조향 배율은 업체 DBC 그대로 ×0.1(10-07 실차 확정). 도구의 조향 숫자는 도(°) 단위다(10-07 현장의 `steer 100` = 이제 `steer 10`).
+4. 녹화 정리: `python3 tools/race_day/summarize_session.py <녹화 폴더>` → `<폴더>/summary/`(summary.md·events.md·timeline.csv, 원격 0x156/0x157 해석 포함).
    9월 EAIT DBC 는 2026-10-07 삭제.
 4. CAN 장치는 PEAK(`can0`, 기본) 또는 Kvaser Leaf v3(`tools/kvaser/README.md` — 미러로 `kv0` 를 만들어 같은 명령 사용).
 

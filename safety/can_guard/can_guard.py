@@ -4,7 +4,7 @@ can_guard — 안전 임계 CAN TX 메인 루프 (§7.2, can_stack_development.m
 
   python3 can_guard.py --channel vcan0
   sudo python3 can_guard.py --channel can0 --cpu 8 --rt-priority 90   # A-3 레시피(§5.C 에서 효과 실측됨)
-  python3 can_guard.py --channel can0 --steer-limit-deg 30 --brake-limit-pct 60 --acc-limit-pct 10 \
+  python3 can_guard.py --channel can0 --steer-limit-deg 15 --brake-limit-pct 60 --acc-limit-pct 10 \
       --status-interval-s 1          # 리프트 시험(tools/race_day/VEHICLE_MANUAL.md "C. 리프트 송신 시험")
 
 2026-10-06 실차 프로토콜(0x200/0x201/0x210, DBC/A1_dbc_fixed.dbc)로 전환 — 이전 EAIT 0x156/0x157 는 git 기록.
@@ -292,10 +292,11 @@ def run(a):
                 fb = (f'조향위치 {last_info["steer_pos_deg"]:+.1f}° 브레이크위치 {last_info["brake_pos"]:.1f} '
                       f'auto {last_info["steer_auto"]}{last_info["brake_auto"]}{last_info["acc_auto"]}'
                       if last_info else '0x200 없음')
-                log(f'[can_guard] {state.value:8s} 보냄: 조향 {out.steer_cmd_deg:+.0f}° 브레이크 '
+                log(f'[can_guard] {state.value:8s} 보냄: 조향 {out.steer_cmd_deg:+.1f}° 브레이크 '
                     f'{out.brake_cmd_pct:.0f}% 가속 {out.acc_cmd_pct:.0f}% auto '
                     f'{int(out.steer_auto)}{int(out.brake_auto)}{int(out.acc_auto)} | 차량: {fb} | 차속 '
-                    f'{vehicle_speed_kph if vehicle_speed_kph is not None else "?"} km/h | 송신실패 {tx_fail}',
+                    f'{vehicle_speed_kph if vehicle_speed_kph is not None else "?"} km/h | 송신오류 누적 {tx_fail}건'
+                    + (' (정상)' if tx_fail == 0 else ' ⚠️'),
                     file=sys.stderr)
 
             sd_notify.watchdog()

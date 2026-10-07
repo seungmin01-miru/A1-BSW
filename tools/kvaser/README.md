@@ -64,6 +64,7 @@ python3 tools/kvaser/kvaser_mirror.py --channel 0 --bitrate 500000 --listen-only
 |---|---|
 | linuxcan 의 `make install` 이 `missing 'System.map' … Skipping depmod` 로 **모듈 목록 갱신을 건너뜀** → 파일은 있는데 `modprobe` 가 못 찾음 | 설치 스크립트가 `depmod` 를 직접 실행하고, 모듈이 안 잡히면 🛑 로 멈춘다 |
 | **python-can 4.6.1 이 Kvaser 채널을 못 엶** — `canIOCTL_SET_LOCAL_TXACK` 를 1바이트로 넘겨 CANlib 5.52 가 "Error in parameter [-1]" | `safety/can_guard/kvaser_compat.py` 가 그 한 호출만 4바이트로 바꿔 넘긴다. 우리 도구는 Kvaser 를 열 때 자동 적용. python-can 을 직접 쓰는 새 코드도 `kvaser_compat.apply()` 를 먼저 부를 것 |
+| 미러를 Ctrl+C 로 끌 때 CANlib "Interrupted system call" 트레이스백(10-07 현장, 데이터는 무사) | 종료 중 읽기 예외를 정상 종료로 처리하도록 수정(10-07) |
 | 가상 채널에서 "canSetAcceptanceFilter … Not implemented [-32]" 경고 | 가상 드라이버가 하드웨어 필터를 지원하지 않아 나는 경고 — 동작에 영향 없음(실제 Leaf v3 는 지원) |
 
 ## 리허설 (설치 후, 장치 없이 — CANlib 가상 채널 0·1)
@@ -73,4 +74,4 @@ bash tools/kvaser/rehearse_kvaser.sh       # 가짜 실차(채널 1) ↔ can_gua
 ```
 2026-10-07 결과: **9/9 PASS** — 미러(silent) kv0 복사·원본 기록, 다른 0x210 송신자 시 can_guard 시작 거부(코드 3),
 can_guard(kvaser) INIT→ACTIVE, lift_cmd 가 can_guard 송신값 확인(로컬 TX 에코), 0x210 주기 19.9 ms, 조향 10° 명령 →
-가짜 실차 위치 10.0°(배율 1), can_guard kill -9 뒤 송신 0.
+가짜 실차 위치 10.0°, can_guard kill -9 뒤 송신 0. (10-07: 조향 배율을 ×0.1 로 고친 뒤 sudo 가 필요해 아직 재실행하지 않음)

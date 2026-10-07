@@ -1,8 +1,9 @@
 # A1-BSW
 
 A1 CHALLENGE 자율주행 차량의 BSW(기본 소프트웨어) 계층 — 메인 PC 한 대가 안전 MCU 없이 "상위 제어기(AI) ↔ 차량 CAN"
-사이의 실시간성·통신·안전을 맡는다. **기준 프로토콜: 실차 A1 DBC `DBC/A1_dbc_fixed.dbc`**(업체 `A1_dbc.dbc` 의 오류
-2곳 수정본, 2026-10-06~07 전환. 9월의 EAIT DBC 는 삭제).
+사이의 실시간성·통신·안전을 맡는다. **기준 프로토콜: 실차 A1 DBC `DBC/A1_dbc_fixed.dbc`**(업체 `A1_dbc.dbc` 에서
+0x200 `steer_is_auto` 오타 1곳만 고친 사본, 2026-10-06~07 전환. 9월의 EAIT DBC 는 삭제). 0x210 조향은 업체 DBC 그대로
+**×0.1°/raw**(2026-10-07 실차 확정). 대회측 원격조종은 0x156/0x157 로 0x210 보다 우선한다.
 
 ```
 ROS2 제어 노드 ──공유메모리──▶ can_guard ──0x210 20 ms──▶ CAN(PEAK can0 / Kvaser) ──▶ 차량
@@ -12,7 +13,7 @@ ROS2 제어 노드 ──공유메모리──▶ can_guard ──0x210 20 ms─
 
 | 디렉터리 | 내용 | 안내 |
 |---|---|---|
-| `DBC/` | `A1_dbc.dbc`(업체 원본), `A1_dbc_fixed.dbc`(기준 — 0x210 조향 배율 ×0.1→×1 등) | 근거: `docs/2026-10-06_a1_dbc_update_and_lift_plan.md` §0 |
+| `DBC/` | `A1_dbc.dbc`(업체 원본), `A1_dbc_fixed.dbc`(기준 — 0x200 `steer_is_auto` 오타만 수정) | 근거: `docs/2026-10-06_a1_dbc_update_and_lift_plan.md` §0 |
 | `safety/can_guard/` | 차량 명령(0x210)의 유일한 송신자, `lift_cmd.py` | `safety/can_guard/README.md` |
 | `ros2_ws/` | ROS2 상태 브리지(`a1_status_decoder`) — 감시 등급 | `ros2_ws/README.md` |
 | `sil/vcan/` | 가상 버스 SIL(가짜 실차 `fake_a1_vehicle.py`) | `sil/vcan/README.md` |

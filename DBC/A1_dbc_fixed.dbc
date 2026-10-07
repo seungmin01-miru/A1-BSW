@@ -73,14 +73,14 @@ SG_ right_live_counter : 48|8@1+ (1,0) [0|255] "" Vector__XXX
 SG_ left_live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
 
 BO_ 528 USER_control_command: 8 Vector__XXX
-SG_ steer_command : 0|16@1- (1,0) [-150|150] "degree" Vector__XXX
+SG_ steer_command : 0|16@1- (0.1,0) [-150|150] "degree" Vector__XXX
 SG_ steer_is_auto_command : 40|1@1+ (1,0) [0|1] "" Vector__XXX
 SG_ break_command : 16|16@1+ (1,0) [0|100] "%" Vector__XXX
 SG_ break_is_auto_command : 41|1@1+ (1,0) [0|1] "" Vector__XXX
 SG_ acc_command : 32|8@1+ (1,0) [0|100] "%" Vector__XXX
 SG_ acc_is_auto_command : 42|1@1+ (1,0) [0|1] "" Vector__XXX
 
-CM_ SG_ 528 steer_command "A1-BSW fix 2026-10-06: factor 0.1 -> 1. KF-1600 log 2026-09-17: settled steer_postion / raw command ratio median 1.000 over 1354 segments.";
+CM_ SG_ 528 steer_command "A1-BSW 2026-10-07: vendor factor 0.1 confirmed on the real car (raw +80/+100 -> steer_postion +8.8/+11.0 deg). The 2026-10-06 change to factor 1 was wrong and is reverted.";
 CM_ SG_ 512 steer_is_auto "A1-BSW fix 2026-10-06: 1-bit flag, factor 0.1 -> 1.";
 
 BA_DEF_  "BusType" STRING ;

@@ -5,8 +5,8 @@
 2026-10-06 실차 프로토콜로 전환(이전: EAIT 0x156/0x157 — git 기록에 남아 있음).
 
 0x210 배치(전부 Intel/리틀엔디언, 바이트 정렬):
-  bit 0-15  steer_command          int16, **1 deg/raw** ⚠️ 업체 DBC 의 0.1 은 오류(9/17 로그로 확인 —
-                                    0.1 로 인코딩하면 의도한 각도의 10배로 핸들이 돈다)
+  bit 0-15  steer_command          int16, **0.1 deg/raw** — 업체 DBC 그대로. 2026-10-07 실차 리프트 시험으로 확정
+                                    (raw +80/+100 → 위치 +8.8/+11.0°). 10-06 의 '×1' 판단은 틀렸다.
   bit 16-31 break_command          uint16, 1 %/raw, 0~100
   bit 32-39 acc_command            uint8,  1 %/raw, 0~100
   bit 40/41/42 steer/break/acc_is_auto_command
@@ -19,6 +19,7 @@
 FRAME_ID_CONTROL_COMMAND = 0x210
 
 STEER_MIN, STEER_MAX = -150, 150   # deg, DBC 범위
+STEER_RAW_PER_DEG = 10            # 0.1 deg/raw
 PCT_MIN, PCT_MAX = 0, 100
 
 
@@ -29,7 +30,7 @@ def _clip_int(v, lo, hi):
 def encode_0x210(cmd):
     """`protocol.Command` → 8바이트. 값은 호출 전에 이미 클램프돼 있다고 가정하지만, DBC 범위 밖이면 여기서도
     한 번 더 자른다(방어적 — 메인 루프에서 예외로 죽는 것보다 안전한 값으로 자르는 쪽이 낫다)."""
-    s = _clip_int(cmd.steer_cmd_deg, STEER_MIN, STEER_MAX)
+    s = _clip_int(cmd.steer_cmd_deg * STEER_RAW_PER_DEG, STEER_MIN * STEER_RAW_PER_DEG, STEER_MAX * STEER_RAW_PER_DEG)
     b = _clip_int(cmd.brake_cmd_pct, PCT_MIN, PCT_MAX)
     a = _clip_int(cmd.acc_cmd_pct, PCT_MIN, PCT_MAX)
     d = bytearray(8)

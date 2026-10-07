@@ -243,7 +243,7 @@ def send_safe_frames(bus, period_s, n, log):
 
 def print_status(cmd, status, log):
     (steer, brake, acc, sa, ba, aa), _ = cmd.snapshot(time.monotonic())
-    log(f'명령: steer={steer:+.0f}° brake={brake:.0f}% acc={acc:.0f}% auto(S/B/A)={int(sa)}{int(ba)}{int(aa)}')
+    log(f'명령: steer={steer:+.1f}° brake={brake:.0f}% acc={acc:.0f}% auto(S/B/A)={int(sa)}{int(ba)}{int(aa)}')
     now = time.monotonic()
     with status.lock:
         i, w, it, wt, ni, nw = status.info, status.wheel, status.info_t, status.wheel_t, status.n_info, status.n_wheel
@@ -313,7 +313,8 @@ def main():
     ap.add_argument('--interface', default='socketcan', choices=('socketcan', 'kvaser'))
     ap.add_argument('--bitrate', type=int, default=500000, help='kvaser 에서만 사용(socketcan 은 ip link 설정)')
     ap.add_argument('--period-ms', type=float, default=20.0, help='0x210 송신 주기 (9/17 실측 21.5 ms)')
-    ap.add_argument('--steer-limit-deg', type=float, default=30.0)
+    ap.add_argument('--steer-limit-deg', type=float, default=15.0,
+                    help='±deg. 기본 15 = 2026-10-07 리프트에서 시험한 최대(raw 150)')
     ap.add_argument('--brake-limit-pct', type=float, default=60.0)
     ap.add_argument('--acc-limit-pct', type=float, default=10.0)
     ap.add_argument('--acc-hold-s', type=float, default=2.0)

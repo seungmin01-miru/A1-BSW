@@ -72,7 +72,7 @@ if mode == 'session':
     c3 = win(m_steer10 + 0.15, m_steer45)
     out(bool(c3) and all(d['steer_command'] == 10 for d in c3), f'C3: 조향 10° 송신 {sorted({d["steer_command"] for d in c3})}')
     pos = [d['steer_postion'] for t, d in info if m_steer10 + 0.7 < t < m_steer45]
-    out(bool(pos) and 8.5 <= max(pos) <= 10.5, f'C3: 가짜 차량 조향 위치 {max(pos) if pos else None}° (배율 1 추종)')
+    out(bool(pos) and 8.5 <= max(pos) <= 10.5, f'C3: 가짜 차량 조향 위치 {max(pos) if pos else None}° (×0.1 인코딩 왕복)')
     c3b = win(m_steer45 + 0.15, m_steer45 + 0.75)
     out(bool(c3b) and all(d['steer_command'] == 30 for d in c3b), f'이중 한계: lift_cmd 45° → can_guard 가 30° 로 클램프 {sorted({d["steer_command"] for d in c3b})}')
     c4 = win(m_brake + 0.15, m_brake + 0.75)

@@ -57,7 +57,7 @@ class _Payload(ctypes.Structure):
         ('brake_auto', ctypes.c_uint8),       # bit41
         ('acc_auto', ctypes.c_uint8),         # bit42
         ('_pad', ctypes.c_uint8),
-        ('steer_cmd_deg', ctypes.c_float),    # -150~150 deg (배율 1 deg/raw — 업체 DBC 의 0.1 은 오류)
+        ('steer_cmd_deg', ctypes.c_float),    # -150~150 deg (0x210 에는 0.1 deg/raw 로 인코딩 — 업체 DBC 그대로)
         ('brake_cmd_pct', ctypes.c_float),    # 0~100 %
         ('acc_cmd_pct', ctypes.c_float),      # 0~100 %
     ]

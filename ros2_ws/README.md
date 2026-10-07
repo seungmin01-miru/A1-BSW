@@ -18,7 +18,7 @@
 | `/interface/can/read/raw` | `CanFrame` | 버스의 모든 프레임 |
 | `/control/status/control_info` | `ControlInfo` | 0x200 — 조향 위치(×0.1°)·브레이크 위치, 축별 auto, live_counter 3개 + 축별 `alive_ok` |
 | `/control/status/wheel_info` | `WheelInfo` | 0x201 — 좌우 바퀴 속도(12비트 ×0.1 km/h)·rpm, live_counter 2개 |
-| `/control/status/command_on_bus` | `ControlCommand` | 0x210 을 버스에서 본 그대로(can_guard 든 원격조종 등 다른 송신자든) — 조향 ×1° |
+| `/control/status/command_on_bus` | `ControlCommand` | 0x210 을 버스에서 본 그대로(can_guard 든 원격조종 등 다른 송신자든) — 조향 ×0.1° (원격조종 0x156/0x157 은 아직 디코드하지 않음) |
 | `/diagnostics` | `DiagnosticArray` | 1 Hz — 0x200·0x201 카운터 건너뜀, 0x210 송신자 유무 |
 
 QoS 는 전부 BEST_EFFORT depth 100. 구독 쪽도 반드시 BEST_EFFORT 로(RELIABLE 구독은 연결돼도 조용히 0개 수신).

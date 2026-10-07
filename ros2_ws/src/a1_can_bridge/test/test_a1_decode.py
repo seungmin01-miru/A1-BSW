@@ -67,7 +67,7 @@ def test_control_command_real_frames():
     for raw in frames:
         ref = DB.decode_message(0x210, raw, decode_choices=False)
         out = decode_control_command(raw)
-        assert out.steer_cmd_deg == ref['steer_command']
+        assert out.steer_cmd_deg == pytest.approx(ref['steer_command'])
         assert out.brake_cmd_pct == ref['break_command']
         assert out.acc_cmd_pct == ref['acc_command']
         assert (out.steer_auto, out.brake_auto, out.acc_auto) == (
@@ -75,13 +75,14 @@ def test_control_command_real_frames():
             bool(ref['acc_is_auto_command']))
 
 
-def test_steer_command_scale_not_vendor():
-    """Vendor DBC would read 15 deg as 1.5 deg — we must read 15."""
-    raw = DB.encode_message(0x210, {'steer_command': 15, 'break_command': 0, 'acc_command': 0,
+def test_steer_command_scale_is_vendor_0p1():
+    """Vendor factor 0.1 deg/raw is correct (2026-10-07 car: raw 100 -> position +11.0 deg)."""
+    raw = DB.encode_message(0x210, {'steer_command': 10.0, 'break_command': 0, 'acc_command': 0,
                                     'steer_is_auto_command': 1, 'break_is_auto_command': 1,
                                     'acc_is_auto_command': 1})
-    assert decode_control_command(raw).steer_cmd_deg == 15
-    assert DB_VENDOR.decode_message(0x210, raw)['steer_command'] == pytest.approx(1.5)
+    assert raw[0:2] == (100).to_bytes(2, 'little', signed=True)
+    assert decode_control_command(raw).steer_cmd_deg == pytest.approx(10.0)
+    assert DB_VENDOR.decode_message(0x210, raw)['steer_command'] == pytest.approx(10.0)
 
 
 def test_negative_steer_position():

@@ -28,12 +28,12 @@ def _samples(fid_hex):
 
 @pytest.mark.parametrize('steer,brake,acc,sa,ba,aa', [
     (0, 0, 0, 0, 0, 0), (1, 0, 0, 1, 1, 1), (-1, 0, 0, 1, 0, 0), (30, 60, 0, 1, 1, 0), (-30, 0, 10, 0, 1, 1),
-    (150, 100, 100, 1, 1, 1), (-150, 0, 0, 1, 1, 1), (15, 20, 5, 1, 1, 1),
+    (150, 100, 100, 1, 1, 1), (-150, 0, 0, 1, 1, 1), (15, 20, 5, 1, 1, 1), (8.8, 0, 0, 1, 0, 0), (-3.5, 0, 0, 1, 1, 1),
 ])
 def test_encode_0x210_matches_fixed_dbc(steer, brake, acc, sa, ba, aa):
     data = p.encode_0x210(steer, brake, acc, sa, ba, aa)
     d = DB_FIXED.decode_message(0x210, data, decode_choices=False)
-    assert d['steer_command'] == steer
+    assert d['steer_command'] == pytest.approx(steer)
     assert d['break_command'] == brake
     assert d['acc_command'] == acc
     assert (d['steer_is_auto_command'], d['break_is_auto_command'], d['acc_is_auto_command']) == (sa, ba, aa)
@@ -41,12 +41,13 @@ def test_encode_0x210_matches_fixed_dbc(steer, brake, acc, sa, ba, aa):
     assert data[3] == 0 and data[6] == 0 and data[7] == 0 and data[5] & 0xF8 == 0
 
 
-def test_encode_0x210_steer_scale_is_1_deg_not_vendor_0p1():
-    """업체 DBC 그대로 디코드하면 15°가 1.5°로 보인다 = 업체 DBC 로 인코딩하면 10배가 된다는 뜻."""
-    data = p.encode_0x210(15, 0, 0, 1, 1, 1)
-    assert data[0:2] == (15).to_bytes(2, 'little', signed=True)
-    assert DB_VENDOR.decode_message(0x210, data)['steer_command'] == pytest.approx(1.5)
-    assert DB_FIXED.decode_message(0x210, data)['steer_command'] == 15
+def test_encode_0x210_steer_scale_is_vendor_0p1():
+    """업체 DBC 배율 ×0.1 이 맞다(2026-10-07 실차: raw 100 → 위치 +11.0°, 원격 raw −35 → −3.5°)."""
+    data = p.encode_0x210(10, 0, 0, 1, 1, 1)
+    assert data[0:2] == (100).to_bytes(2, 'little', signed=True)
+    assert DB_VENDOR.decode_message(0x210, data)['steer_command'] == pytest.approx(10.0)
+    assert DB_FIXED.decode_message(0x210, data)['steer_command'] == pytest.approx(10.0)
+    assert p.decode_0x210(data)['steer_raw'] == 100 and p.decode_0x210(data)['steer_deg'] == 10.0
 
 
 def test_encode_0x210_roundtrip_real_frames():

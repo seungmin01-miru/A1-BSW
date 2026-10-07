@@ -86,7 +86,7 @@ dts = [b[0] - a[0] for a, b in zip(c210, c210[1:]) if b[0] < tk]
 out(len(dts) > 20 and 18 <= statistics.median(dts) * 1000 <= 22, f'kv0 에서 본 can_guard 0x210 {len(c210)}개, 주기 {statistics.median(dts)*1000 if dts else 0:.1f} ms')
 out(10 in {d['steer_command'] for _, d in c210}, '조향 10° 명령이 버스에 나감')
 pos = [d['steer_postion'] for t, d in c200 if t < tk]
-out(bool(pos) and 8.5 <= max(pos) <= 10.5, f'가짜 실차 조향 위치 {max(pos) if pos else None}° (배율 1)')
+out(bool(pos) and 8.5 <= max(pos) <= 10.5, f'가짜 실차 조향 위치 {max(pos) if pos else None}° (×0.1 인코딩 왕복)')
 after = [t for t, _ in c210 if t > tk + 0.1]
 out(not after, f'can_guard kill -9 뒤 0x210 {len(after)}개 (기대 0)')
 EOF

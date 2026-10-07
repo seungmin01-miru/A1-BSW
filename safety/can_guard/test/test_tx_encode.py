@@ -32,21 +32,25 @@ def test_frame_id():
     Command(steer_auto=True, brake_auto=True, acc_auto=True, steer_cmd_deg=150.0, brake_cmd_pct=100.0,
             acc_cmd_pct=100.0),
     Command(steer_cmd_deg=-150.0),
-    Command(steer_cmd_deg=12.4),   # 반올림 → 12
+    Command(steer_cmd_deg=12.4),   # 0.1° 단위 → raw 124
+    Command(steer_cmd_deg=1.26),   # 반올림 → 1.3 (raw 13)
 ])
 def test_matches_fixed_dbc(cmd):
     d = DB.decode_message(0x210, encode_0x210(cmd), decode_choices=False)
-    assert d['steer_command'] == round(cmd.steer_cmd_deg)
+    assert d['steer_command'] == pytest.approx(round(cmd.steer_cmd_deg, 1))
     assert d['break_command'] == round(cmd.brake_cmd_pct)
     assert d['acc_command'] == round(cmd.acc_cmd_pct)
     assert (d['steer_is_auto_command'], d['break_is_auto_command'], d['acc_is_auto_command']) == \
         (int(cmd.steer_auto), int(cmd.brake_auto), int(cmd.acc_auto))
 
 
-def test_steer_scale_is_1_deg_not_vendor_0p1():
-    data = encode_0x210(Command(steer_cmd_deg=15.0))
-    assert DB.decode_message(0x210, data)['steer_command'] == 15
-    assert DB_VENDOR.decode_message(0x210, data)['steer_command'] == pytest.approx(1.5)
+def test_steer_scale_is_vendor_0p1():
+    """업체 DBC 배율 ×0.1 이 맞다(2026-10-07 실차: raw 100 → 0x200 위치 +11.0°, raw 80 → +8.8°).
+    10° 명령은 raw 100 으로 나가야 하고, 업체 DBC·수정본 모두 10.0° 로 읽어야 한다."""
+    data = encode_0x210(Command(steer_cmd_deg=10.0))
+    assert data[0:2] == (100).to_bytes(2, 'little', signed=True)
+    assert DB.decode_message(0x210, data)['steer_command'] == pytest.approx(10.0)
+    assert DB_VENDOR.decode_message(0x210, data)['steer_command'] == pytest.approx(10.0)
 
 
 def test_reproduces_real_frames_bit_exact():
