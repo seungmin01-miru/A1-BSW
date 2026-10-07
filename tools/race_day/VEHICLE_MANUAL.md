@@ -51,6 +51,33 @@
 
 ---
 
+## 재부팅할 때마다 (PC 를 켤 때마다, 1분)
+
+재부팅하면 사라지는 것만 다시 만든다. 나머지(`vcan0`, RT 튜닝, Leaf v3 드라이버 자동 로드)는 부팅 때 저절로 된다.
+
+```bash
+# ① Kvaser 를 쓸 때만 — kv0 다시 만들기 (재부팅하면 사라짐. 없으면 미러가 시작 즉시 종료 → CAN 로그가 안 남는다)
+sudo ip link add dev kv0 type vcan 2>/dev/null; sudo ip link set kv0 up
+ip -br link show kv0                                      # 상태가 UP 또는 UNKNOWN 이면 OK
+
+# ② Kvaser 리허설을 돌릴 때만 — 가상 채널 모듈 (부팅 때 자동 로드 안 됨. 실제 Leaf v3 는 꽂으면 자동)
+sudo modprobe kvvirtualcan
+
+# ③ 확인 (아무것도 안 바꿈)
+ip -br link show vcan0                                    # 리허설용 가상 버스 — 부팅 때 자동 생성
+bash ~/git/A1-BSW/tools/kvaser/install_kvaser.sh check    # Kvaser 를 쓸 때: libcanlib 설치됨, 채널 목록
+```
+
+| 재부팅 후 | 할 일 |
+|---|---|
+| `kv0` | **사라짐 → ①** (Kvaser 를 쓸 때만) |
+| Kvaser 가상 채널(`kvvirtualcan`) | **자동 로드 안 됨 → ②** (리허설 때만) |
+| `can0`/`can1` 비트레이트·listen-only | 사라짐 → 매뉴얼 **1단계**에서 다시 설정(현장 절차에 이미 있음) |
+| 터미널의 `D`·`m` | 터미널마다 사라짐 → "현장 폴더·메모 명령" 세 줄을 **새 터미널마다** 붙여 넣기 |
+| `vcan0`, RT 튜닝(`a1-bsw-rt-tune.service`), Leaf v3 드라이버(`mhydra`) | 자동 — 할 일 없음 |
+
+PEAK 카드만 쓴다면 ①·② 는 필요 없다.
+
 ## 아침 확인 (출발 전 5분, 이 PC에서)
 
 어젯밤 만든 도구가 전부 정상인지 한 번에 확인한다. 전부 vcan0(가상 버스)에서 돌고 실차와 무관하다.
@@ -72,7 +99,7 @@ bash tools/kvaser/rehearse_kvaser.sh            # (Kvaser 를 쓸 때만) CANlib
       점퍼선
 - [ ] 120Ω 저항 1~2개
 - [ ] (Kvaser 를 쓸 경우) Kvaser Leaf v3 + 케이블, 드라이버 설치 확인 `bash tools/kvaser/install_kvaser.sh check`,
-      부팅 후 `sudo ip link add dev kv0 type vcan && sudo ip link set kv0 up`
+      재부팅했으면 위 "재부팅할 때마다" ① 실행
 - [ ] USB 메모리 2개, 휴대폰(사진·시각 확인)
 - [ ] PC 전원 방안(차량 12V로는 직접 못 켬 — 업체 콘센트/인버터 확인)
 - [ ] **이 매뉴얼의 시간표·S 시나리오 표, `answers_template.md` 출력본**(대회 측 조작자에게 시나리오 표를

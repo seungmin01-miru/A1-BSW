@@ -45,7 +45,7 @@ Kvaser 는 비트레이트·listen-only 를 `ip link` 가 아니라 **프로그�
 
 ### 미러 (`kvaser_mirror.py`)
 ```bash
-sudo ip link add dev kv0 type vcan && sudo ip link set kv0 up        # 부팅마다 한 번
+sudo ip link add dev kv0 type vcan && sudo ip link set kv0 up        # 재부팅마다 한 번(재부팅하면 사라짐)
 python3 tools/kvaser/kvaser_mirror.py --channel 0 --bitrate 500000 --listen-only --log "$D/kvaser_ch0.log"
 ```
 - `--listen-only` = Kvaser **silent 모드**(ACK·에러 프레임을 버스에 전혀 안 냄). 비트레이트 스캔·녹화·원격 판정은 반드시 이 모드로.
@@ -68,6 +68,7 @@ python3 tools/kvaser/kvaser_mirror.py --channel 0 --bitrate 500000 --listen-only
 
 ## 리허설 (설치 후, 장치 없이 — CANlib 가상 채널 0·1)
 ```bash
+sudo modprobe kvvirtualcan                 # 재부팅 후엔 가상 채널 모듈이 자동 로드되지 않는다
 bash tools/kvaser/rehearse_kvaser.sh       # 가짜 실차(채널 1) ↔ can_guard(채널 0) + 미러 → kv0 확인
 ```
 2026-10-07 결과: **9/9 PASS** — 미러(silent) kv0 복사·원본 기록, 다른 0x210 송신자 시 can_guard 시작 거부(코드 3),
