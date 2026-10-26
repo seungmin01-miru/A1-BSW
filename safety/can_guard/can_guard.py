@@ -9,7 +9,7 @@ can_guard — 안전 임계 CAN TX 메인 루프 (§7.2, can_stack_development.m
 
 2026-10-06 실차 프로토콜(0x200/0x201/0x210, DBC/A1_dbc_fixed.dbc)로 전환 — 이전 EAIT 0x156/0x157 는 git 기록.
 
-매 주기(기본 20ms = 9/17 실차 로그의 0x210 주기 21.5 ms 에 맞춤):
+매 주기(기본 20ms — 10-07 실측 차량 상태 주기 21.0 ms 보다 약간 빠르게):
   CommandChannel.read() → (0x201 차속·0x200 상태 non-blocking 수신) → state_machine.next_state()
   → command_policy.command_for_state() → plausibility.clamp_range(운용 한계)(방어 이중화)
   → tx_encode.encode_0x210 → bus.send(0x210)
@@ -62,7 +62,7 @@ def parse_args(argv=None):
     ap.add_argument('--bitrate', type=int, default=500000,
                     help='socketcan 이 아닌 인터페이스(kvaser)에서만 사용 — socketcan 은 ip link 로 이미 정해져 있음')
     ap.add_argument('--period', type=float, default=0.020,
-                    help='TX 주기(초) — 9/17 실차 로그의 0x210 주기(21.5 ms)에 맞춘 20 ms')
+                    help='TX 주기(초) — 10-07 실측 차량 상태 주기(21.0 ms)에 맞춘 20 ms')
     ap.add_argument('--cpu', default='', help='격리 코어 배치, 예 "8" (A-3)')
     ap.add_argument('--rt-priority', type=int, default=0, help='SCHED_FIFO 우선순위, 0=미적용')
     ap.add_argument('--watchdog-t', type=float, default=DEFAULT_WATCHDOG_T_S, help='명령 staleness 임계(초)')

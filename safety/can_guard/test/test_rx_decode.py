@@ -1,4 +1,4 @@
-"""0x200/0x201 디코더 — cantools + DBC/A1_dbc_fixed.dbc + 2026-09-17 실차 프레임과 대조."""
+"""0x200/0x201 디코더 — cantools + DBC/A1_dbc_fixed.dbc + 2026-10-07 실차 프레임과 대조."""
 import csv
 import os
 
@@ -10,7 +10,7 @@ from rx_decode import (FRAME_ID_CONTROL_INFO, FRAME_ID_WHEEL_INFO, decode_contro
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
-SAMPLES = os.path.join(REPO, 'tools', 'race_day', 'testdata', 'kf1600_20260917_samples.csv')
+SAMPLES = os.path.join(REPO, 'tools', 'race_day', 'testdata', 'a1_20261007_samples.csv')
 
 
 def _real(fid_hex):
@@ -34,7 +34,7 @@ def test_wheel_speeds_match_dbc_on_real_frames():
 
 
 def test_wheel_speed_above_8bit_range():
-    """9월 말 정정 사례: 25.7 km/h(raw 257)가 8비트 해석이면 깨진다 — 12비트로 읽혀야 한다."""
+    """12비트 속도: 25.7 km/h(raw 257)는 8비트로 읽으면 깨진다. 10-07 녹화는 속도가 전부 0 이라 합성 프레임으로 확인."""
     raw = DB.encode_message(0x201, {'right_speed': 25.7, 'right_rpm': 243, 'left_speed': 25.1, 'left_rpm': 238,
                                     'right_live_counter': 1, 'left_live_counter': 2})
     assert decode_wheel_speeds_kph(raw) == (pytest.approx(25.7), pytest.approx(25.1))

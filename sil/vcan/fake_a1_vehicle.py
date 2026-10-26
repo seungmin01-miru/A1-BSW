@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""가짜 실차(USER_ 프로토콜) — vcan0 리허설용. 0x200·0x201 을 20 ms 주기(9/17 실측 20.8 ms)로 보내고,
+"""가짜 실차(USER_ 프로토콜) — vcan0 리허설용. 0x200·0x201 을 21 ms 주기(10-07 실측 21.0 ms)로 보내고,
 0x210 을 받으면 auto 비트가 켜진 축만 반응한다.
 
   - 조향 위치: 명령을 1차 지연(시정수 0.2 s)으로 추종 — 배율은 0.1 deg/raw(업체 DBC, 10-07 실차 확정)
-  - 브레이크 위치: 명령 % / 10 로 추종(9/17 로그에서 명령 0–100 % 일 때 위치 0–10 범위였던 것만 흉내)
+  - 브레이크 위치: 명령 % / 10 로 추종(10-07 실측: 위치 = 명령 % ÷ 10)
   - 바퀴 속도: 가속 % − 브레이크 % 로 단순 적분(물리 모델 아님, 숫자가 움직이는지만 보는 용도)
-  - auto 비트(0x200 byte4): 마지막으로 받은 0x210 의 auto 비트를 그대로 보고, 0x210 이 0.5 s 끊기면 0
-    ⚠️ 실차의 명령 타임아웃 동작은 모르므로 흉내 내지 않는다 — 이 0.5 s 는 가짜 차량의 임의 값
+  - auto 비트(0x200 byte4): 마지막으로 받은 0x210 의 auto 비트를 그대로 보고, **0x210 이 끊겨도 유지**한다
+    (10-07 실차: 0x210 없이 59.9 s 동안 auto 111 유지, auto 0 프레임이 와야 해제). 다른 동작을 시험하려면
+    --cmd-timeout-s 로 타임아웃을 줄 수 있다(기본 0 = 없음).
 
   python3 sil/vcan/fake_a1_vehicle.py --channel vcan0
 """
@@ -36,7 +37,9 @@ def main():
     ap.add_argument('--interface', default='socketcan', choices=('socketcan', 'kvaser'),
                     help='kvaser = CANlib 가상 채널로 리허설(Kvaser 설치 후, 채널 번호를 --channel 로)')
     ap.add_argument('--bitrate', type=int, default=500000)
-    ap.add_argument('--period-ms', type=float, default=20.0)
+    ap.add_argument('--period-ms', type=float, default=21.0, help='0x200/0x201 주기 (10-07 실측 21.0 ms)')
+    ap.add_argument('--cmd-timeout-s', type=float, default=0.0,
+                    help='0x210 이 이 시간 끊기면 auto 0 (기본 0 = 타임아웃 없음, 10-07 실차 동작)')
     a = ap.parse_args()
     signal.signal(signal.SIGTERM, _on_signal)
     signal.signal(signal.SIGINT, _on_signal)
@@ -62,7 +65,7 @@ def main():
             if m.arbitration_id == FRAME_CONTROL_COMMAND and len(m.data) == 8:
                 cmd, cmd_t = decode_0x210(m.data), time.monotonic()
         now = time.monotonic()
-        live = cmd is not None and now - cmd_t < 0.5
+        live = cmd is not None and (a.cmd_timeout_s <= 0 or now - cmd_t < a.cmd_timeout_s)
         sa = ba = aa = 0
         if live:
             sa, ba, aa = cmd['steer_auto'], cmd['brake_auto'], cmd['acc_auto']
@@ -75,7 +78,7 @@ def main():
             kph = max(0.0, kph + (acc * 0.5 - bpct * 1.0 - 0.5) * dt)
         else:
             kph = max(0.0, kph - 0.5 * dt)
-        rpm = int(kph * 9.5)   # 9/17 로그의 속도·rpm 비율 근처(숫자 확인용)
+        rpm = int(kph * 9.5)   # 속도·rpm 비율은 미확인(10-07 은 바퀴 0) — 숫자 확인용 임의값
         bus.send(can.Message(arbitration_id=FRAME_CONTROL_INFO, is_extended_id=False,
                              data=encode_0x200(steer, brake, sa, ba, aa, cnt, cnt, cnt)))
         bus.send(can.Message(arbitration_id=FRAME_WHEEL_INFO, is_extended_id=False,

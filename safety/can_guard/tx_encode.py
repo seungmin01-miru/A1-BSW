@@ -1,6 +1,6 @@
 """USER_control_command(0x210) 인코더 — can_guard 가 클램프를 통과한 `Command` 를 차량으로 낼 마지막 단계.
 런타임에 DBC 를 읽지 않는다(RX 디코더들과 같은 원칙) — 정확성은 test/test_tx_encode.py 가 cantools +
-`DBC/A1_dbc_fixed.dbc` + 2026-09-17 실차 프레임(다른 팀 PC 가 실제로 보낸 0x210)과 비트 단위로 대조해 보장한다.
+`DBC/A1_dbc_fixed.dbc` + 2026-10-07 실차 리프트 녹화의 0x210 프레임과 비트 단위로 대조해 보장한다.
 
 2026-10-06 실차 프로토콜로 전환(이전: EAIT 0x156/0x157 — git 기록에 남아 있음).
 
@@ -10,7 +10,7 @@
   bit 16-31 break_command          uint16, 1 %/raw, 0~100
   bit 32-39 acc_command            uint8,  1 %/raw, 0~100
   bit 40/41/42 steer/break/acc_is_auto_command
-  나머지(byte3·6·7, byte5 상위 5비트) 0 — 9/17 로그 전 프레임에서 항상 0
+  나머지(byte3·6·7, byte5 상위 5비트) 0 — 10-07 녹화 전 프레임(13만여 개)에서 항상 0
 
 명령 메시지에 alive counter 가 **없다**(DBC 확인) — EAIT 시절의 Aliv_Cnt 소유 로직은 대상이 없어 제거했다.
 차량이 송신자 생존을 수신 간격만으로 판단하는지는 업체 확인 대기(계획서 §7).

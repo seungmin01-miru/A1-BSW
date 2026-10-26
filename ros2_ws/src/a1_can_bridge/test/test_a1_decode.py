@@ -11,7 +11,7 @@ from a1_can_bridge.a1_status_decoder import (decode_control_command, decode_cont
 REPO = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')
 DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
 DB_VENDOR = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc.dbc'), strict=False)
-SAMPLES = os.path.join(REPO, 'tools', 'race_day', 'testdata', 'kf1600_20260917_samples.csv')
+SAMPLES = os.path.join(REPO, 'tools', 'race_day', 'testdata', 'a1_20261007_samples.csv')
 
 
 def _real(fid_hex):

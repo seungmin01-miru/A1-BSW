@@ -5,6 +5,9 @@
 텍스트 정리: 같은 폴더 `summary/`(`tools/race_day/summarize_session.py` 로 생성 — summary.md, events.md, timeline.csv).
 조건: 차량 리프트 위, 500 kbps classic CAN, 우리 송신은 can_guard(20 ms) + lift_cmd. 브레이크 모듈은 11:17 까지 고장.
 
+상세 분석(통신 지연 최악값·DBC 형식 점검·조향/브레이크 역산·추가로 필요한 정보): [`analysis_report.md`](analysis_report.md)
+제어기 매칭용 신호 범위(10-08 주행 이미지 포함): [`signal_ranges.md`](signal_ranges.md)
+
 ## 버스
 
 | ID | 송신자 | 개수 | 주기(중앙값 / p99) |
@@ -34,6 +37,6 @@
 ## 미해결
 
 - **0x201 바퀴 속도가 73분 내내 0** — 가속 40~60 %(auto 001 과 111, 브레이크 0)에도 0. 원격 구동 장면은 CAN 분리 중이라 미기록.
-- 10:35 버스 공백 원인, 미확인 0x210 송신자의 정체, 9/17 로그 해석이 왜 ×1 로 나왔는지.
+- 10:35 버스 공백 원인, 미확인 0x210 송신자의 정체.
 - 조향 0 근처 오프셋(약 +1°)·불감대.
 - C6 안전 시험(can_guard kill, E-stop)은 정식으로 하지 못함.

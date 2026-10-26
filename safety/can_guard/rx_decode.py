@@ -1,5 +1,5 @@
 """can_guard 가 읽는 RX 신호 — tx_encode.py 와 같은 원칙: 런타임에 DBC 를 읽지 않고 다른 디렉터리에 기대지
-않는다(§5.D "최소 의존"). 정확성은 test/test_rx_decode.py 가 cantools + `DBC/A1_dbc_fixed.dbc` + 9/17 실차
+않는다(§5.D "최소 의존"). 정확성은 test/test_rx_decode.py 가 cantools + `DBC/A1_dbc_fixed.dbc` + 10-07 실차
 프레임과 대조한다.
 
 2026-10-06 실차 프로토콜로 전환(이전: EAIT 0x711 VS).
@@ -28,7 +28,7 @@ def decode_vehicle_speed_kph(data):
 
 
 def decode_control_info(data):
-    """0x200 → dict(조향 위치 deg, 브레이크 위치, 축별 auto). 브레이크 위치 단위는 DBC 에 없음(9/17: 0~10)."""
+    """0x200 → dict(조향 위치 deg, 브레이크 위치, 축별 auto). 브레이크 위치 단위는 DBC 에 없음(10-07: 명령 % ÷ 10, 0~10)."""
     d = bytes(data[:8])
     return {
         'steer_pos_deg': int.from_bytes(d[0:2], 'little', signed=True) * 0.1,

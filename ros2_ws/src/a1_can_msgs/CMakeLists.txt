@@ -15,6 +15,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ControlInfo.msg"
   "msg/WheelInfo.msg"
   "msg/ControlCommand.msg"
+  "msg/ControllerOutput.msg"
+  "msg/AdapterStatus.msg"
   DEPENDENCIES std_msgs
 )
 

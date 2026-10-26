@@ -36,7 +36,7 @@ from a1_proto import decode_0x200, decode_0x201, decode_0x210  # noqa: E402
 LINE = re.compile(r'\((\d+\.\d+)\) \S+ ([0-9A-Fa-f]+)#([0-9A-Fa-f]*)')
 A1_IDS = {0x200: 'USER_control_info', 0x201: 'USER_right_wheel_info', 0x210: 'USER_control_command'}
 KNOWN_OTHER = {0x156: '원격조종 Control_01(EPS/ACC/AEB En)', 0x157: '원격조종 Control_02(조향·가감속 명령)',
-               0x004: '미확인(9/17 로그에 있던 ID)', 0x204: '미확인(9/17 로그에 있던 ID)'}
+               0x004: '미확인(DBC 에 없음)', 0x204: '미확인(DBC 에 없음)'}
 
 
 def hms(t, ms=True):

@@ -4,13 +4,15 @@
 (spd/eps/acc/imu, 0x710~0x713)와 그 메시지·launch 를 지우고 A1 기준 하나로 정리했다(git 기록).
 
 **이 토픽들은 감시 등급**(§5.C 설계 규칙): 10 ms 대 제어 루프가 직접 구독하지 말 것. 차량으로 명령을 보내는 건
-`safety/can_guard/can_guard.py` 하나뿐이고, 이 워크스페이스의 노드는 아무것도 송신하지 않는다.
+`safety/can_guard/can_guard.py` 하나뿐이고, 이 워크스페이스의 노드는 CAN 으로 아무것도 송신하지 않는다
+(`a1_control_adapter` 는 can_guard 의 공유메모리에 명령을 쓸 뿐이다 — 2026-10-26 추가).
 
 ## 패키지
 
 | 패키지 | 종류 | 내용 |
 |---|---|---|
-| `a1_can_msgs` | ament_cmake (msg) | `CanFrame`(원시 프레임), `ControlInfo`(0x200), `WheelInfo`(0x201), `ControlCommand`(버스 위 0x210) |
+| `a1_can_msgs` | ament_cmake (msg) | `CanFrame`(원시 프레임), `ControlInfo`(0x200), `WheelInfo`(0x201), `ControlCommand`(버스 위 0x210), `ControllerOutput`(제어기 출력: 가감속·타이어각), `AdapterStatus` |
+| `a1_control_adapter` | ament_python | `cmd_adapter`(`/control/target` → can_guard 공유메모리, 표 변환·축별 arm·고장 래치), `test_target_pub`(제어기 대역), `launch/track.launch.py`(브리지 + 어댑터) — [README](src/a1_control_adapter/README.md) |
 | `a1_can_bridge` | ament_python | `can_raw_bridge`(SocketCAN → `/interface/can/read/raw`), `a1_status_decoder`(raw 1회 구독 → 3토픽 + 축별 카운터 진단), `dbc_bits.py`(비트필드 공용 추출), `e2e.py`(`AliveCounter`), `rt_utils.py`(A-3), `launch/a1_bridge.launch.py` |
 
 | 토픽 | 타입 | 출처 |
@@ -32,7 +34,7 @@ cd ~/git/A1-BSW/ros2_ws
 source /opt/ros/humble/setup.bash
 colcon build --symlink-install
 source install/setup.bash
-colcon test && colcon test-result --all       # 2026-10-07: 28개, 실패 0 (수정본 DBC + 9/17 실차 프레임 대조 포함)
+colcon test && colcon test-result --all       # 2026-10-07: 28개, 실패 0 (수정본 DBC + 10-07 실차 프레임 대조 포함)
 ```
 
 ## 실행

@@ -4,6 +4,8 @@
 
 **절차는 전부 `VEHICLE_MANUAL.md` 한 문서를 위에서부터 따라간다.** 이 README 는 도구 목록·설계 설명이다.
 
+> 2026-10-26: 제어기를 실차에 붙이는 트랙 시험(표 측정·shadow·arm)은 [`tools/track_day/TRACK_MANUAL.md`](../track_day/TRACK_MANUAL.md).
+
 1. 출발 전·아침: `VEHICLE_MANUAL.md` "아침 확인" — 유닛테스트 + 리허설 2개가 `FAIL 0` 인지(가상 버스, 약 3분)
 2. 현장: 질문 → 연결 → **listen-only** 비트레이트 → `candump -l` 녹화 → 원격 판정 → (조건 충족 시) **C. 리프트 송신 시험**
 3. 기준 DBC 는 **`DBC/A1_dbc_fixed.dbc`** — 0x210 조향 배율은 업체 DBC 그대로 ×0.1(10-07 실차 확정). 도구의 조향 숫자는 도(°) 단위다(10-07 현장의 `steer 100` = 이제 `steer 10`).
@@ -23,7 +25,7 @@
 | `../kvaser/kvaser_mirror.py` | Kvaser(CANlib) → `kv0`(vcan) 복사 + 원본 기록. silent(listen-only) 지원 → 매뉴얼 명령을 `kv0` 로 그대로 사용 | ❌ |
 | `../kvaser/rehearse_kvaser.sh` | Kvaser 경로 리허설(CANlib 가상 채널, 장치 불필요) | 가상 채널만 |
 | `04_CAN.pdf`, `Practice_04_CAN.pdf` | 참고 자료 — CAN 일반 강의 / Kvaser 드라이버·CANlib 실습(실습의 `apt remove dkms` 는 이 PC 에서 금지, `tools/kvaser/README.md`) | — |
-| `a1_proto.py`, `test_lift_tx.py`, `testdata/` | 0x200/0x201/0x210 인코더·디코더, 테스트, 9/17 실차 프레임 샘플 | — |
+| `a1_proto.py`, `test_lift_tx.py`, `testdata/` | 0x200/0x201/0x210 인코더·디코더, 테스트, 10-07 실차 프레임 샘플 | — |
 | `collect.sh`, `can_csv_logger.py` | 일괄 수집(아래 설명). ⚠️ **현재 실차일에는 쓰지 않는다** — 이 PC 의 `/dev/ttyUSB0~2`(LTE 모뎀)를 GPS 로 착각해 읽고, `sudo` 실행 시 저장 위치가 `/root` 로 바뀌는 문제가 미수정. 매뉴얼의 `candump -l` 직접 녹화를 쓴다 | ❌ |
 
 ---

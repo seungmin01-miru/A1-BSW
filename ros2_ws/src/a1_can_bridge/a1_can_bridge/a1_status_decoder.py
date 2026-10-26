@@ -16,7 +16,7 @@ Decode the real-vehicle USER_ protocol (0x200 / 0x201 / 0x210) into ROS2 topics 
 can_guard(safety/can_guard/) 하나뿐이다 — 이 노드는 아무것도 송신하지 않는다.
 
 파싱은 dbc_bits.unpack(비트 단위 추출, 런타임 DBC 없음). 정확성은 test/test_a1_decode.py 가 cantools + 수정본 DBC +
-9/17 실차 프레임과 대조한다. 0x210 steer_command 배율은 업체 DBC 그대로 ×0.1 deg(2026-10-07 실차로 확정).
+10-07 실차 프레임과 대조한다. 0x210 steer_command 배율은 업체 DBC 그대로 ×0.1 deg(2026-10-07 실차로 확정).
 
   ros2 run a1_can_bridge a1_status_decoder
 """

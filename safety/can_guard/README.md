@@ -35,7 +35,7 @@
 
 ```bash
 cd safety/can_guard
-python3 -m pytest test/ -q                                  # 67개(수정본 DBC + 9/17 실차 프레임 대조), 하드웨어 불필요
+python3 -m pytest test/ -q                                  # 68개(수정본 DBC + 10-07 실차 프레임 대조), 하드웨어 불필요
 
 python3 can_guard.py --channel vcan0                         # SIL
 python3 sil_tests/p1_kill_control_node.py --channel vcan0    # §7.3 P-1
@@ -49,7 +49,7 @@ python3 can_guard.py --interface kvaser --channel 0 --bitrate 500000 --steer-lim
     --acc-limit-pct 10 --status-interval-s 1
 ```
 
-주요 CLI(전부 코드 변경 없이 조정): `--period 0.020`(9/17 실측 0x210 주기), `--watchdog-t 0.05`,
+주요 CLI(전부 코드 변경 없이 조정): `--period 0.020`(10-07 실측 차량 0x200 주기 21.0 ms 에 맞춤), `--watchdog-t 0.05`,
 `--hold-brake-pct 30`, `--hold-brake-ramp-pct-s 30`, `--stopped-mode hold|manual`, `--steer/brake/acc-limit-*`,
 `--precheck-s 1.0`, `--status-interval-s`.
 
@@ -79,7 +79,8 @@ python3 can_guard.py --interface kvaser --channel 0 --bitrate 500000 --steer-lim
 
 ## 보류 — 외부 입력 필요
 
-- [ ] **진짜 ROS2 제어 노드**를 `CommandChannel.open()` 으로 결선(지금은 `lift_cmd.py`·`fake_control_node.py`)
+- [~] **진짜 ROS2 제어 노드**를 `CommandChannel.open()` 으로 결선 — 2026-10-26 `ros2_ws/src/a1_control_adapter`(제어기 출력 `/control/target` → 이 채널, 50 Hz) 완료. 제어기 자체는 미완성
+- [~] 인지 하트비트 — 인지 프로세스 전까지 어댑터가 대신 보냄(`perception_heartbeat`)
 - [ ] **진짜 인지 프로세스**를 `HeartbeatChannel.open()` 으로 결선
 - [ ] **변화율 상한** — 조향 deg/s, 가속 %/s. 실차 액추에이터 사양 필요. 그 전까지 `RateLimiter` 비활성
 - [x] 0x210 조향 배율 — 10-07 실차로 ×0.1 확정, 코드 수정

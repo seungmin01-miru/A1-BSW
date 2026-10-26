@@ -1,4 +1,4 @@
-"""lift_tx.py / a1_proto.py 유닛테스트 — 수정본 DBC(cantools) + 9/17 실차 프레임으로 대조.
+"""lift_tx.py / a1_proto.py 유닛테스트 — 수정본 DBC(cantools) + 2026-10-07 실차 프레임으로 대조.
 
   cd tools/race_day && python3 -m pytest -q test_lift_tx.py
 """
@@ -15,7 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
 DB_FIXED = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
 DB_VENDOR = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc.dbc'), strict=False)
-SAMPLES = os.path.join(HERE, 'testdata', 'kf1600_20260917_samples.csv')
+SAMPLES = os.path.join(HERE, 'testdata', 'a1_20261007_samples.csv')
 
 
 def _samples(fid_hex):
@@ -37,7 +37,7 @@ def test_encode_0x210_matches_fixed_dbc(steer, brake, acc, sa, ba, aa):
     assert d['break_command'] == brake
     assert d['acc_command'] == acc
     assert (d['steer_is_auto_command'], d['break_is_auto_command'], d['acc_is_auto_command']) == (sa, ba, aa)
-    # 정의되지 않은 바이트(3, 6, 7)와 byte5 상위 비트는 0 — 9/17 로그 전 프레임에서 항상 0 이었다
+    # 정의되지 않은 바이트(3, 6, 7)와 byte5 상위 비트는 0 — 10-07 녹화 전 프레임에서 항상 0 이었다
     assert data[3] == 0 and data[6] == 0 and data[7] == 0 and data[5] & 0xF8 == 0
 
 
@@ -51,7 +51,7 @@ def test_encode_0x210_steer_scale_is_vendor_0p1():
 
 
 def test_encode_0x210_roundtrip_real_frames():
-    """9/17 실차 0x210 프레임(다른 팀 PC 가 실제로 보낸 것)을 디코드 → 다시 인코드하면 바이트가 완전히 같다."""
+    """10-07 실차 0x210 프레임을 디코드 → 다시 인코드하면 바이트가 완전히 같다."""
     frames = _samples('0x210')
     assert len(frames) >= 100
     for raw in frames:

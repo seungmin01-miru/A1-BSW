@@ -1,7 +1,7 @@
 # USER_control_info (0x200, 차량 → PC) — DBC/A1_dbc_fixed.dbc. 2026-10-06 실차 프로토콜.
 std_msgs/Header header        # 원본 CanFrame.header 를 그대로 물려받는다(종단 지연 측정 가능)
 float32 steer_position_deg    # steer_postion, int16 ×0.1 deg
-float32 brake_position        # break_postion, int16 ×0.1 (단위 DBC 에 없음 — 9/17 로그에서 명령 0~100 % 일 때 0~10)
+float32 brake_position        # break_postion, int16 ×0.1 (단위 DBC 에 없음 — 10-07 실측: 명령 % ÷ 10)
 bool steer_auto               # steer_is_auto (0 Manual / 1 Auto)
 bool brake_auto               # break_is_auto
 bool acc_auto                 # acc_is_auto

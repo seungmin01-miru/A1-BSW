@@ -312,7 +312,7 @@ def main():
     ap.add_argument('--channel', required=True, help='can0 등(socketcan) 또는 Kvaser CANlib 채널 번호(kvaser)')
     ap.add_argument('--interface', default='socketcan', choices=('socketcan', 'kvaser'))
     ap.add_argument('--bitrate', type=int, default=500000, help='kvaser 에서만 사용(socketcan 은 ip link 설정)')
-    ap.add_argument('--period-ms', type=float, default=20.0, help='0x210 송신 주기 (9/17 실측 21.5 ms)')
+    ap.add_argument('--period-ms', type=float, default=20.0, help='0x210 송신 주기 (10-07 실측 can_guard 20.0 ms)')
     ap.add_argument('--steer-limit-deg', type=float, default=15.0,
                     help='±deg. 기본 15 = 2026-10-07 리프트에서 시험한 최대(raw 150)')
     ap.add_argument('--brake-limit-pct', type=float, default=60.0)
