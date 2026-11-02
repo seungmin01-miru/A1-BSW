@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """collect.sh 의 보조 원시 CAN 로거 — candump -l 과 이중화용(§tools/race_day/README.md).
 DBC 없이 무조건 arbitration_id+raw_hex 만 남긴다(디코드는 나중에 이 컴퓨터로 가져와서).
-python-can 에만 의존(sil/vcan/eait_rx.py 와 같은 방식), cantools 등 무거운 의존 없음.
+python-can 에만 의존, cantools 등 무거운 의존 없음.
 
   python3 can_csv_logger.py --channel can0 --out can0.csv
 """
@@ -31,6 +31,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--channel', required=True)
     ap.add_argument('--interface', default='socketcan')
+    ap.add_argument('--bitrate', type=int, default=500000, help='socketcan 이 아닐 때만 사용')
+    ap.add_argument('--listen-only', action='store_true', help='kvaser: 하드웨어 silent 모드(ACK·에러프레임 안 보냄)')
     ap.add_argument('--out', required=True)
     a = ap.parse_args()
 
@@ -38,7 +40,17 @@ def main():
     signal.signal(signal.SIGINT, _on_signal)
 
     try:
-        bus = can.Bus(channel=a.channel, interface=a.interface)
+        kw = {}
+        if a.interface != 'socketcan':
+            kw['bitrate'] = a.bitrate
+        if a.interface == 'kvaser' and a.listen_only:
+            kw['driver_mode'] = False   # python-can DRIVER_MODE_SILENT
+        if a.interface == 'kvaser':
+            import os
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'safety', 'can_guard'))
+            import kvaser_compat
+            kvaser_compat.apply()
+        bus = can.Bus(channel=a.channel, interface=a.interface, **kw)
     except Exception as e:   # noqa: BLE001 — 남의 PC 에서 인터페이스가 없거나 권한 문제일 수 있음, 한 줄로만 남김
         print(f'[can_csv_logger] {a.channel} 열기 실패 — {e}', file=sys.stderr)
         sys.exit(1)

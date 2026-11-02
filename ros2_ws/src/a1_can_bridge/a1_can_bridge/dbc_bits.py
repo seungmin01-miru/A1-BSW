@@ -3,9 +3,9 @@ Generic little-endian (Intel) DBC bit-field extraction.
 
 DBC 의 "little_endian" 신호는 8바이트 페이로드 전체를 하나의 64비트 리틀엔디언 정수로 보고
 [start, start+length) 비트 구간을 뽑는 것과 같다(Vector DBC 관례) — 이 프로젝트 DBC 신호는
-전부 little_endian(=Intel) 이므로(EAIT_INFO_EPS/ACC/SPD 확인) 이 하나의 함수로 전부 처리한다.
-0x712(EAIT_INFO_SPD) 처럼 바이트 정렬된 신호만 있는 메시지는 struct 로 더 빠르게 풀 수도 있지만,
-0x710/0x711 처럼 1~16비트가 바이트 경계 없이 섞인 메시지는 이 비트 단위 추출이 정확하고 일반적이다.
+전부 little_endian(=Intel) 이므로(A1_dbc_fixed.dbc 전 신호 확인) 이 하나의 함수로 전부 처리한다.
+0x200 처럼 바이트 정렬된 신호만 있는 메시지는 struct 로 더 빠르게 풀 수도 있지만,
+0x201 의 12비트 쌍처럼 바이트 경계를 걸치는 필드는 이 비트 단위 추출이 정확하고 일반적이다.
 정확성은 test/test_dbc_bits.py 가 cantools(DBC 정식 디코드)와 다수의 합성 값으로 대조해 검증한다.
 """
 

@@ -1,14 +1,41 @@
-# 실차 인수 당일 매뉴얼 (초안 v2, 2026-10-06 작성 / 10-07 실행, 실험 시간 3시간)
+# 실차 인수 당일 매뉴얼 (v5, 2026-10-07 실차 결과 반영 — 리프트 송신 시험, PEAK / Kvaser 둘 다)
 
 내일 목표는 세 가지다.
 
 1. **원격조종 시스템이 CAN에 직결되는지 판정** — 직결이면 그 자리에서 리버스 엔지니어링용 주행 로그를
    뜨고, 아니면 원격 시스템의 출력 형식을 기록해 와서 우리 레이어에 맞춘 뒤 리버스 엔지니어링한다.
-2. **CAN 형식과 DBC 확보** — 업체가 DBC를 주는지에 따라 B1 / B2 / B3 중 하나로 진행한다.
+2. **받은 DBC 검증** — 업체 DBC(`DBC/A1_dbc.dbc`, 10-06 수령)를 실차 버스로 대조하고, 오류(0x210 조향 배율)와
+   빠진 것(0x004·0x204, SYS 계열의 위치)을 업체에 확인한다(아래 "B. DBC 검증").
 3. **검증 체크리스트(`2026-09-14_can_verification_checklist.md`) 미결 항목 확인** — 원격이 되면 차량
    fail-safe·E-stop·우선권 등을 실제로 관측한다(아래 "체크리스트 대응표").
+4. **리프트 송신 시험(C단계)** — 차량을 리프트에 올린 상태에서 can_guard 로 0x210 을 보내 기본 명령이 먹히는지
+   확인한다(아래 "C. 리프트 송신 시험"). 계획·근거: `docs/2026-10-06_a1_dbc_update_and_lift_plan.md`.
 
-**내일 우리 PC는 끝까지 듣기만 한다(listen-only).** 송신은 실차 프로토콜 전환(노션 09번)이 끝난 뒤의 일이다.
+**송신은 C단계에서만, 전제 조건을 전부 통과한 뒤에만 한다.** 그 외 시간은 끝까지 listen-only.
+
+> ⚠️ **2026-10-07 실차 결과로 바뀐 것 — 다음 실차 전에 반드시 읽을 것**
+> 1. **0x210 조향 배율은 업체 DBC 의 ×0.1 이 맞다**(raw +80/+100 → 위치 +8.8/+11.0°). 10-06 의 "×1" 판단은 틀렸다.
+>    코드를 고쳐서 **can_guard·lift_cmd·lift_tx 의 조향 숫자는 이제 진짜 도(°)** 다 — 10-07 현장에서 쓰던
+>    `steer 100`(raw 100) 은 이제 **`steer 10`**, `--steer-limit-deg 150` 은 이제 **`--steer-limit-deg 15`** 다.
+>    옛 숫자를 그대로 넣으면 핸들이 10배로 돈다. lift_cmd·lift_tx 기본 한계는 ±15°(10-07 에 시험한 최대).
+> 2. **원격조종 메시지는 0x156/0x157**(EAIT_Control_01/02 형식, 10 ms). 0x210 보다 ID 가 낮아 버스 중재에서 이기고,
+>    차량도 0x156 의 EPS_En/ACC_En 이 1 이면 원격을 우선한다(녹화: En=1 → 차량 auto 111 이 약 20 ms 안에,
+>    0x157 감속 −3.0 m/s² → 브레이크 위치 10.0). 원격 유닛은 켜져 있으면 En=0 으로 계속 보낸다 — 이건 정상.
+> 3. **대회측 확인: 강제 종료 시 자동 브레이크**가 걸린다(실차에서 아직 직접 재 보지 않음 — C6 에서 확인).
+>    반면 **0x210 만 끊기면 차량은 auto 를 풀지 않는다**(10-07: 59.9초 동안 auto 111 유지) → can_guard 를 끌 때는
+>    lift_cmd 에서 `auto off` 를 먼저 보낸다.
+> 4. 브레이크 위치 ≈ 명령 % ÷ 10(20 % → 1.9, 50 % → 5.0). 0x201 바퀴 속도는 10-07 내내 0(미해결).
+> 현장 디코드·코드는 `DBC/A1_dbc_fixed.dbc`(업체 DBC 에서 0x200 `steer_is_auto` 배율 오타 1곳만 고친 사본) 기준.
+> 10-07 결과 전체: `~/a1_race_capture/vehicle_20261007/summary/findings.md`, 요약 도구 `tools/race_day/summarize_session.py`.
+
+### CAN 장치 — PEAK(기본) 또는 Kvaser
+| | PEAK PCAN-PCIe FD(내장) | Kvaser Leaf v3(USB) |
+|---|---|---|
+| 이 PC 에서 보이는 이름 | `can0`, `can1`(SocketCAN) | CANlib 채널 `0`, `1`… — **SocketCAN 이 아님**(6.8 커널 `kvaser_usb` 미지원, 0x0117) |
+| 드라이버 | 커널 내장 | `sudo bash tools/kvaser/install_kvaser.sh`(1회) |
+| 이 매뉴얼의 명령 | 그대로 | **미러를 먼저 띄우고 `can0` → `kv0`** 로 바꿔 쓴다(아래 각 단계의 "Kvaser:" 줄). 상세: `tools/kvaser/README.md` |
+
+차량 커넥터·케이블이 Kvaser 기준이 아니면 PEAK 를 기본으로 쓴다(검증·리허설이 더 많이 된 경로).
 
 ---
 
@@ -22,14 +49,57 @@
 | 0:15 | 15 | ★ 1단계 종단 측정 → 연결 → listen-only → 비트레이트 | PC |
 | 0:30 | 5 | ★ 2단계 녹화 시작 + S0 기준선(1분) + 주기 측정 | PC |
 | 0:35 | 15 | ★ A-1 원격 판정 T1~T3 | PC + 대회 측 |
-| 0:50 | 90 | 갈래별 실험 — **A-직결**(아래 표) 또는 **A-비직결**. 질문 담당은 **동시에 B(DBC)** 진행 | 전원 |
-| 2:20 | 20 | ☆ 남은 질문(V4~V8, R4~R6, 규정) + 못 한 시나리오 보충 | 질문 담당 |
+| 0:50 | 70 | 갈래별 실험 — **A-직결**(★ 시나리오 위주, ☆는 시간 될 때) 또는 **A-비직결**. 질문 담당은 **동시에 B(DBC 검증)** | 전원 |
+| 2:00 | 25 | ★ **C. 리프트 송신 시험** C0~C7 (업체 허락·리프트·E-stop 확인 후. 안 되면 건너뛰고 질문으로) | 전원 |
+| 2:25 | 15 | ☆ 남은 질문(V4~V8, R4~R6, 규정) + 못 한 시나리오 보충 | 질문 담당 |
 | 2:40 | 20 | ★ 3단계 마무리·백업 2부, answers.md 빈칸 확인 | PC |
 
+리프트 시험을 원격 판정보다 뒤에 두는 이유: 원격이 직결이면 원격이 0x210 을 보내므로 **원격을 끈 뒤에만** 우리가
+송신할 수 있다(can_guard 가 다른 0x210 송신자를 보면 시작을 거부한다). 원격 데이터를 먼저 다 받고 끈다.
+
 **인원 2명 권장**: PC 담당(녹화·메모 `m`·cansniffer 관찰) / 질문 담당(대회 측·업체 대응, `answers.md` 작성,
-사진). 1명이면 B(DBC)는 실험 중 대기 시간에 끼워 넣는다.
+사진). 1명이면 B(DBC 검증)는 실험 중 대기 시간에 끼워 넣는다 — B-1 은 S0 기준선 녹화 중에 같이 해도 된다.
 
 ---
+
+## 재부팅할 때마다 (PC 를 켤 때마다, 1분)
+
+재부팅하면 사라지는 것만 다시 만든다. 나머지(`vcan0`, RT 튜닝, Leaf v3 드라이버 자동 로드)는 부팅 때 저절로 된다.
+
+```bash
+# ① Kvaser 를 쓸 때만 — kv0 다시 만들기 (재부팅하면 사라짐. 없으면 미러가 시작 즉시 종료 → CAN 로그가 안 남는다)
+sudo ip link add dev kv0 type vcan 2>/dev/null; sudo ip link set kv0 up
+ip -br link show kv0                                      # 상태가 UP 또는 UNKNOWN 이면 OK
+
+# ② Kvaser 리허설을 돌릴 때만 — 가상 채널 모듈 (부팅 때 자동 로드 안 됨. 실제 Leaf v3 는 꽂으면 자동)
+sudo modprobe kvvirtualcan
+
+# ③ 확인 (아무것도 안 바꿈)
+ip -br link show vcan0                                    # 리허설용 가상 버스 — 부팅 때 자동 생성
+bash ~/git/A1-BSW/tools/kvaser/install_kvaser.sh check    # Kvaser 를 쓸 때: libcanlib 설치됨, 채널 목록
+```
+
+| 재부팅 후 | 할 일 |
+|---|---|
+| `kv0` | **사라짐 → ①** (Kvaser 를 쓸 때만) |
+| Kvaser 가상 채널(`kvvirtualcan`) | **자동 로드 안 됨 → ②** (리허설 때만) |
+| `can0`/`can1` 비트레이트·listen-only | 사라짐 → 매뉴얼 **1단계**에서 다시 설정(현장 절차에 이미 있음) |
+| 터미널의 `D`·`m` | 터미널마다 사라짐 → "현장 폴더·메모 명령" 세 줄을 **새 터미널마다** 붙여 넣기 |
+| `vcan0`, RT 튜닝(`a1-bsw-rt-tune.service`), Leaf v3 드라이버(`mhydra`) | 자동 — 할 일 없음 |
+
+PEAK 카드만 쓴다면 ①·② 는 필요 없다.
+
+## 아침 확인 (출발 전 5분, 이 PC에서)
+
+어젯밤 만든 도구가 전부 정상인지 한 번에 확인한다. 전부 vcan0(가상 버스)에서 돌고 실차와 무관하다.
+```bash
+cd ~/git/A1-BSW
+python3 -m pytest -q -p no:cacheprovider safety/can_guard/test tools/race_day/test_lift_tx.py   # 유닛테스트
+bash tools/race_day/rehearse_lift_guard.sh      # C단계 리허설(can_guard + lift_cmd), 약 1분 30초
+bash tools/race_day/rehearse_lift_tx.sh         # 비상용 lift_tx 리허설, 약 1분
+bash tools/kvaser/rehearse_kvaser.sh            # (Kvaser 를 쓸 때만) CANlib 가상 채널 리허설, 약 40초
+```
+마지막 줄이 각각 `PASS n / FAIL 0` 이면 OK. FAIL 이 있으면 **C단계는 하지 말고** 듣기만 한다.
 
 ## 출발 전 (오늘 밤)
 
@@ -39,6 +109,8 @@
       3번 GND** — PEAK 카드 매뉴얼로 재확인). 차량 하네스 쪽 모양은 모르므로 **브레이크아웃(나사 단자) DB9**과
       점퍼선
 - [ ] 120Ω 저항 1~2개
+- [ ] (Kvaser 를 쓸 경우) Kvaser Leaf v3 + 케이블, 드라이버 설치 확인 `bash tools/kvaser/install_kvaser.sh check`,
+      재부팅했으면 위 "재부팅할 때마다" ① 실행
 - [ ] USB 메모리 2개, 휴대폰(사진·시각 확인)
 - [ ] PC 전원 방안(차량 12V로는 직접 못 켬 — 업체 콘센트/인버터 확인)
 - [ ] **이 매뉴얼의 시간표·S 시나리오 표, `answers_template.md` 출력본**(대회 측 조작자에게 시나리오 표를
@@ -83,14 +155,14 @@ m(){ echo "$(date +%s.%N) $(date +%H:%M:%S) $*" | tee -a "$D/notes.txt"; }
 ### 업체 — CAN/DBC
 | # | | 질문 |
 |---|---|---|
-| V1 | ★ | **DBC 파일을 줄 수 있나? 반출 가능한가?** (갈래 B1 / B2 / B3 결정) |
-| V2 | ★ | 비트레이트, classic CAN인지 CAN-FD인지, 종단저항 위치 |
-| V3 | ★ | 명령 메시지(0x210) 스케일·단위 — 조향(deg? ×0.1?), 브레이크·가속(%? 0–100?) |
-| V4 | ☆ | is_auto 비트(지금 관측값 항상 0x07)의 각 비트 의미 |
+| V1 | ★ | 받은 `A1_dbc.dbc` 가 **이 차량의 최신 버전인가?** 더 새 버전·변경 이력·신호 설명 문서가 있나? |
+| V2 | ★ | 비트레이트(DBC 에 없음), classic CAN인지 CAN-FD인지, 종단저항 위치 |
+| V3 | ☆ | ~~0x210 조향 배율~~ → **10-07 해결: ×0.1 맞음**. 남은 것: 브레이크·가속 % 의 실제 의미(브레이크 위치 = 명령 ÷ 10 은 확인), 0 근처 조향 불감대·오프셋(약 +1°) |
+| V4 | ☆ | auto 비트(0x210 bit40~42, 0x200 bit32~34)를 켜는 데 다른 조건(키·스위치·모드)이 있나? 0 을 보내면 즉시 수동? |
 | V5 | ☆ | 명령이 끊기면 몇 ms 뒤 무엇을 하나? alive counter가 필요한가? 범위·변화율 검증을 하나? |
-| V6 | ☆ | 0x004, 0x204는 무엇인가? |
+| V6 | ☆ | DBC 에 없는 0x004·0x204 는 무엇인가? SYS 계열(0x100·0x110~0x114·0x301)은 어느 버스에 있나, 0x301 은 언제 쓰나? |
 | V7 | ☆ | KF-1600 출력 설정 변경 가능한가? — 지금 로그는 **1 Hz, 위치·속도(GGA/VTG)뿐**이라 제어 모델에 부족. 10 Hz 이상 + 자세/각속도 문장 요청. 보레이트 |
-| V8 | ☆ | (EAIT DBC를 보여 주며) 이 차량과 맞는 버전인가? 방향지시등·레이더는? |
+| V8 | ☆ | 방향지시등·AEB·레이더 — A1 DBC 에 없는데 이 차량엔 없는 건가, 다른 버스에 있나? |
 
 ---
 
@@ -122,7 +194,7 @@ sudo ip link set can0 up
 ip -details link show can0 | grep -o 'LISTEN-ONLY'      # 반드시 출력돼야 함. 없으면 즉시 down
 candump can0                                             # 확인 후 Ctrl+C
 ```
-순서: `500000`(V2 답 / EAIT 스펙) → `250000` → `1000000` → `125000`. 한 값당 30초 이상 쓰지 않는다.
+순서: `500000`(V2 답 / 9월 스펙 PDF §5.B) → `250000` → `1000000` → `125000`. 한 값당 30초 이상 쓰지 않는다.
 
 **정상 판단**: `0x200` 또는 `0x201`이 계속(초당 수십 개) 들어온다.
 ⚠️ `0x210`(명령)은 **누군가 보내고 있을 때만** 보인다 — 원격이 꺼져 있으면 없어도 정상.
@@ -138,6 +210,13 @@ candump can0                                             # 확인 후 Ctrl+C
 
 확정되면 **끝까지 listen-only 그대로.**
 
+**Kvaser:** `ip link` 대신 미러를 silent 모드로 띄운다(터미널 0, 계속 둔다). 1초마다 "프레임 n, 에러프레임 m" 이 찍힌다 —
+프레임이 0 이고 에러만 늘면 비트레이트가 틀린 것 → Ctrl+C 후 다음 값으로.
+```bash
+python3 ~/git/A1-BSW/tools/kvaser/kvaser_mirror.py --channel 0 --bitrate 500000 --listen-only --log "$D/kvaser_ch0.log"
+```
+이후 이 매뉴얼의 `candump`·`cansniffer`·cantools 명령은 `can0` 을 **`kv0`** 로 바꿔 그대로 쓴다.
+
 ---
 
 ## 2. 녹화 시작 + 기준선 (5분)
@@ -148,6 +227,7 @@ candump can0                                             # 확인 후 Ctrl+C
 ```bash
 cd ~/a1_race_capture/vehicle_$(date +%Y%m%d)
 candump -l can0            # can1 도 연결했으면: candump -l can0 can1
+                           # Kvaser: 원본은 미러의 --log 가 기록 중. 2차로 candump -l kv0
 ```
 
 ### 터미널 2 — 메모 + 실시간 확인
@@ -160,7 +240,7 @@ m "녹화 시작, can0 500k listen-only"
 ### 실시간 확인 도구
 ```bash
 # ID별 개수 (10초 세서 ÷10 = Hz, ÷ 대신 주기 = 10000/개수 ms)
-timeout 10 candump can0 | awk '{print $2}' | sort | uniq -c
+timeout --foreground 10 candump can0 | awk '{print $2}' | sort | uniq -c
 
 # 조작할 때 어떤 ID의 어떤 바이트가 바뀌나 (바뀐 바이트가 색으로 표시)
 cansniffer -c can0          # 끝내려면 Ctrl+C
@@ -176,6 +256,8 @@ cansniffer -c can0          # 끝내려면 Ctrl+C
 ### 꼭 지킬 것
 - **차나 PC 전원을 끄기 전에 터미널 1에서 Ctrl+C.** candump는 버퍼에 모았다가 쓰기 때문에 강제로 꺼지면
   마지막 부분이 사라진다(실험으로 확인).
+- `timeout` 으로 candump 를 끊어 파이프로 집계할 때는 **반드시 `timeout --foreground`**. 빼면 시간이 다 됐을 때
+  `sort`·`uniq` 까지 같이 죽어 **아무것도 안 나온다**(10-07 확인 — "트래픽이 없다"로 오판하기 쉽다).
 - 내일은 `collect.sh`를 쓰지 않는다 — LTE 모뎀 포트를 GPS로 착각해 읽는 문제, sudo 실행 시 저장 위치가
   `/root`로 바뀌는 문제가 아직 안 고쳐졌다.
 
@@ -198,12 +280,11 @@ cansniffer -c can0          # 끝내려면 Ctrl+C
 | O | X | 원격이 우리가 못 듣는 곳(다른 버스·게이트웨이 뒤)으로 명령 | can1·다른 커넥터로 옮겨 듣기(5분 제한), 업체에 배선도 요청 → 보이면 A-직결, 아니면 A-비직결 |
 | X | — | **비직결** | **A-비직결** |
 
-변하는 ID가 0x210이면 `m "원격 명령 ID = 0x210"` — 9/17 KF-1600 로그의 0x210 송신자가 이 원격 시스템이었을
-가능성이 높다.
+10-07 결과: 원격 명령 ID 는 **0x156/0x157**(0x210 아님). 0x210 에 다른 송신자가 보이면 정체를 메모한다.
 
 ---
 
-## A-직결 — 주행 로그 + 체크리스트 확인 (90분)
+## A-직결 — 주행 로그 + 체크리스트 확인 (70분)
 
 대회 측 조작자에게 아래 표를 보여 주며 순서대로 부탁한다. **정지 상태 시험을 먼저**(안전하고 빠름),
 주행 시험은 공간이 있을 때만. 각 시나리오의 시작·끝에 `m`.
@@ -234,7 +315,7 @@ cansniffer -c can0          # 끝내려면 Ctrl+C
 
 ---
 
-## A-비직결 — 원격 인터페이스 기록 + 수동 역추적 (90분)
+## A-비직결 — 원격 인터페이스 기록 + 수동 역추적 (70분)
 
 오늘은 **연결 방식과 데이터 형식만** 확보한다. 우리 PC가 대신 CAN으로 보내는 건 can_guard 실차 전환 후.
 
@@ -242,7 +323,7 @@ cansniffer -c can0          # 끝내려면 Ctrl+C
 |---|---|---|
 | ★ | 20 | 원격이 PC에 붙는 방식 확인·기록(아래 표) + 대회 측 연동 문서·샘플 코드 요청 |
 | ★ | 30 | 사람이 직접 조작하며 차량 메시지 역추적 — S1(핸들 손으로), S3(페달), S6②(키·모드 전환), 가능하면 S8(수동 주행) |
-| ★ | 20 | 업체에 0x210 형식(V3·V4·V5) 집중 질문 — 오늘 명령 메시지를 관측할 방법이 없으므로 |
+| ★ | 20 | 업체에 V4·V5 집중 질문(조향 배율 V3 는 10-07 에 해결) |
 | ☆ | 20 | 업체가 자기 장비로 차를 움직여 줄 수 있으면 그동안 녹화(0x210 관측 기회) |
 
 | 원격이 PC에 붙는 방식 | 확인 | 기록 |
@@ -257,44 +338,151 @@ cansniffer -c can0          # 끝내려면 Ctrl+C
 
 ---
 
-## B. DBC 상황별 (질문 담당이 A와 동시에)
+## B. DBC 검증 (질문 담당이 A와 동시에, 약 20분)
 
-### B1. DBC를 받았다 (10분)
+10-06 에 업체 DBC 를 받았다(`DBC/A1_dbc.dbc`). 10-07 녹화(89만 프레임)와 대조해 아는 것
+(최종 DBC 이전인 9/17 로그는 참고하지 않는다):
+- 0x200·0x201·0x210 비트 배치는 10-07 녹화 45만여 프레임과 **디코드 오류 0, 범위 위반 0, 정의 밖 비트 0**
+- 0x210 `steer_command` 배율 ×0.1 은 **맞음**(10-07 실차 확정 — 10-06 의 ×1 판단은 오류), 0x200 `steer_is_auto` 배율 오타
+- DBC 에 **없는 것**: 원격 0x156·0x157(대회측 정의 필요), 비트레이트(실측 500 kbps), 주기, AEB·방향지시등
+- DBC 에 **있지만 10-07 버스엔 없는 것**: SYS 계열 0x100·0x110~0x114·0x301 → 다른 버스로 추정. **0x301(엔코더 설정)은 절대 송신 금지**
+
+그래서 현장에서는 "확보"가 아니라 **"오늘 버스에서도 맞는지 + 업체 확인"**만 하면 된다.
+현장 디코드는 항상 **수정본** 으로: `F=~/git/A1-BSW/DBC/A1_dbc_fixed.dbc`
+
+### B-1. 오늘 버스와 대조 (5분, S0 기준선 녹화 중에 같이)
 ```bash
-mkdir -p "$D/dbc" && cp <받은파일>.dbc "$D/dbc/"           # USB에도 즉시 한 부 더
-python3 -m cantools dump "$D/dbc/<파일>.dbc" | less          # 메시지·신호 목록
-grep -iE 'baud|bitrate' "$D/dbc/<파일>.dbc"                   # 비트레이트 속성
-```
-그 자리에서 실시간 대조:
-```bash
-candump can0 | python3 -m cantools decode --single-line "$D/dbc/<파일>.dbc"
-# DBC에 없는 ID 목록(있으면 업체에 질문)
-timeout 10 candump can0 | python3 -m cantools decode "$D/dbc/<파일>.dbc" \
+F=~/git/A1-BSW/DBC/A1_dbc_fixed.dbc
+# (1) DBC 에 없는 ID 목록 — 0x004·0x204 외에 새 ID 가 있으면 사진·메모 후 업체 질문
+timeout --foreground 10 candump can0 | python3 -m cantools decode "$F" \
   | grep -o 'Unknown frame id [0-9]* (0x[0-9a-f]*)' | sort | uniq -c
+# (2) 해석값이 말이 되는지 — 정지·핸들 중앙에서 조향≈0, 속도 0, 카운터 증가
+candump can0 | python3 -m cantools decode --single-line "$F" | grep -E 'USER_control_info|USER_right_wheel' | head -20
+# (3) SYS 계열이 이 단자에 보이나(0x100·0x110~0x114·0x301) — 보이면 이 버스가 차량 내부 버스일 수 있다
+timeout --foreground 5 candump can0 | awk '{print $2}' | grep -E '^(100|11[0-4]|301)$' | sort | uniq -c
 ```
-확인할 것: 핸들 중앙일 때 조향 ≈ 0, 정지 시 속도 = 0, 카운터가 1씩 증가, 값이 물리적으로 말이 되는지.
-받은 DBC가 우리 역추적(0x200 / 0x201 / 0x210, 노션 09번)과 같은지도 메모.
-→ B1이면 V3·V4·V6 질문은 DBC로 대부분 답이 나오니 생략하고 V5(타임아웃)·V7에 시간을 쓴다.
+| 결과 | 의미 | 할 일 |
+|---|---|---|
+| Unknown 이 0x156·0x157(원격) 뿐, 값 정상 | 10-07 과 같은 버스·같은 프로토콜 | 그대로 진행 |
+| 새 Unknown ID 가 있음 | 10-07 이후 바뀌었거나 다른 장치 추가 | ID·주기 메모 → 업체·대회 측 질문(R2·V1) |
+| 0x200/0x201 값이 이상(정지인데 속도≠0 등) | 버전이 다르거나 다른 차량 | **C단계 보류**, 업체에 최신 DBC 요청 |
+| SYS 계열이 보임 | 우리 PC 가 차량 내부 버스에 붙어 있음 | 단자·하네스 확인(사용자용 버스로 옮겨야 할 수 있음), **C단계 보류** |
 
-### B2. 파일은 못 받고 문서·화면만 보여 준다 (20분)
-- 사진 촬영 허락을 먼저 구한다.
-- 안 되면 신호표를 받아 적는다. 메시지마다: **ID, 주기, 신호 이름, 시작 비트, 길이, 바이트 순서(인텔/모토롤라),
-  부호, 배율, 오프셋, 단위, 범위.**
-- 우선순위: 0x210(명령) > 0x200·0x201(상태) > 나머지.
+### B-2. 조향 배율 확인 (★ 가장 중요, A-직결이면 S1 에서 / C단계면 C3 에서)
+**10-07 에 판정 끝: 위치 ≈ 명령 raw × 0.1 → 업체 DBC 가 맞다.** 다음 실차에서는 재확인만 한다(명령 도 ≈ 위치 도, 약 +1° 오차).
+```bash
+candump can0 | python3 -m cantools decode --single-line "$F" | grep -E 'USER_control_command|USER_control_info'
+```
+원격이 0x210 을 보내는 A-직결이면 S1(조향 좌끝→우끝) 동안 바로 판정된다. 결과와 업체 답(V3)을 `answers.md` 에 기록.
+**위치가 명령의 10배 또는 1/10 이면 C단계를 멈춘다**(코드는 ×0.1 로 인코딩한다 — 집에서 수정 후 재시험).
 
-### B3. 아무것도 못 받는다 (A의 시나리오 시간 안에서)
-- 출발점은 9/17 로그로 만든 가설(노션 09번). 오늘 로그에서도 같은지 확인한다.
-  - 0x200: 조향 위치(int16 ×0.1), 브레이크 위치, is_auto, 카운터 3개
-  - 0x201: 바퀴 속도·rpm(12비트 묶음 2개), 카운터 2개
-  - 0x210: 조향·브레이크·가속 명령, is_auto
-- S1~S6 동안 `cansniffer -c can0`을 켜 두고 바이트 변화 위치를 본다.
-- 최소한 V2·V3·V5는 말로라도 받아 온다.
+### B-3. 업체에 물어볼 것 (V1·V3·V4·V6·V8, 질문 담당)
+- 더 새 DBC·변경 이력·신호 설명 문서가 있으면 **파일로 받기**(USB 로 바로 복사 → `$D/dbc/`, 원본 이름 그대로)
+- 받은 게 지금 것과 다르면: `diff ~/git/A1-BSW/DBC/A1_dbc.dbc "$D/dbc/<새 파일>"` 로 차이만 메모하고, 위 B-1 을
+  새 파일로 다시 돌린다. 코드 반영은 집에 와서(현장에서 코드 수정 금지)
 
-### 가장 위험한 조합
-**A-비직결 + B3**이면 명령 메시지 정보가 하나도 없다 → 업체에 **0x210 형식 하나만이라도**(바이트 위치·단위)
-요청하는 것을 최우선으로.
+### 혹시 업체가 "그 DBC 말고 다른 프로토콜을 쓴다"고 하면
+- 사진 촬영 허락 → 신호표(ID, 주기, 시작 비트, 길이, 바이트 순서, 부호, 배율, 오프셋, 단위, 범위)를 받아 온다
+- **C단계는 하지 않는다**(우리 코드는 지금 DBC 기준). S1~S6 동안 `cansniffer -c can0` 로 바이트 변화만 기록
 
 ---
+
+## C. 리프트 송신 시험 (25분) — can_guard 로 0x210 송신
+
+우리 PC 가 처음으로 차량에 명령을 보내는 단계. 구조: `lift_cmd.py`(사람이 한 줄 명령 → 가짜 제어 노드 + 가짜 인지
+하트비트) → 공유메모리 → **can_guard**(상태머신·한계·안전 동작) → 0x210 20 ms → 차량. lift_cmd 는 버스에
+아무것도 보내지 않는다 — 차로 나가는 프레임은 전부 can_guard 가 만든다.
+
+### 전제 조건 (하나라도 X 면 송신하지 않는다 — `answers.md` C절에 체크)
+- [ ] 아침 확인 리허설 FAIL 0
+- [ ] **B-1 대조 정상**(값 이상 없음, SYS 계열 안 보임) — 아니면 C단계 보류
+- [ ] **업체 송신 허락**(누가, 몇 시)
+- [ ] 구동륜이 공중(리프트), 차량 주변 사람 없음
+- [ ] 업체 담당 입회, **E-stop 위치와 누를 사람** 정함
+- [ ] 원격조종 송신기 꺼짐(다른 0x210 송신자 없음 — C0 에서 자동 확인)
+- [ ] 비트레이트 확정, 녹화(`candump -l`) 중, `m` 준비
+
+### C0. 듣기 상태에서 확인 (2분)
+```bash
+m "C0 시작"
+timeout --foreground 3 candump can0 | awk '{print $2}' | sort | uniq -c     # 210 이 없어야 함. 200·201 은 있어야 함
+```
+`210` 이 보이면 누가 보내는지 확인하고 끌 때까지 진행하지 않는다.
+
+### C1. listen-only 해제 + can_guard 시작 (3분)
+```bash
+m "C1 listen-only 해제"
+sudo ip link set can0 down
+sudo ip link set can0 type can bitrate <확정값> listen-only off
+sudo ip link set can0 up
+ip -details link show can0 | grep -o 'LISTEN-ONLY' || echo "정상 모드 OK"
+
+# 터미널 3 — can_guard (리프트 한계, 1초마다 상태 표시). 이 터미널이 차로 나가는 유일한 송신자.
+cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/can_guard.py --channel can0 \
+    --steer-limit-deg 15 --brake-limit-pct 60 --acc-limit-pct 10 --status-interval-s 1 2>&1 | tee -a can_guard.log
+```
+- 시작하면 1초 동안 듣고 **다른 0x210 이 있으면 스스로 거부**(종료 코드 3)한다.
+- 그 뒤 `INIT` 상태로 **auto 0·명령 0** 을 20 ms 마다 보낸다 — 차량은 반응이 없어야 한다.
+- 확인: `ip -details -statistics link show can0` 의 `berr-counter`·state 가 그대로(ERROR-ACTIVE)인지, 1분 뒤 다시.
+
+**Kvaser:** listen-only 해제 = 미러를 silent 없이 다시 띄우는 것(silent 핸들이 남아 있으면 송신이 막힐 수 있다).
+```bash
+# 터미널 0: 미러 Ctrl+C →
+python3 ~/git/A1-BSW/tools/kvaser/kvaser_mirror.py --channel 0 --bitrate <확정값> --log "$D/kvaser_ch0_c.log"
+# 터미널 3: can_guard
+cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/can_guard.py --interface kvaser --channel 0 --bitrate <확정값> \
+    --steer-limit-deg 15 --brake-limit-pct 60 --acc-limit-pct 10 --status-interval-s 1 2>&1 | tee -a can_guard.log
+```
+버스 상태는 미러의 1초 줄(에러프레임 수)로 본다.
+
+### C2~C5. 명령 (12분)
+```bash
+# 터미널 4 — lift_cmd (가짜 제어 노드). 명령은 한 줄씩. 여러 줄 붙여넣어도 됨.
+cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/lift_cmd.py --channel can0
+# Kvaser: ... lift_cmd.py --interface kvaser --channel 0 --bitrate <확정값>
+```
+| 단계 | 입력 | 확인 (can_guard 1초 상태 줄 또는 `status`) |
+|---|---|---|
+| C2 | `auto on` | 차량 0x200 auto 비트가 `111` 로, 핸들은 그대로 |
+| C3 | `steer 1` → `steer 0` → `steer -1` → `steer 0`, 이어서 ±5, ±10, ±15 (단위 °) | 차량 **조향 위치 ≈ 명령**(10-07: 8° → 8.8°, 10° → 11.0°, 63 % 응답 약 0.2초). 10배로 움직이면 즉시 `zero` |
+| C4 | `brake 20` → `brake 50` → `brake 0` | 브레이크 위치 ≈ 명령 ÷ 10 (10-07: 1.9 / 5.0 / 0) |
+| C5 | `acc 5` (2초 뒤 자동 0) → `acc 10` → `brake 20` | 바퀴 속도 상승·하강(0x201) |
+
+- 입력 한계는 조향 ±15°, 브레이크 60 %, 가속 10 % — 넘는 값은 **거부**(자르지 않음). can_guard 도 같은 한계로
+  한 번 더 자른다(이중).
+- **자동 원위치**: 가속 2초, 조향·브레이크 5초가 지나면 0. 계속 유지하려면 다시 입력.
+- 가속과 브레이크는 동시에 못 건다(브레이크 우선).
+- 단계마다 `m "C3 시작"` / `m "C3 끝"`, 숫자는 `answers.md` C절 표에.
+
+### C6. 안전 동작 (6분) — 체크리스트 §7.1·§9.1 B5·B6·P-6 를 실차에서 처음 확인
+| | 하는 것 | 기대 동작 |
+|---|---|---|
+| (a) | `steer 10` 건 상태에서 **lift_cmd 창에서 Ctrl+C** (제어 노드 죽음) | 50 ms 뒤 can_guard: 조향 10° 고정, 가속 0, 브레이크 30 % 까지 서서히 → STOPPED(바퀴가 서 있으면 바로 STOPPED). **STOPPED 는 can_guard 재시작으로만 풀림** |
+| (b) | can_guard 재시작(Ctrl+C 후 C1 명령 다시) → lift_cmd 재시작 → `auto on` → `perception off` | 0.5초 뒤 DEGRADED(또는 정지 상태면 바로 STOPPED), 같은 안전 동작 |
+| (c) | can_guard 재시작 → `auto on`, `steer 10`, `brake 10` → **다른 터미널에서 `pkill -9 -f can_guard.py`** | 우리 0x210 이 끊긴다 → 10-07 우연 관측: **타임아웃 없음, auto 유지(≥60초)**. 대회측은 "강제 종료 시 자동 브레이크"라고 함 → 브레이크 위치가 오르는지, 몇 초 뒤인지 확인 |
+| (d) | (업체 동의 시) can_guard 송신 중 **E-stop** | can_guard 로그에 "송신 실패"가 뜨면 전원 차단형, 안 뜨면 차량 쪽 처리. 버스에 새 ID 가 뜨는지 |
+
+### C7. 복귀 (2분)
+```bash
+# lift_cmd 에서: auto off → (1초 기다림) → q        ← auto 0 을 먼저 보내 수동으로 돌려놓고 끈다
+# can_guard 창: Ctrl+C
+sudo ip link set can0 down
+sudo ip link set can0 type can bitrate <확정값> listen-only on
+sudo ip link set can0 up
+ip -details link show can0 | grep -o 'LISTEN-ONLY'      # 반드시 출력
+m "C7 listen-only 복귀"
+# Kvaser: 미러 Ctrl+C → --listen-only 붙여 다시 실행
+```
+
+### 문제가 생기면
+| 증상 | 할 일 |
+|---|---|
+| can_guard 가 "다른 0x210 송신자" 로 시작 거부 | 원격조종 송신기 끄기. 그래도 보이면 업체에 문의, C단계 중단 |
+| 송신 실패 / berr-counter 증가 / bus-off | 비트레이트·배선 재확인. can_guard 중단 후 listen-only 복귀 |
+| `auto on` 해도 0x200 auto 비트가 안 바뀜 | 차량 쪽 다른 조건(키·스위치·모드)이 있는지 업체에 질문 — 우리 쪽 강제 시도 금지 |
+| 조향이 명령의 10배 등 크기가 다르게 움직임 | 즉시 `zero` → `auto off`. 실제 배율을 `answers.md` 에 기록하고 중단 |
+| can_guard 에 문제가 있을 때(비상용) | `tools/race_day/lift_tx.py --channel can0`(Kvaser: `--interface kvaser --channel 0 --bitrate <값>`) — 가드 없이 0x210 을 직접 보내는 단독 도구(같은 한계·자동 원위치·시작 전 점검, 상태머신 없음). **can_guard 와 동시에 띄우지 말 것** |
+| Kvaser 가 `listChannels` 에 안 보임 | `bash tools/kvaser/install_kvaser.sh check` — 모듈 미로드면 `sudo modprobe mhydra`. 그래도 안 되면 PEAK 로 전환 |
 
 ## 체크리스트 대응표 — 내일 무엇으로 확인하나
 
@@ -346,7 +534,7 @@ sudo cat /dev/ttyUSBx | while IFS= read -r l; do echo "$(date +%s.%N) $l"; done 
      candump-*.log      # CAN 원본
      notes.txt          # 시각 메모(S 시작·끝)
      answers.md         # 질문 답변·관측 기록
-     dbc/               # B1이면
+     dbc/               # 현장에서 새 DBC·문서를 받았으면
      gps.log            # 연결했으면
      remote.pcap 등      # A-비직결이면
    ```
@@ -358,9 +546,10 @@ sudo cat /dev/ttyUSBx | while IFS= read -r l; do echo "$(date +%s.%N) $l"; done 
 
 ## 하지 말 것
 
-- listen-only를 끄는 것(정상 모드로 버스에 붙는 것)
-- `can_guard.py` 실행 — 아직 옛 프로토콜(0x156/0x157)로 송신한다
-- `cansend` 등 어떤 송신도
+- C단계 밖에서 listen-only를 끄는 것(정상 모드로 버스에 붙는 것)
+- C단계 전제 조건을 다 채우기 전에 `can_guard.py` / `lift_tx.py` 실행
+- `cansend` 등 손으로 하는 송신, **SYS 계열(0x100·0x110~0x114·0x301) 송신** — 특히 0x301 은 엔코더 설정을 바꾼다
+- `can_guard.py` 와 `lift_tx.py` 동시 실행(둘 다 0x210 을 보낸다)
 - `collect.sh` — 2단계의 알려진 문제 때문
 - 녹화 중 PC 전원 강제 차단
 - S7a·S7b를 대회 측 동의 없이, 또는 주행 중에 하는 것
@@ -370,7 +559,7 @@ sudo cat /dev/ttyUSBx | while IFS= read -r l; do echo "$(date +%s.%N) $l"; done 
 ## 집에 와서 (분석 계획 — 내일 할 일 아님)
 
 1. `notes.txt`의 "S? 시작/끝"으로 로그를 시나리오별로 자른다.
-2. DBC(B1·B2) 또는 역추적 가설(B3)로 해석 → 전 프레임 검증(범위·연속성 위반 0).
+2. 수정본 DBC(또는 현장에서 받은 새 버전)로 해석 → 전 프레임 검증(범위·연속성 위반 0), B-2 배율 판정 확정.
 3. S7a에서 차량 fail-safe 시간 측정 → 체크리스트 §7.1·§7.4 잔여 위험 갱신.
 4. 제어 모델용 데이터셋 — 시나리오별, 일정 시간 간격으로 맞춘 표:
    시각, 조향 명령, 조향 위치, 브레이크 명령, 브레이크 위치, 가속 명령, 좌·우 바퀴 속도, GPS 위치·속도·방향, 모드

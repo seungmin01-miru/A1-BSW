@@ -3,7 +3,7 @@
 <package format="3">
   <name>a1_can_bridge</name>
   <version>0.0.0</version>
-  <description>A1-BSW Phase C — vcan0/can0 ↔ ROS2 브리지·디코더 (걷기골격: EAIT_INFO_SPD 슬라이스)</description>
+  <description>A1-BSW — CAN ↔ ROS2 상태 브리지 (실차 A1 DBC: 0x200/0x201/0x210)</description>
   <maintainer email="ailab@example.com">ailab</maintainer>
   <license>Apache-2.0</license>
 

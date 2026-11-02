@@ -1,8 +1,8 @@
 """
 Apply the RT execution recipe.
 
-sil/vcan/eait_tx.py 의 레시피(can_stack_development.md §5.A, 468행 "이것이 Phase C 노드의
-실행 조건이다")를 ROS2 노드에도 그대로 적용한다.
+이전 sil/vcan/eait_tx.py(2026-10-07 삭제, git 기록)의 레시피(can_stack_development.md §5.A,
+"이것이 Phase C 노드의 실행 조건이다")를 ROS2 노드에도 그대로 적용한다.
 
   1) 타이머 여유(timer slack) 1µs — 권한 불필요, 항상 적용. 기본 50µs 여유가 sleep 기반
      주기 편차의 대부분이었음(실측).
