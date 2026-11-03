@@ -115,9 +115,12 @@ def main():
         else:
             # Kvaser: 같은 채널의 다른 핸들(can_guard)이 보낸 0x210 을 보려면 로컬 TX 에코를 켜야 한다
             # (python-can kvaser 의 receive_own_messages). 이 도구는 송신하지 않는다.
+            # 11-03: 기본 2핸들 + 에코로 열면 같은 채널 can_guard 송신이 전부 실패(kvaser_mirror 와 같은 원인,
+            # measurements/2026-11-03_signal_audit/analysis/stage2_static.md) → 듣기만 하므로 핸들 1개.
             import kvaser_compat
             kvaser_compat.apply()
-            bus = can.Bus(channel=a.channel, interface='kvaser', bitrate=a.bitrate, receive_own_messages=True)
+            bus = can.Bus(channel=a.channel, interface='kvaser', bitrate=a.bitrate, receive_own_messages=True,
+                          single_handle=True)
         threading.Thread(target=rx_loop, args=(bus, status, last_tx, stop), daemon=True).start()
     w = threading.Thread(target=writer_loop, args=(ch, hb, cmd, perception_on, period, stop, log), daemon=True)
     w.start()
