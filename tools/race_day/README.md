@@ -1,4 +1,36 @@
-# tools/race_day — 대회장 데이터 수집 패키지
+# tools/race_day — 실차 테스트·데이터 수집 도구
+
+## ▶ 실차 테스트는 여기서 시작 (2026-10-07 기준)
+
+**절차는 전부 `VEHICLE_MANUAL.md` 한 문서를 위에서부터 따라간다.** 이 README 는 도구 목록·설계 설명이다.
+
+> 2026-10-26: 제어기를 실차에 붙이는 트랙 시험(표 측정·shadow·arm)은 [`tools/track_day/TRACK_MANUAL.md`](../track_day/TRACK_MANUAL.md).
+
+1. 출발 전·아침: `VEHICLE_MANUAL.md` "아침 확인" — 유닛테스트 + 리허설 2개가 `FAIL 0` 인지(가상 버스, 약 3분)
+2. 현장: 질문 → 연결 → **listen-only** 비트레이트 → `candump -l` 녹화 → 원격 판정 → (조건 충족 시) **C. 리프트 송신 시험**
+3. 기준 DBC 는 **`DBC/A1_dbc_fixed.dbc`** — 0x210 조향 배율은 업체 DBC 그대로 ×0.1(10-07 실차 확정). 도구의 조향 숫자는 도(°) 단위다(10-07 현장의 `steer 100` = 이제 `steer 10`).
+4. 녹화 정리: `python3 tools/race_day/summarize_session.py <녹화 폴더>` → `<폴더>/summary/`(summary.md·events.md·timeline.csv, 원격 0x156/0x157 해석 포함).
+   9월 EAIT DBC 는 2026-10-07 삭제.
+4. CAN 장치는 PEAK(`can0`, 기본) 또는 Kvaser Leaf v3(`tools/kvaser/README.md` — 미러로 `kv0` 를 만들어 같은 명령 사용).
+
+| 파일 | 역할 | 버스에 송신? |
+|---|---|---|
+| `VEHICLE_MANUAL.md` | 당일 절차서(시간표·질문·연결·녹화·원격 판정·DBC 갈래·리프트 송신 시험) | — |
+| `answers_template.md` | 현장 질문·관측 기록 양식(체크리스트 항목 번호 표기) | — |
+| `../../safety/can_guard/can_guard.py` | 차량으로 나가는 0x210 의 **유일한 송신자**(상태머신·한계·안전 동작) | ✅ C단계에서만 |
+| `../../safety/can_guard/lift_cmd.py` | 리프트 시험용 한 줄 명령 → can_guard(가짜 제어 노드 + 하트비트) | ❌ 듣기만 |
+| `lift_tx.py` | **비상용** — can_guard 없이 0x210 을 직접 보내는 단독 도구. can_guard 와 동시 실행 금지 | ✅ 비상시만 |
+| `rehearse_lift_guard.sh` / `rehearse_lift_tx.sh` | 위 두 경로를 vcan0 + 가짜 차량(`sil/vcan/fake_a1_vehicle.py`)으로 자동 리허설 | 가상 버스만 |
+| `../kvaser/install_kvaser.sh` | Kvaser Leaf v3 드라이버(linuxcan)·CANlib·Python canlib 설치(이 PC 안전판 — dkms 제거 안 함) | — |
+| `../kvaser/kvaser_mirror.py` | Kvaser(CANlib) → `kv0`(vcan) 복사 + 원본 기록. silent(listen-only) 지원 → 매뉴얼 명령을 `kv0` 로 그대로 사용 | ❌ |
+| `../kvaser/rehearse_kvaser.sh` | Kvaser 경로 리허설(CANlib 가상 채널, 장치 불필요) | 가상 채널만 |
+| `04_CAN.pdf`, `Practice_04_CAN.pdf` | 참고 자료 — CAN 일반 강의 / Kvaser 드라이버·CANlib 실습(실습의 `apt remove dkms` 는 이 PC 에서 금지, `tools/kvaser/README.md`) | — |
+| `a1_proto.py`, `test_lift_tx.py`, `testdata/` | 0x200/0x201/0x210 인코더·디코더, 테스트, 10-07 실차 프레임 샘플 | — |
+| `collect.sh`, `can_csv_logger.py` | 일괄 수집(아래 설명). ⚠️ **현재 실차일에는 쓰지 않는다** — 이 PC 의 `/dev/ttyUSB0~2`(LTE 모뎀)를 GPS 로 착각해 읽고, `sudo` 실행 시 저장 위치가 `/root` 로 바뀌는 문제가 미수정. 매뉴얼의 `candump -l` 직접 녹화를 쓴다 | ❌ |
+
+---
+
+## collect.sh — 일괄 수집 패키지 (위 ⚠️ 문제 수정 전까지 보류)
 
 대회장에서 실차를 인계받았을 때, 정확히 뭐가 돌고 있을지 모르는 상태에서도 **켜기만 하면** 원시 CAN·
 ROS2 토픽·can_guard 흔적·GPS/INS 시리얼·시스템 상태를 전부 모아 하나의 압축 파일로 남기는 도구.
@@ -7,7 +39,7 @@ ROS2 토픽·can_guard 흔적·GPS/INS 시리얼·시스템 상태를 전부 모
 > 실차 CAN 단자를 처음 연결하는 순간부터의 전체 절차(비트레이트 찾기 포함)는 **`VEHICLE_MANUAL.md`** 참고.
 > 이 문서는 `collect.sh` 자체의 사용법·설계만 다룬다.
 
-## 현장에서 할 일 (이게 전부)
+## 사용법 (문제 수정 후)
 
 ```bash
 sudo bash tools/race_day/collect.sh
@@ -92,7 +124,7 @@ python3 can_guard.py --channel can0 --cpu 8 --rt-priority 90 2>~/a1_race_capture
 ```bash
 # vcan0 로 리허설 — 아무 CAN 트래픽 없이도 안 죽는지, 끝나고 tar.gz 가 제대로 나오는지 확인
 sudo ip link show vcan0 || sudo bash ~/git/A1-BSW/sil/vcan/vcan_up.sh
-python3 ~/git/A1-BSW/sil/vcan/eait_tx.py --channel vcan0 &   # 트래픽 흘려주기(선택)
+python3 ~/git/A1-BSW/sil/vcan/fake_a1_vehicle.py --channel vcan0 &   # 가짜 실차 0x200/0x201 흘려주기(선택)
 sudo bash tools/race_day/collect.sh
 # 10초 정도 기다렸다가 Ctrl+C, 결과 tar.gz 를 풀어서 can/vcan0/candump-*.log 와 can/vcan0.csv 에 프레임이 찍혔는지 확인
 ```

@@ -6,7 +6,7 @@ IF=${1:-vcan0}
 command -v candump >/dev/null || { echo "can-utils 없음: sudo apt install can-utils"; exit 1; }
 ip link show "$IF" >/dev/null 2>&1 || { echo "$IF 없음: sudo bash vcan_up.sh"; exit 1; }
 
-FRAME="712#0102030405060708"          # 0x712 EAIT_INFO_SPD 자리, 임의 페이로드
+FRAME="201#0102030405060708"          # 0x201 USER_right_wheel_info 자리, 임의 페이로드
 OUT=$(mktemp)
 candump -n 1 -T 2000 "$IF" > "$OUT" &  # 프레임 1개 받거나 2초 지나면 종료
 sleep 0.3

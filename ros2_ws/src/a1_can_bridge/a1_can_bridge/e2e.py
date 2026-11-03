@@ -1,7 +1,7 @@
 """
 End-to-end Alive_Cnt continuity tracking (§2 category-C responsibility).
 
-EAIT 보드가 보내는 상태 메시지의 Alive_Cnt(0~255 롤오버 카운터) 연속성만 감지한다.
+실차가 보내는 상태 메시지의 live_counter(0~255 롤오버, 0x200 축별 3개·0x201 2개) 연속성만 감지한다.
 stale 타임아웃에 따른 safe-state 진입 판단은 이 계층의 일이 아니다 — §5.D 헬스 슈퍼바이저
 (Phase D, 아직 미착수)의 몫이다. 여기서는 "몇 프레임을 놓쳤는가"만 세어 /diagnostics 로 보고한다.
 """

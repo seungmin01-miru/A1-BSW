@@ -17,7 +17,7 @@ from protocol import Command, CommandChannel  # noqa: E402
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--cmd-shm', required=True)
-    ap.add_argument('--period', type=float, default=0.01)
+    ap.add_argument('--period', type=float, default=0.02)
     ap.add_argument('--duration', type=float, default=0.0, help='0=무한')
     a = ap.parse_args()
 
@@ -28,10 +28,9 @@ def main():
         while a.duration == 0 or time.monotonic() - t0 < a.duration:
             t = time.monotonic() - t0
             ch.write(Command(
-                eps_en=True, acc_en=True,
-                eps_cmd=30.0 * math.sin(2 * math.pi * 0.2 * t),
-                acc_cmd=0.5 * math.sin(2 * math.pi * 0.1 * t),
-                eps_speed=100,
+                steer_auto=True, brake_auto=True, acc_auto=True,
+                steer_cmd_deg=30.0 * math.sin(2 * math.pi * 0.2 * t),
+                acc_cmd_pct=5.0 + 5.0 * math.sin(2 * math.pi * 0.1 * t),   # 0~10 %, 브레이크 0
             ))
             time.sleep(a.period)
     except KeyboardInterrupt:

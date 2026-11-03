@@ -1,5 +1,8 @@
 # vcan 마일스톤 액션 보드 — Phase A 갱신분 (2026-09-12)
 
+> **2026-10-07 안내** — 이 문서는 작성 시점(EAIT DBC 시절) 기록이다. 실차는 A1 DBC(`DBC/A1_dbc_fixed.dbc`)를 쓰고 EAIT DBC 는
+> 저장소에서 삭제했다. 현재 상태는 `can_stack_development.md` 맨 위 "★ 현재 기준"과 루트 `README.md` 참고.
+
 > 보드의 해당 절을 아래 내용으로 **교체**한다. 측정치·근거의 원본은 `can_stack_development.md` §5.A (브랜치 `claude/ecstatic-keller-uhtbhe`, 커밋 `c200fdd`).
 
 ---

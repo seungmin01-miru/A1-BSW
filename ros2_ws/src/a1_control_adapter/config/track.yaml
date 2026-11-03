@@ -1,0 +1,36 @@
+# a1_control_adapter 트랙 설정 — 표는 전부 **잠정값**(10-07 리프트·10-08 주행 이미지 근거, docs/a1_vehicle_characteristics.md).
+# 트랙에서 tools/track_day/TRACK_MANUAL.md T1~T4 로 실측해 고친다. 고친 뒤엔 어댑터만 재시작하면 된다.
+a1_cmd_adapter:
+  ros__parameters:
+    can_guard_dir: ~/git/A1-BSW/safety/can_guard   # protocol.py 위치(구조체 정의 공유)
+    cmd_shm: a1_can_guard_cmd
+    hb_shm: a1_can_guard_perception_hb
+    period_s: 0.02              # 공유메모리 기록 주기 — can_guard 워치독 50 ms 의 2.5배 여유
+    stale_timeout_s: 0.15       # arm 중 제어기 입력이 이보다 오래 끊기면 고장 래치 → can_guard HOLDING
+    perception_heartbeat: true  # 인지 프로세스가 생기면 false
+
+    # ── 조향: 타이어각 → 핸들각 (T2 에서 실측). 좌우 비대칭이면 점을 더 넣는다. x 는 오름차순.
+    # 초기값 = 조향비 7.5 선형(10-08 이미지 판독: 핸들 150° ≈ 타이어 20°, 미확정)
+    steer_sign: 1.0             # T1: 제어기 +(좌회전)일 때 0x200 위치가 + 로 가면 1, − 면 -1
+    steer_map:
+      tire_deg:  [-20.0, 0.0, 20.0]
+      wheel_deg: [-150.0, 0.0, 150.0]
+    steer_wheel_limit_deg: 150.0     # DBC 명령 한계. can_guard --steer-limit-deg 와 같게
+    steer_rate_limit_deg_s: 120.0    # 핸들각 속도. 10-07 실측 액추에이터 최대 약 125 °/s
+
+    # ── 종방향: 목표 가감속 → 가속 % / 브레이크 % (T3·T4 에서 실측)
+    long_deadband_mps2: 0.1
+    # 가속: 미식별(0x201 바퀴속도 0). 10-08 최대 가속 1.33 m/s² 를 30 % 에 대응시킨 보수적 가정
+    accel_map:
+      accel_mps2: [0.1, 1.3]
+      acc_pct:    [0.0, 30.0]
+    acc_max_pct: 30.0                # T4 전까지 30 % 상한
+    # 브레이크: 10-08 이벤트 평균 감속(33~65 % → 0.4~1.7, 100 % → 최대 4.1 m/s²)을 부드럽게 이은 잠정 곡선
+    brake_map:
+      decel_mps2: [0.1, 1.0, 2.0, 3.0, 4.0]
+      brake_pct:  [0.0, 40.0, 70.0, 90.0, 100.0]
+    brake_max_pct: 100.0
+
+    # ── 입력 거부 한계(이 밖이면 제어기 고장으로 보고 버림 + arm 중이면 고장 래치)
+    input_accel_abs_mps2: 15.0
+    input_steer_tire_abs_deg: 45.0

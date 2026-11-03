@@ -1,4 +1,4 @@
-"""RT 실행 환경 적용 — sil/vcan/eait_tx.py 의 apply_rt_setup 과 같은 레시피를, can_guard 전용으로
+"""RT 실행 환경 적용 — 이전 sil/vcan/eait_tx.py(2026-10-07 삭제, git 기록)의 apply_rt_setup 과 같은 레시피를, can_guard 전용으로
 독립 구현한다(§5.D "최소 의존" 원칙 — 이 디렉터리는 이 저장소의 다른 어떤 부분도 import 하지 않는다).
 A-3(격리 코어+SCHED_FIFO+mlockall+timer slack)는 can_stack_development.md §5.C 재측정으로 raw SocketCAN
 경로에서 효과가 실측된 바로 그 레시피다 — can_guard 가 그 경로를 쓴다.
