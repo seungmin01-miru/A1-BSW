@@ -51,6 +51,11 @@ def main():
     signal.signal(signal.SIGINT, _on_signal)
 
     kw = {'bitrate': a.bitrate, 'receive_own_messages': True}
+    if a.interface == 'kvaser':
+        # 11-03: 이 핸들이 read/write 두 핸들(기본)로 열리고 LOCAL_TXACK 가 켜진 채 다른 핸들(can_guard)이 송신하면
+        # 송신이 전부 실패하고 버스가 에러프레임으로 덮였다(재현: measurements/2026-11-03_signal_audit/raw/notes.txt).
+        # single_handle=True 면 송신 성공·우리 0x210 도 기록됨(같은 날 단발 시험 (c)).
+        kw['single_handle'] = True
     if a.listen_only:
         kw['driver_mode'] = False   # python-can kvaser DRIVER_MODE_SILENT
     if a.interface == 'kvaser':
