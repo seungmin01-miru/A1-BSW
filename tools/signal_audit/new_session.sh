@@ -36,7 +36,7 @@ cat > "$D/raw/README.md" <<EOF
 
 끝나고 아래로 목록을 갱신한다:
 
-    cd "$D/raw" && sha256sum -- $(find . -type f \( -name '*.log' -o -name '*.mcap' -o -name '*.txt' \) | sort) | tee -a README.md
+    cd "$D/raw" && sha256sum -- \$(find . -type f \( -name '*.log' -o -name '*.mcap' -o -name '*.txt' \) | sort) | tee -a README.md
     du -sh "$D/raw"/* | tee -a README.md
 EOF
 
