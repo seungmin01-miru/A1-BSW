@@ -40,8 +40,8 @@ run() {  # run <이름> <명령...> — 종료 코드로 PASS/FAIL
 
 # ── 0. 준비 확인 ─────────────────────────────────────────
 ip -br link show vcan0 2>/dev/null | grep -q UP || { echo "vcan0 없음/DOWN → bash $HERE/setup_env.sh"; exit 2; }
-env -u PYTHONPATH $PY -c "import can, cantools, pytest" 2>/dev/null \
-  || { echo "$PY 에 python-can/cantools/pytest 없음 → bash $HERE/setup_env.sh (또는 PYTHON=<venv python>)"; exit 2; }
+env -u PYTHONPATH $PY -c "import can, cantools, pytest, yaml" 2>/dev/null \
+  || { echo "$PY 에 python-can/cantools/pytest/PyYAML 없음 → bash $HERE/setup_env.sh (또는 PYTHON=<venv python>)"; exit 2; }
 pgrep -f "safety/can_guard/can_guard.py" >/dev/null && { echo "can_guard 가 이미 실행 중(실차 세션?) — stop.sh 후 다시"; exit 2; }
 
 GUARD_ARGS=""
@@ -76,6 +76,9 @@ run sil_e_estop $PY sil_tests/e_estop.py --channel vcan0 --trials "$TRIALS" --gu
 # ── 3. 기존 회귀 P-1 / P-2 ───────────────────────────────
 run sil_p1 $PY sil_tests/p1_kill_control_node.py --channel vcan0
 run sil_p2 $PY sil_tests/p2_kill_perception.py --channel vcan0
+# ── 3b. 02 프로파일 생성기 (단위 + vcan 2회 재현성·0x210 일치) ──
+run unit_profile_lib $PY -m pytest "$REPO/bsw_test/common/scripts" -q
+run sil_02_profile $PY "$REPO/bsw_test/02_LON_profile/scripts/sil_profile.py" --channel vcan0 --out "$OUT/sil_02_profile"
 # ── 4. (선택) 트랙 리허설 — 어댑터 disarm 침묵 포함 ─────────
 if [ $TRACK = 1 ]; then
   if [ -f "$REPO/ros2_ws/install/setup.bash" ]; then

@@ -1,0 +1,10 @@
+# 02 실차 1회 확인 — 저속 사다리꼴 가속(생성기 자체가 맞게 도는지). 03/04/07 에 쓰기 전에 한 번.
+name: LON-PROF-01
+vars: {acc: 6}                 # 5 km/h 근처가 나오는 % (00 S1 에서 찾은 값)
+limits: {steer_deg: 15, brake_pct: 100, acc_pct: 10, max_speed_kph: 10}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: set, brake: 0, t: 0.5, label: 브레이크풀기}
+  - {type: trap, axis: acc, peak: $acc, up: 2, hold: 4, down: 2, label: 사다리꼴}
+  - {type: hold, t: 1}
+end: {brake: 100, ramp_s: 2.5}

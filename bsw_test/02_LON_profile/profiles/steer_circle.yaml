@@ -1,0 +1,12 @@
+# 05 최대 조향 / 07 원 — 정지 상태에서 핸들을 deg 까지 돌리고(60 °/s) → acc % 로 t 초 원선회 → 끝내기.
+# 좌 = +, 우 = −  (--var deg=-150). 속도는 개루프라 PC 가 상태줄 차속을 보고 acc 를 회차마다 조정.
+name: LAT-MAXSTEER-01
+vars: {deg: 150, acc: 6, t: 40, vmax: 10}
+limits: {steer_deg: 150, brake_pct: 100, acc_pct: $acc, max_speed_kph: $vmax}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: ramp, axis: steer, to: $deg, rate: 60, label: 조향돌리기}
+  - {type: hold, t: 3, label: 조향대기}
+  - {type: set, brake: 0, t: 0.3, label: 브레이크풀기}
+  - {type: step, axis: acc, to: $acc, t: $t, label: 원선회}
+end: {brake: 100, ramp_s: 2.5}

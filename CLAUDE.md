@@ -6,6 +6,7 @@
 | 근거 문서 | 내용 |
 |---|---|
 | [`bsw_test/FIELD_MANUAL.md`](bsw_test/FIELD_MANUAL.md) | **현장 매뉴얼** — 역할·안전·띄우기/끝내기·테스트별 입력 순서 |
+| [`bsw_test/FIELD_CHEATSHEET.txt`](bsw_test/FIELD_CHEATSHEET.txt) | 현장 메모장 — 입력 순서만(명령 + 한 줄 설명), `bsw_test/field_env.sh` 단축 명령 |
 | [`docs/a1_vehicle_characteristics.md`](docs/a1_vehicle_characteristics.md) | 지연·가감속·조향 범위, 어댑터 클램프 근거 |
 | [`docs/a1_todo.md`](docs/a1_todo.md) 0-1절 | 현장 검증 순위(관문 1~4) |
 | [`measurements/2026-11-03_signal_audit/`](measurements/2026-11-03_signal_audit/) | 11-03 실차 신호 검증(`results.md`, `limits.md`, `vendor_answers.md`) |
@@ -13,6 +14,9 @@
 | [`ros2_ws/src/a1_control_adapter/config/track.yaml`](ros2_ws/src/a1_control_adapter/config/track.yaml) | 변환표·부호·클램프 (테스트 결과로 갱신) |
 
 ---
+
+**기준 PC = 대회 차량 PC**(Ubuntu 22.04·ROS2 Humble·`~/git/A1-BSW`·시스템 `python3`·Kvaser Leaf 채널 0·격리 코어 8-15). 스크립트·매뉴얼 명령은 이 PC 에서 그대로 돌아야 하고,
+다른 PC(개발 PC) 결과는 "참고"로만 적고 판정에 쓰지 않는다.
 
 ## 1. 안전 규칙과 Claude 권한
 
@@ -105,7 +109,7 @@
 |---|---|
 | 00 SAF-ESTOP | can_guard 에 비상 정지 신호 구현 → SIL(vcan) 검증 → 저속(≤ 10 km/h) 실차. 감지 ≤ 100 ms, 제동 시작 ≤ 200 ms. 정지 후 auto 000 을 보내지 않는지 확인 |
 | 01 LAT-ALIGN | 오프셋은 타이어각으로 산출. 왕복은 사람이 방향 전환. 보정 전·후 비교 |
-| 02 LON-PROF | 계단·램프·사다리꼴. 1단계는 **가속/브레이크 % 프로파일**, 2단계는 목표속도 프로파일. 상한 내장 + 명령값 로그 |
+| 02 LON-PROF | 계단·램프·사다리꼴. 1단계는 **가속/브레이크 % 프로파일**, 2단계는 목표속도 프로파일. 상한 내장 + 명령값 로그. 1단계 구현 `bsw_test/common/scripts/profile_gen.py`(CommandChannel 직접, yaml `02_LON_profile/profiles/`) |
 | 03 LON-ACC / 04 LON-DEC | **(a) 개루프 % 계단 → % ↔ m/s² 변환표(`fit_maps.py` → `track.yaml`) 먼저**, (b) 폐루프 속도 추종은 그다음. 지연·오버슈트 합격 기준은 (b)에 적용 |
 | 05 LAT-MAXSTEER | 좌·우 각각, 저속, GNSS 궤적 + 요레이트 |
 | 06 LAT-ACK | 05 데이터로 1차 분석, 07(원) 이후 갱신. 오차 기준 타이어각 1~2° |

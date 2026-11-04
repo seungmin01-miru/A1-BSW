@@ -1,0 +1,12 @@
+# 07 나선 — acc % 로 출발(4 s) → 가속 유지한 채 조향 0 → deg 를 rate °/s 로 → 2 s 유지 → 끝내기.
+# goal.md: 0 → ±150, 10 °/s, 5 km/h. 좌우는 --var deg=-150.
+name: LAT-PROF-01
+vars: {deg: 150, rate: 10, acc: 6, vmax: 10}
+limits: {steer_deg: 150, brake_pct: 100, acc_pct: $acc, max_speed_kph: $vmax}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: set, brake: 0, t: 0.3, label: 브레이크풀기}
+  - {type: step, axis: acc, to: $acc, t: 4, label: 출발}
+  - {type: ramp, axis: steer, to: $deg, rate: $rate, label: 나선}
+  - {type: hold, t: 2, label: 유지}
+end: {brake: 100, ramp_s: 2.5}

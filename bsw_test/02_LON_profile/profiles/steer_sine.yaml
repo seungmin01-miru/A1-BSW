@@ -1,0 +1,12 @@
+# 07 사인 — acc % 로 출발(4 s) → 조향 amp·freq 사인 cycles 번 → 끝내기.
+# goal.md: 진폭 30°, 0.1 / 0.2 / 0.5 Hz, 10 km/h. 진폭×2π×f ≤ 120 °/s 는 check 가 막는다.
+name: LAT-PROF-01
+vars: {amp: 30, freq: 0.2, cycles: 3, acc: 8, vmax: 15}
+limits: {steer_deg: 60, brake_pct: 100, acc_pct: $acc, max_speed_kph: $vmax}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: set, brake: 0, t: 0.3, label: 브레이크풀기}
+  - {type: step, axis: acc, to: $acc, t: 4, label: 출발}
+  - {type: sine, axis: steer, amp: $amp, freq: $freq, cycles: $cycles, label: 사인}
+  - {type: hold, t: 1, label: 유지}
+end: {brake: 100, ramp_s: 2.5}

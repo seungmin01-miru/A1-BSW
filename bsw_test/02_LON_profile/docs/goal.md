@@ -10,8 +10,12 @@
 - 계단·램프·사다리꼴 명령을 설정값만 바꿔 반복 입력하는 생성기를 만든다 (03·04·07 공용).
 
 ## 전제 조건
-- [ ] can_guard 와의 연결 경로 결정 (CommandChannel 직접 / 제어기→어댑터 경유)
-- [ ] SIL(vcan) 환경
+- [x] can_guard 와의 연결 경로 결정 — **CommandChannel 직접**(lift_cmd 와 같은 자리, `bringup --no-adapter`) (2026-11-04)
+- [x] SIL(vcan) 스크립트 — `scripts/sil_profile.py` (2026-11-04, 개발 PC 로직 확인만)
+- [x] 1단계(% 개루프) 구현 — `bsw_test/common/scripts/profile_gen.py` + `profile_lib.py`, 설정 `profiles/*.yaml` (2026-11-04)
+- [ ] **대회 PC SIL** — `run_sil_check.sh --rt auto` 에 포함(`sil_02_profile`) ← 판정 기준
+- [ ] 실차 저속 1회 — `profiles/gen_check.yaml` (FIELD_MANUAL 5절 02)
+- [ ] 2단계(목표 속도 폐루프) — 속도 제어기 필요, 03(a)·04(a) 변환표 확정 후
 
 ## 입력 (명령 조건)
 | 단계 | 출력 | 프로파일 | 설정값 |
@@ -20,6 +24,15 @@
 | 2 | 목표 속도 km/h (폐루프, 속도 제어기 필요) | 계단·램프·사다리꼴 | 목표속도, 기울기, 유지 시간 |
 
 - 설정 파일(yaml) 하나로 회차를 재현. 회차 이름(`날짜_ID_회차`)을 받아 명령 로그 파일명에 사용.
+
+### 구현 메모 (2026-11-04)
+| 항목 | 내용 |
+|---|---|
+| 구간 종류 | `hold` `set` `step` `ramp`(t 또는 rate) `trap` `sine` `until_speed`(차속 도달까지, 시간 초과 = 중단) |
+| 변수 | yaml `vars` + 현장 `--var acc=15` (코드·yaml 수정 없이 회차 값 변경) |
+| 상한 | yaml `limits`(조향·브레이크·가속·조향 속도·차속) — 30 km/h·150°·125 °/s 초과 설정은 거부. 실행 전 전 구간 검사, 가속·브레이크 동시 금지 |
+| 자동 중단 | 차속 > `max_speed_kph`, 0x201 0.3 s 끊김, `until_speed` 시간 초과, Enter/Ctrl+C → 끝내기(가속 0, 브레이크 100 % 까지 2.5 s) |
+| 로그 | `<회차>_cmd.csv`(매 주기 명령 + 차속·0x200·0x210), `_gen.log`, `_profile.yaml`(vars 적용본), `notes.txt` 시작/끝 |
 
 ## 측정 신호
 - [ ] 생성기 명령 로그 (시각, 프로파일 종류, 명령값)

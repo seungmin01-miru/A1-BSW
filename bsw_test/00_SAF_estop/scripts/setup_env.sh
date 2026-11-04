@@ -7,7 +7,7 @@
 #
 # 하는 일 (tools/deploy 30_ros2.sh·90_validate.sh 와 같은 버전·경로 기준)
 #   1. vcan0 생성·UP           — sil/vcan/vcan_up.sh (sudo). 차량 버스(can0/Kvaser)는 건드리지 않음
-#   2. 사용자 python3 패키지   — python-can 4.6.1, cantools 44.0.0, pytest
+#   2. 사용자 python3 패키지   — python-can 4.6.1, cantools 44.0.0, pytest, PyYAML
 #                                오프라인 wheel(/var/local/a1-wheels 또는 $A1_WHEELS) 우선, 없으면 인터넷 pip --user
 #   3. (선택) ros2_ws 빌드     — /opt/ros/humble 있을 때만
 #   4. 저장소 상태              — 브랜치·커밋, can_guard 실행 중 여부
@@ -48,6 +48,7 @@ PY -m pip --version >/dev/null 2>&1 || warn "pip 없음 → sudo apt install pyt
 want can python-can 4.6.1
 want cantools cantools 44.0.0
 want pytest pytest ""
+want yaml PyYAML ""            # 02 프로파일 생성기 (ROS 있으면 python3-yaml 로 이미 있음)
 
 echo "-- 3. ros2_ws (rehearse_track 용, 선택)"
 if [ -f "$REPO/ros2_ws/install/setup.bash" ]; then ok "빌드됨"

@@ -39,6 +39,7 @@ bg() { local name=$1; shift; setsid "$@" > "$D/$name.log" 2>&1 < /dev/null & ech
 set +u; source /opt/ros/humble/setup.bash; source "$WS/install/setup.bash" || die "ros2_ws 빌드 필요"; set -u
 pgrep -f "^(/usr/bin/)?python3 .*safety/can_guard/can_guard.py" >/dev/null && die "can_guard 가 이미 실행 중 — stop.sh 먼저"
 pgrep -f "^(/usr/bin/)?python3 .*lift_(cmd|tx)\.py" >/dev/null && die "lift_tx/lift_cmd 실행 중 — 0x210 송신자가 둘이 된다"
+pgrep -f "^(/usr/bin/)?python3 .*profile_gen\.py run" >/dev/null && die "profile_gen 실행 중 — 명령 쓰는 쪽이 둘이 된다"
 cp "$PARAMS" "$D/track_params.yaml"
 say "세션 폴더 $D, 모드 $MODE, 어댑터 표 $PARAMS (사본 저장)"
 
@@ -101,6 +102,8 @@ if [ $ADAPTER = false ]; then
 ✅ 준비 완료(브리지만). 표 측정 명령 도구(다른 터미널):
    python3 $REPO/safety/can_guard/lift_cmd.py ${LC_IF[*]} --steer-limit-deg 150 --brake-limit-pct 100 --acc-limit-pct $ACC_LIMIT --log $D/lift_cmd.log
    (명령: auto on / steer <핸들각°> / brake <%> / acc <%> / zero / auto off / q — 끝낼 땐 brake 100 유지한 채 q)
+   또는 프로파일 생성기(lift_cmd 대신, 동시 사용 불가):
+   python3 $REPO/bsw_test/common/scripts/profile_gen.py run <프로파일.yaml> --var 이름=값 --run <날짜_ID_r회차> ${LC_IF[*]} --out $D
    메모:  echo "\$(date +%s.%N) \$(date +%H:%M:%S) 내용" >> $D/notes.txt
    비상 정지: python3 $REPO/safety/can_guard/estop.py   (해제: --reset, 정지 상태에서만)
    종료:  lift_cmd 에서 brake 100 → q, 그다음 bash $HERE/stop.sh

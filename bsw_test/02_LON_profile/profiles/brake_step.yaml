@@ -1,0 +1,12 @@
+# 04(a) 브레이크 % 계단 — acc 로 v km/h 까지 → 가속 0 과 동시에 brake % → t 초 유지 → 끝내기(100 %).
+# v 에 timeout 초 안에 못 가면 중단(끝내기). vmax 는 v 보다 조금 위로.
+name: LON-DEC-01
+vars: {acc: 15, v: 10, vmax: 15, brake: 40, t: 8}
+limits: {steer_deg: 15, brake_pct: 100, acc_pct: $acc, max_speed_kph: $vmax}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: set, brake: 0, t: 0.3, label: 브레이크풀기}
+  - {type: ramp, axis: acc, to: $acc, t: 1.0, label: 가속}
+  - {type: until_speed, kph: $v, timeout: 20, label: 속도대기}
+  - {type: set, acc: 0, brake: $brake, t: $t, label: 제동계단}
+end: {brake: 100, ramp_s: 2.5}

@@ -1,0 +1,10 @@
+# 03(a) 가속 % 계단 — 정지 출발, acc % 를 t 초 유지 → 끝내기(가속 0, 브레이크 100 까지 2.5 s).
+# 30 km/h(또는 vmax)에 닿으면 자동으로 끝내기. 불감대 찾기는 --var acc=3 --var t=5 처럼 작은 값으로.
+name: LON-ACC-01
+vars: {acc: 10, t: 10, vmax: 30}
+limits: {steer_deg: 15, brake_pct: 100, acc_pct: $acc, max_speed_kph: $vmax}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: set, brake: 0, t: 0.3, label: 브레이크풀기}
+  - {type: step, axis: acc, to: $acc, t: $t, label: 가속계단}
+end: {brake: 100, ramp_s: 2.5}
