@@ -18,6 +18,7 @@ E1~E3 의 40 ms = can_guard 주기 20 ms × 2(주기 위상 + 송신). 차량 �
 """
 import argparse
 import os
+import shlex
 import signal
 import statistics
 import subprocess
@@ -33,6 +34,7 @@ from sil_tests._common import (can_guard_cmd, start_fake_control_node,  # noqa: 
                                start_fake_perception, wait_for_shm)
 
 PERIOD = 0.02
+GUARD_ARGS = ()   # --guard-args 로 채움(예: 격리 코어·SCHED_FIFO)
 LIMIT_TRIGGER_S = 0.040
 LIMIT_WATCHDOG_S = 0.100
 
@@ -60,7 +62,7 @@ class Rig:
         self.channel = channel
         self.bus = can.Bus(channel=channel, interface='socketcan', receive_own_messages=False)
         argv = can_guard_cmd(self.cmd, self.hb, channel, 0.05, PERIOD,
-                             ('--estop-shm', self.es, '--quiet', *extra))
+                             ('--estop-shm', self.es, '--quiet', *GUARD_ARGS, *extra))
         self.guard = subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.ctrl = self.perc = None
         if not (wait_for_shm(self.cmd) and wait_for_shm(self.hb) and wait_for_shm(self.es)):
@@ -203,7 +205,11 @@ def main():
     ap.add_argument('--channel', default='vcan0')
     ap.add_argument('--trials', type=int, default=10)
     ap.add_argument('--only', default='', help='예: E1,E3')
+    ap.add_argument('--guard-args', default='',
+                    help='can_guard 에 덧붙일 인자, 예 "--cpu 8 --rt-priority 90" (sudo chrt 로 감쌈, 대회 PC 실측용)')
     a = ap.parse_args()
+    global GUARD_ARGS
+    GUARD_ARGS = tuple(shlex.split(a.guard_args))
     sel = set(a.only.split(',')) if a.only else None
     plan = [
         ('E1', '공유메모리 누름', lambda: scenario_trigger(a.channel, a.trials, 'shm')),

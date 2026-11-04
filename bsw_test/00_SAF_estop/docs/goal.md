@@ -14,7 +14,8 @@
 - [x] can_guard 에 비상 정지 구현 — `ESTOP` 상태, 원천: 핸드폰 앱(0x156/0x157)·`estop.py`·SIGUSR1 (2026-11-04)
 - [x] 이벤트 로그 `--event-log` (estop_request 감지 지연, state, estop_first_tx) (2026-11-04)
 - [x] 단위 시험 91개 통과, virtual 버스 스모크(감지 → 첫 ESTOP 프레임 약 10 ms) (2026-11-04)
-- [ ] SIL(vcan) `sil_tests/e_estop.py` E1~E6 통과 — vcan0 생성(sudo) 필요
+- [x] SIL(vcan) `sil_tests/e_estop.py` E1~E6 통과 — **개발 PC**(비격리, 2026-11-04). 로직 확인용
+- [ ] **대회 차량 PC** SIL: `scripts/setup_env.sh` → `scripts/run_sil_check.sh --rt auto` → `results/sil_*` 커밋 (00 판정에 쓰는 값)
 - [ ] **앱 비상 정지 버튼이 실제로 보내는 0x156/0x157 값** 확인(정지 상태, 듣기만) → `--estop-acc-mps2`·판정 조건 확정
 - [ ] 앱이 0x156/0x157 을 계속(10 ms) 보내는지 → 데드맨 `--estop-can-timeout` 사용 여부
 - [ ] 0x210 끊김 시 차량 동작 확인 (TODO-2, 실무자)

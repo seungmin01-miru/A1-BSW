@@ -18,13 +18,16 @@ echo "-- 1) verify";  bash "$RT/a1_rt.sh" verify > "$R/verify.txt" 2>&1; grep -E
 if [[ ${A1_QUICK:-0} != 1 ]]; then echo "-- 2) bench (~5분)"; bash "$RT/a1_rt.sh" bench > "$R/bench.txt" 2>&1; tail -15 "$R/bench.txt"; fi
 echo "-- 3) soak ${SOAK_MIN}분";  bash "$RT/a1_rt.sh" soak "$SOAK_MIN" > "$R/soak.txt" 2>&1; tail -15 "$R/soak.txt"
 
-echo "-- 4) can_guard 유닛테스트 + SIL(P-1/P-2)"
+echo "-- 4) can_guard 유닛테스트 + SIL(P-1/P-2 + 비상 정지 E1~E6)"
 if [[ -d $REPO/safety/can_guard ]]; then
   ( modprobe vcan 2>/dev/null; bash "$REPO/sil/vcan/vcan_up.sh" vcan0 ) >/dev/null 2>&1 && ok "vcan0 up" || warn "vcan0 생성 실패(모듈 vcan?)"
   ( cd "$REPO/safety/can_guard"
     sudo -u "$U" python3 -m pytest test/ -q 2>&1 | tail -2 | tee "$R/can_guard_unit.txt"
     sudo -u "$U" python3 sil_tests/p1_kill_control_node.py --channel vcan0 2>&1 | tail -6 | tee "$R/sil_p1.txt"
-    sudo -u "$U" python3 sil_tests/p2_kill_perception.py   --channel vcan0 2>&1 | tail -6 | tee "$R/sil_p2.txt" )
+    sudo -u "$U" python3 sil_tests/p2_kill_perception.py   --channel vcan0 2>&1 | tail -6 | tee "$R/sil_p2.txt"
+    iso=$(cut -d, -f1 /sys/devices/system/cpu/isolated | cut -d- -f1)   # 비상 정지 지연은 배포 형태(격리 코어·FIFO 90)로
+    sudo -u "$U" env -u PYTHONPATH python3 sil_tests/e_estop.py --channel vcan0 --trials 20 \
+      ${iso:+--guard-args "--cpu $iso --rt-priority 90"} 2>&1 | grep -E '^\[E|^전체' | tee "$R/sil_e_estop.txt" )
 else warn "저장소 없음($REPO) — 50_workspace.sh 먼저"; fi
 
 echo "-- 5) 회수 자료 수집"
