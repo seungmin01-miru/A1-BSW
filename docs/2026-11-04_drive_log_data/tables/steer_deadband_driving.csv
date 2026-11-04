@@ -1,0 +1,5 @@
+# 2-4b. 주행 중(> 3 km/h) 0x200 위치는 계단식: 0.1 s 이상 멈춰 있다가 |명령 − 위치| 가 err_at_move 만큼 벌어지면 움직인다(핸들 °)
+source,n_plateaus,err_at_move_p25_deg,p50,p75,hold_p50_s,hold_p90_s,err_while_still_p50,err_while_still_p90,frac_time_still
+auto_bsw3,87,3.097,3.932,6.397,0.4831,1.197,1.7,4.214,0.8614
+auto_bsw5,611,3,3.984,5.694,0.3989,1.113,1.78,4.586,0.8419
+remote,1151,3.352,8.2,32.42,0.315,0.9032,2.4,27.8,0.6414

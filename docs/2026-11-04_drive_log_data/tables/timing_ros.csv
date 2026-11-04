@@ -1,0 +1,14 @@
+# ROS 쪽 주기·어댑터 입력 나이. stale_timeout_s = 0.15, odom_timeout_s(follower) = 0.2
+session,topic,n,med_ms,p99_ms,max_ms,count_over_200ms(age:over_stale_150ms),rejected_max,writing_false_while_armed
+bsw3,/control/adapter/status,17531,19.94,26.85,348.8,3,,
+bsw3,/control/target,17126,20,22.83,3580,4,,
+bsw3,/localization/odom,34938,10.02,14.2,348.5,4,,
+bsw3,adapter input_age (armed),13787,14.67,23.58,406.4,2,0,2
+bsw4,/control/adapter/status,6332,19.99,26.79,347.2,1,,
+bsw4,/control/target,6328,19.99,24.09,348.8,1,,
+bsw4,/localization/odom,12595,9.988,14.11,338.1,1,,
+bsw4,adapter input_age (armed),5919,17.61,25.16,43.08,0,0,0
+bsw5,/control/adapter/status,23258,19.98,27.04,64.67,0,,
+bsw5,/control/target,23290,20.02,23.73,339.6,1,,
+bsw5,/localization/odom,46652,10.02,14.27,336.6,2,,
+bsw5,adapter input_age (armed),22649,15.85,21.94,35.56,0,0,0

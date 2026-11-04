@@ -1,0 +1,7 @@
+# 2-5b. 핸들각 = 기울기 × 유효 타이어각 + 절편. 절편 = 차가 직진(요레이트 0)할 때의 핸들각 = 조향 오프셋(핸들 °)
+item,slope_wheel_per_tire,intercept_wheel_deg,n
+fit |wheel|<40: wheel = a*tire + b,8.85,-13.65,10252
+fit left (wheel>3),13.59,-24.25,700
+fit right (wheel<-3),10.9,-13.62,11303
+tire at wheel=0 (from |wheel|<40 fit),1.542,,
+corr wheel vs tire,0.9879,,12243

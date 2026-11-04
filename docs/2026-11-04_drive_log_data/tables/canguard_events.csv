@@ -1,0 +1,26 @@
+# 4. can_guard 이벤트(원본 그대로)
+session,wall_s,event,detail
+bsw,1793778117.655712,start,kvaser:0 init=silent estop_can=remote
+bsw,1793778123.840243,state,INIT->ACTIVE cmd_age=0.0013748710007348564 speed_kph=0.0
+bsw,1793778126.160197,state,ACTIVE->STOPPED cmd_age=0.05251317199872574 speed_kph=0.0
+bsw,1793778309.760667,stop,cycles=9556 tx_fail=0
+bsw2,1793778328.827805,start,kvaser:0 init=silent estop_can=remote
+bsw2,1793778335.289101,state,INIT->ACTIVE cmd_age=8.348600022145547e-05 speed_kph=0.0
+bsw2,1793778382.428974,state,ACTIVE->STOPPED cmd_age=0.05977722299940069 speed_kph=0.0
+bsw2,1793778831.269422,stop,cycles=25073 tx_fail=0
+bsw3,1793778837.404792,start,kvaser:0 init=silent estop_can=remote
+bsw3,1793778843.585711,state,INIT->ACTIVE cmd_age=0.0032134780012711417 speed_kph=0.0
+bsw3,1793779169.345685,state,ACTIVE->STOPPED cmd_age=0.06286424200152396 speed_kph=0.0
+bsw3,1793779200.186075,stop,cycles=18090 tx_fail=0
+bsw4,1793779205.222358,start,kvaser:0 init=silent estop_can=remote
+bsw4,1793779211.583716,state,INIT->ACTIVE cmd_age=0.005284808001306374 speed_kph=0.0
+bsw4,1793779243.143672,estop_request,remote remote_en detect_lag_ms=5.8
+bsw4,1793779243.143742,state,ACTIVE->ESTOP cmd_age=0.02221653100059484 speed_kph=14.2
+bsw4,1793779243.144621,estop_first_tx,brake=30.8 acc=0.0 auto=111
+bsw4,1793779342.744012,stop,cycles=6827 tx_fail=0
+bsw5,1793779346.768323,start,kvaser:0 init=silent estop_can=remote
+bsw5,1793779352.870283,state,INIT->ACTIVE cmd_age=0.007368698999925982 speed_kph=0.0
+bsw5,1793779821.770252,estop_request,remote remote_en detect_lag_ms=18.3
+bsw5,1793779821.770327,state,ACTIVE->ESTOP cmd_age=0.01376003399855108 speed_kph=0.0
+bsw5,1793779821.770900,estop_first_tx,brake=100.0 acc=0.0 auto=111
+bsw5,1793779927.010705,stop,cycles=28963 tx_fail=0
