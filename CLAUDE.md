@@ -109,7 +109,7 @@
 | ID | 확정 사항 |
 |---|---|
 | 00 SAF-ESTOP | can_guard 에 비상 정지 신호 구현 → SIL(vcan) 검증 → 저속(≤ 10 km/h) 실차. 감지 ≤ 100 ms, 제동 시작 ≤ 200 ms. 정지 후 auto 000 을 보내지 않는지 확인 |
-| 01 LAT-ALIGN | 오프셋은 타이어각으로 산출. **직선 50 m**(앱 신호 거리, 11-04), 기준 50 m 횡편차 ≤ 0.25 m(100 m·0.5 m 비례 환산, 사용자 결정). 왕복은 자율 U턴(두 차선 약 13 m 간격). 보정 전·후 비교 |
+| 01 LAT-ALIGN | 오프셋은 타이어각으로 산출. **직선 50 m**(앱 신호 거리, 11-04), 기준 50 m 횡편차 ≤ 0.125 m(100 m·0.5 m 제곱 환산 — 이탈 ∝ L², 사용자 결정. 불감대 ±0.2° 타이어면 못 지킬 수 있음 → 실제 조향 위치 같이 기록). 왕복은 자율 U턴(두 차선 약 13 m 간격). 보정 전·후 비교 |
 | 02 LON-PROF | 계단·램프·사다리꼴. 1단계는 **가속/브레이크 % 프로파일**, 2단계는 목표속도 프로파일. 상한 내장 + 명령값 로그. 1단계 구현 `bsw_test/common/scripts/profile_gen.py`(CommandChannel 직접, yaml `02_LON_profile/profiles/`). 11-04: 한 세션 여러 회차(`--reps/--sweep`) + 회차 사이 자율 U턴(`--turn`) + 코스 길이 끝내기 + `--steer-offset` + 폐루프 속도 제어(`SpeedController`, 0x201 피드백, 파라미터 `02_LON_profile/ctrl/speed_ctrl.yaml` 잠정). SIL `02_LON_profile/scripts/sil_session.py` |
 | 03 LON-ACC / 04 LON-DEC | **(a) 개루프 % 계단 → % ↔ m/s² 변환표(`fit_maps.py` → `track.yaml`) 먼저**, (b) 폐루프 속도 추종은 그다음. 지연·오버슈트 합격 기준은 (b)에 적용 |
 | 05 LAT-MAXSTEER | 좌(+150, 반시계)·우(−150, 시계) 각각, 저속, GNSS 궤적 + 요레이트. 07 나선이 있어도 유지(11-04) |
