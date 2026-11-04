@@ -1,0 +1,11 @@
+# 07 나선 — 속도 제어기 버전(--ctrl). 폐루프 kph 로 출발(4 s 직진) → 차속 유지한 채 조향 0 → deg 를 rate °/s → 2 s → 끝내기.
+# 좌 = +(반시계, 원이 점점 작아짐), 우 = −(시계). 시작점 기준 바깥쪽 여유(처음 반경이 큼).
+name: LAT-PROF-02
+vars: {deg: 150, rate: 10, kph: 5, vmax: 10, accmax: 15}
+limits: {steer_deg: 150, brake_pct: 100, acc_pct: $accmax, max_speed_kph: $vmax}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: speed, from: 0, to: $kph, rate: 2, t: 4, label: 출발}
+  - {type: ramp, axis: steer, to: $deg, rate: $rate, label: 나선}
+  - {type: hold, t: 2, label: 유지}
+end: {brake: 100, ramp_s: 2.5}

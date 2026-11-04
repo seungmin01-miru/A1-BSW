@@ -1,0 +1,28 @@
+# 속도 제어기(SpeedController) 파라미터 — profile_gen run … --ctrl bsw_test/02_LON_profile/ctrl/speed_ctrl.yaml
+# 지금 값은 전부 **잠정**(SIL 가짜 차량 기준). 03(a)·04(a) 결과로 아래 순서대로 고친다(변경 = 승인 사항, 커밋 해시를 results.md 에):
+#   1) hold_kph/hold_pct : 03(a) 계단에서 속도가 평평해진 구간의 (차속, 가속 %) — 정속 유지 피드포워드
+#   2) start_pct         : 03(a) 불감대(차가 처음 움직인 %) + 1
+#   3) accel_*/decel_*   : fit_maps.py 결과(track.yaml accel_map / brake_map 과 같은 값)
+#   4) kp/ki             : 03(b) 계단에서 오버슈트 > 10 % 면 kp 를 낮추고, 정속 오차가 남으면 ki 를 올림
+speed_ctrl:
+  kp: 2.0
+  ki: 0.6
+  i_max_pct: 8.0
+  i_band_kph: 2.0
+  kp_brake: 6.0
+  brake_on_kph: 1.5
+  brake_off_kph: 0.3
+  coast_decel_mps2: 0.3
+  stop_brake_pct: 40.0
+  hold_kph: [0.0, 5.0, 10.0, 20.0, 30.0]
+  hold_pct: [0.0, 6.0, 8.0, 11.0, 14.0]
+  start_pct: 6.0
+  accel_mps2: [0.1, 1.3]
+  accel_pct: [0.0, 30.0]
+  decel_mps2: [0.1, 1.0, 2.0, 3.0, 4.0]
+  brake_pct: [0.0, 40.0, 70.0, 90.0, 100.0]
+  acc_max_pct: 30.0
+  brake_max_pct: 82.0
+  acc_slew_pct_s: 50.0
+  brake_slew_pct_s: 60.0
+  filter_s: 0.1

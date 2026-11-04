@@ -1,0 +1,11 @@
+# 05 최대 조향 / 07 원 — 속도 제어기 버전(--ctrl). 정지 상태에서 핸들 deg(60 °/s) → 3 s → 폐루프 kph 로 t 초 원선회 → 끝내기.
+# 좌 = +(반시계), 우 = −(시계, --var deg=-150).
+name: LAT-MAXSTEER-02
+vars: {deg: 150, kph: 5, t: 40, vmax: 10, accmax: 15}
+limits: {steer_deg: 150, brake_pct: 100, acc_pct: $accmax, max_speed_kph: $vmax}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: ramp, axis: steer, to: $deg, rate: 60, label: 조향돌리기}
+  - {type: hold, t: 3, label: 조향대기}
+  - {type: speed, from: 0, to: $kph, rate: 2, t: $t, label: 원선회}
+end: {brake: 100, ramp_s: 2.5}

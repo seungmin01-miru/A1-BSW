@@ -1,5 +1,6 @@
 """profile_lib 단위 시험 — env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest bsw_test/common/scripts -q"""
 import glob
+import math
 import os
 import sys
 
@@ -119,3 +120,120 @@ def test_shipped_profiles_pass(path):
         prof = pl.build(yaml.safe_load(f))
     assert pl.validate(prof) == []
     assert prof.limits['max_speed_kph'] <= 30
+
+
+# ── 2026-11-04: 폐루프·U턴·코스·오프셋 ──────────────────────────────
+
+def ctrl(**kw):
+    p = dict(pl.SPEED_CTRL_DEFAULTS)
+    p.update(kw)
+    return pl.SpeedController(pl.check_speed_ctrl(p), acc_limit=30, brake_limit=100)
+
+
+def test_speed_controller_never_acc_and_brake():
+    c = ctrl()
+    v = 0.0
+    seq = [(10, 0)] * 200 + [(10, 0)] * 50 + [(3, 0)] * 100 + [(0, 0)] * 100
+    for vr, ar in seq:
+        acc, br = c.step(v, vr, ar, 0.02)
+        assert not (acc > 0 and br > 0)
+        assert acc == int(acc) and br == int(br)          # 0x210 정수 %
+        v = max(0.0, v + (acc * 0.05 - br * 0.08 - 0.1) * 0.02 * 3.6)
+
+
+def test_speed_controller_brakes_on_overspeed_and_stop():
+    c = ctrl()
+    c.reset(15.0)
+    acc, br = 0, 0
+    for _ in range(50):
+        acc, br = c.step(15.0, 10.0, 0.0, 0.02)
+    assert acc == 0 and br > 0 and c.mode == 'brake'
+    c.reset(0.5)
+    for _ in range(100):
+        acc, br = c.step(0.5, 0.0, 0.0, 0.02)
+    assert acc == 0 and br >= 40      # 목표 0 + 거의 섬 → stop_brake_pct
+
+
+def test_speed_controller_limits_and_start():
+    c = pl.SpeedController(pl.check_speed_ctrl(dict(pl.SPEED_CTRL_DEFAULTS)), acc_limit=12, brake_limit=60)
+    outs = [c.step(0.0, 25.0, 0.0, 0.02) for _ in range(300)]
+    assert max(a for a, _ in outs) <= 12
+    assert outs[0][0] > 0                  # 정지에서 바로 출발(start_pct, 올림 변화율 안)
+
+
+def test_speed_ctrl_bad_params():
+    with pytest.raises(pl.ProfileError):
+        pl.check_speed_ctrl(dict(pl.SPEED_CTRL_DEFAULTS, nope=1))
+    with pytest.raises(pl.ProfileError):
+        pl.check_speed_ctrl(dict(pl.SPEED_CTRL_DEFAULTS, hold_kph=[0, 5], hold_pct=[1]))
+    with pytest.raises(pl.ProfileError):
+        pl.check_speed_ctrl(dict(pl.SPEED_CTRL_DEFAULTS, brake_off_kph=3.0))
+
+
+def test_speed_segment_target_ramp():
+    p = pl.build(base(limits={'max_speed_kph': 15, 'acc_pct': 20, 'steer_deg': 30},
+                      segments=[{'type': 'speed', 'from': 0, 'to': 10, 'rate': 2, 't': 8}]))
+    pr = p.prims[0]
+    assert pr.closed_loop and p.needs_speed
+    assert pr.target(0) == (0, 2) and pr.target(2.5) == (5, 2) and pr.target(6) == (10, 0)
+    with pytest.raises(pl.ProfileError):   # t 가 램프보다 짧음
+        pl.build(base(limits={'max_speed_kph': 15}, segments=[{'type': 'speed', 'to': 10, 'rate': 2, 't': 3}]))
+    with pytest.raises(pl.ProfileError):   # 목표가 상한 − 1 위
+        pl.build(base(limits={'max_speed_kph': 10}, segments=[{'type': 'speed', 'to': 10, 't': 3}]))
+
+
+def test_steer_ramp_inherits_closed_loop_and_acc_breaks_it():
+    p = pl.build(base(limits={'max_speed_kph': 10, 'steer_deg': 150, 'acc_pct': 10},
+                      segments=[{'type': 'speed', 'from': 0, 'to': 5, 't': 2},
+                                {'type': 'ramp', 'axis': 'steer', 'to': 90, 'rate': 10},
+                                {'type': 'set', 'acc': 0, 'brake': 40, 't': 1}]))
+    assert [x.closed_loop for x in p.prims] == [True, True, False]
+    assert p.prims[1].target(0) == (5, 0)
+    assert pl.validate(p) == []
+
+
+def test_uturn_macro_open_and_closed():
+    lim = {'max_speed_kph': 10, 'steer_deg': 150, 'acc_pct': 10}
+    po = pl.build(base(limits=lim, segments=[{'type': 'uturn', 'deg': 150, 'acc': 6}]))
+    kinds = [x.kind for x in po.prims]
+    assert kinds[0] == 'until_stop' and 'until_heading' in kinds and kinds[-1] == 'ramp'
+    assert po.prims[-1].b == 0 and pl.validate(po) == []
+    assert not any(x.closed_loop for x in po.prims)
+    pc = pl.build(base(limits=lim, segments=[{'type': 'uturn', 'deg': -150, 'kph': 5}]))
+    h = [x for x in pc.prims if x.kind == 'until_heading'][0]
+    assert h.closed_loop and h.base['steer'] == -150 and h.m > 0
+    with pytest.raises(pl.ProfileError):   # kph 와 acc 둘 다
+        pl.build(base(limits=lim, segments=[{'type': 'uturn', 'deg': 150, 'acc': 6, 'kph': 5}]))
+
+
+def test_uturn_lock_fits_offset():
+    lim = {'max_speed_kph': 10, 'steer_deg': 150, 'acc_pct': 10}
+    p = pl.build(base(limits=lim, segments=[{'type': 'uturn', 'deg': 150, 'acc': 6}]), steer_offset=1.5)
+    assert max(x.base['steer'] for x in p.prims) == pytest.approx(148.5)
+    assert pl.validate(p) == []
+
+
+def test_steer_offset_in_validate():
+    cfg = base(limits={'steer_deg': 20, 'max_speed_kph': 10}, segments=[{'type': 'ramp', 'axis': 'steer', 'to': 19, 'rate': 10}])
+    assert pl.validate(pl.build(cfg)) == []
+    assert any('오프셋' in e for e in pl.validate(pl.build(cfg, steer_offset=2.0)))
+    with pytest.raises(pl.ProfileError):
+        pl.build(cfg, steer_offset=20)
+
+
+def test_course_and_stop_distance():
+    p = pl.build(base(course={'length_m': 50}))
+    assert p.course['length_m'] == 50 and p.needs_speed
+    c = {'decel_mps2': 1.5, 'delay_s': 0.3}
+    assert pl.stop_distance_m(0, c, 2.5) == 0
+    d20 = pl.stop_distance_m(20, c, 2.5)      # 5.56 m/s × 1.55 s + 5.56²/3 ≈ 18.9 m
+    assert d20 == pytest.approx(20 / 3.6 * 1.55 + (20 / 3.6) ** 2 / 3.0)
+    with pytest.raises(pl.ProfileError):
+        pl.build(base(course={'length_m': 2}))
+
+
+def test_yaw_rate_bicycle():
+    v = dict(pl.VEHICLE_DEFAULTS)
+    r = pl.yaw_rate_deg_s(5, 150, v)          # 타이어 20°, R = 2.36 / tan20 ≈ 6.48 m
+    assert r == pytest.approx(math.degrees((5 / 3.6) / (2.36 / math.tan(math.radians(20)))))
+    assert pl.yaw_rate_deg_s(5, -150, v) == pytest.approx(-r)

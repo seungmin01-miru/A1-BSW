@@ -4,7 +4,7 @@
 |---|---|---|---|---|---|---|---|---|
 | 00 | 비상 정지 fallback | 선행 | 대기 |  |  |  | [results](../00_SAF_estop/docs/results.md) |  |
 | 01 | 타이어 정렬 및 보정 | 1 | 대기 |  |  |  | [results](../01_LAT_align/docs/results.md) |  |
-| 02 | 목표 프로파일 생성기 | 2 | 구현(11-04), 대회 PC SIL·실차 1회 대기 |  |  |  | [results](../02_LON_profile/docs/results.md) |  |
+| 02 | 목표 프로파일 생성기 | 2 | 구현(11-04) + v2 세션·U턴·속도 제어기(11-04, 개발 PC SIL PASS), 대회 PC SIL·실차 대기 |  |  |  | [results](../02_LON_profile/docs/results.md) |  |
 | 03 | 가속 추종 성능 | - | 대기 |  |  |  | [results](../03_LON_accel/docs/results.md) |  |
 | 04 | 감속 추종 성능 | - | 대기 |  |  |  | [results](../04_LON_decel/docs/results.md) |  |
 | 05 | 최대 조향 정속 주행 | 3 | 대기 |  |  |  | [results](../05_LAT_maxsteer/docs/results.md) |  |

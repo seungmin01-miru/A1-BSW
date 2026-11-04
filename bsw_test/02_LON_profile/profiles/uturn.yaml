@@ -1,0 +1,13 @@
+# 회차 사이 자율 U턴 — profile_gen run … --turn profiles/uturn.yaml (전진만, 2026-11-04)
+# 정지 확인 → 정지 상태에서 핸들 deg(60 °/s) → 출발 → 방위 180°(자전거 모델 추정, 조향비 7.5 잠정) → 정지 → 핸들 0.
+# 좌 = +150(반시계), 우 = −150(시계). **늘 같은 방향**으로 돌면 두 차선(간격 ≈ 2R ≈ 13 m ★)을 도는 타원 코스가 된다.
+# 방위 추정이 틀려도 거리 상한(1.6 × 반원 길이 ★)이나 timeout 에서 끝내기. 남는 각도는 다음 회차 전에 사람이 확인.
+#   속도 제어기 전: --turn-var acc=<00 S1 에서 찾은 5 km/h 근처 %>          (kph=0, 개루프)
+#   속도 제어기 후: --turn-var acc=0 --turn-var kph=5                          (폐루프, --ctrl 파일)
+name: TURN
+vars: {deg: 150, kph: 0, acc: 6, accmax: 15, vmax: 10}
+limits: {steer_deg: 150, brake_pct: 100, acc_pct: $accmax, max_speed_kph: $vmax}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: uturn, deg: $deg, kph: $kph, acc: $acc, heading: 180, timeout: 60}
+end: {brake: 100, ramp_s: 2.5}

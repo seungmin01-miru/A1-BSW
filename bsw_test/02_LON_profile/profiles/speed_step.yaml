@@ -1,0 +1,11 @@
+# 03(b) LON-ACC / 02 2단계 — 목표 차속 계단(폐루프, --ctrl 파일). v0 까지 → t0 초 유지 → v 로 계단(rate 0) 또는 램프 → t 초 → 끝내기.
+# goal.md: 0→10, 10→20 km/h (50 m 코스면 20→30 은 들어가지 않음 ★). 코스 끝 예측이면 그 자리에서 끝내기.
+name: LON-ACC-02
+vars: {v0: 0, t0: 0.5, v: 10, rate: 0, t: 10, vmax: 15, accmax: 30, course: 50}
+limits: {steer_deg: 15, brake_pct: 100, acc_pct: $accmax, max_speed_kph: $vmax}
+course: {length_m: $course}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: speed, from: 0, to: $v0, rate: 3, t: $t0, label: 전단}
+  - {type: speed, to: $v, rate: $rate, t: $t, label: 계단}
+end: {brake: 100, ramp_s: 2.5}

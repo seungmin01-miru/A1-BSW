@@ -1,0 +1,12 @@
+# 04(b) LON-DEC — 폐루프로 v 까지 → 유지 → 목표 차속을 decel(m/s²) 기울기로 0 까지 → 끝내기.
+# rate(km/h/s) = decel × 3.6 :  1.0 m/s² → 3.6,  2.0 → 7.2,  3.0 → 10.8.  t_down 은 v/rate + 2 s 이상.
+name: LON-DEC-02
+vars: {v: 15, t_hold: 3, rate: 3.6, t_down: 7, vmax: 20, accmax: 30, course: 50}
+limits: {steer_deg: 15, brake_pct: 100, acc_pct: $accmax, max_speed_kph: $vmax}
+course: {length_m: $course}
+start: {steer: 0, brake: 30, acc: 0}
+segments:
+  - {type: speed, from: 0, to: $v, rate: 4, t: 15, label: 가속}
+  - {type: speed, to: $v, t: $t_hold, label: 유지}
+  - {type: speed, to: 0, rate: $rate, t: $t_down, label: 감속램프}
+end: {brake: 100, ramp_s: 2.5}

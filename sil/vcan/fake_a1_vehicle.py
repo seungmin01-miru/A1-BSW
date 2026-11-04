@@ -10,7 +10,15 @@
     --cmd-timeout-s 로 타임아웃을 줄 수 있다(기본 0 = 없음).
 
   python3 sil/vcan/fake_a1_vehicle.py --channel vcan0
+  python3 sil/vcan/fake_a1_vehicle.py --channel vcan0 --physics --pose-log /tmp/pose.csv   # 02 세션 SIL(속도 제어·U턴)
+
+--physics (2026-11-04, bsw_test 02 세션 SIL): 가속 % → 가속도(불감대 5 %, track.yaml accel_map 비슷하게),
+브레이크 % → 감속도(track.yaml brake_map), 주행 저항 0.15 + 0.01·v m/s², 구동·제동 1차 지연 0.15 s, 브레이크 위치는
+82 % 에서 8.2 포화. 자세(x, y, 방위)는 자전거 모델(휠베이스 2.36 m, 조향비 --steer-ratio)로 적분해 --pose-log 에 남긴다.
+**물리 모델이 실차와 같다는 뜻이 아니다** — 제어 로직이 닫히고 멈추는지만 본다(실차 판정에 쓰지 않음).
 """
+import csv
+import math
 import argparse
 import os
 import signal
@@ -40,6 +48,9 @@ def main():
     ap.add_argument('--period-ms', type=float, default=21.0, help='0x200/0x201 주기 (10-07 실측 21.0 ms)')
     ap.add_argument('--cmd-timeout-s', type=float, default=0.0,
                     help='0x210 이 이 시간 끊기면 auto 0 (기본 0 = 타임아웃 없음, 10-07 실차 동작)')
+    ap.add_argument('--physics', action='store_true', help='변환표 기반 가감속·자세 모델(02 세션 SIL)')
+    ap.add_argument('--steer-ratio', type=float, default=7.5)
+    ap.add_argument('--pose-log', default='', help='--physics: 자세 CSV (t, x, y, yaw_deg, kph, steer_deg)')
     a = ap.parse_args()
     signal.signal(signal.SIGTERM, _on_signal)
     signal.signal(signal.SIGINT, _on_signal)
@@ -52,6 +63,21 @@ def main():
     bus = can.Bus(channel=a.channel, interface=a.interface, **bus_kw)
     dt = a.period_ms / 1000.0
     steer = brake = kph = 0.0
+    a_drive = a_brake = 0.0
+    x = y = yaw = 0.0
+    pose_w = None
+    if a.pose_log:
+        pose_f = open(a.pose_log, 'w', newline='', buffering=1)
+        pose_w = csv.writer(pose_f)
+        pose_w.writerow(['mono_s', 'x_m', 'y_m', 'yaw_deg', 'kph', 'steer_deg', 'brake_pos'])
+
+    def interp(v, xs, ys):
+        if v <= xs[0]:
+            return ys[0]
+        for j in range(1, len(xs)):
+            if v <= xs[j]:
+                return ys[j - 1] + (ys[j] - ys[j - 1]) * (v - xs[j - 1]) / (xs[j] - xs[j - 1])
+        return ys[-1]
     cmd = None
     cmd_t = None
     cnt = 0
@@ -75,9 +101,31 @@ def main():
                 brake += (cmd['brake_pct'] / 10.0 - brake) * min(1.0, dt / 0.2)
             acc = cmd['acc_pct'] if aa else 0
             bpct = cmd['brake_pct'] if ba else 0
-            kph = max(0.0, kph + (acc * 0.5 - bpct * 1.0 - 0.5) * dt)
+            if not a.physics:
+                kph = max(0.0, kph + (acc * 0.5 - bpct * 1.0 - 0.5) * dt)
         else:
-            kph = max(0.0, kph - 0.5 * dt)
+            acc = bpct = 0
+            if not a.physics:
+                kph = max(0.0, kph - 0.5 * dt)
+        if a.physics:
+            if ba and live:
+                brake = min(brake, 8.2)
+            k = min(1.0, dt / 0.15)
+            a_drive += (interp(acc, [0, 5, 30, 100], [0, 0, 1.3, 3.0]) - a_drive) * k
+            a_brake += (interp(min(bpct, 82), [0, 40, 70, 82], [0, 1.0, 2.0, 2.8]) - a_brake) * k
+            v = kph / 3.6
+            res = (0.15 + 0.01 * v) if v > 0 else 0.0
+            v = max(0.0, v + (a_drive - a_brake - res) * dt)
+            if v == 0.0 and a_drive <= a_brake + 0.15:
+                v = 0.0
+            kph = v * 3.6
+            tire = math.radians(steer / a.steer_ratio)
+            yaw += v * math.tan(tire) / 2.36 * dt
+            x += v * math.cos(yaw) * dt
+            y += v * math.sin(yaw) * dt
+            if pose_w:
+                pose_w.writerow([f'{now:.4f}', f'{x:.3f}', f'{y:.3f}', f'{math.degrees(yaw):.2f}', f'{kph:.2f}',
+                                 f'{steer:.1f}', f'{brake:.2f}'])
         rpm = int(kph * 9.5)   # 속도·rpm 비율은 미확인(10-07 은 바퀴 0) — 숫자 확인용 임의값
         bus.send(can.Message(arbitration_id=FRAME_CONTROL_INFO, is_extended_id=False,
                              data=encode_0x200(steer, brake, sa, ba, aa, cnt, cnt, cnt)))
