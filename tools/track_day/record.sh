@@ -16,7 +16,7 @@ TOPICS=(
   /control/status/command_on_bus   # 버스 위 0x210(우리 것이든 다른 송신자든)
   /diagnostics
   /gsof_client/odom /gsof_client/navsat /gsof_client/gsof/ins_solution_49 /gsof_client/gsof/ins_solution_rms_50
-  /a1_gnss/odom /a1_gnss/navsat
+  /a1_gnss/odom /a1_gnss/navsat /a1_gnss/accel   # A1_localization gnss.launch.py (TODO-5)
 )
 PIDS=()
 if [ -n "$CH" ] && ip link show "$CH" >/dev/null 2>&1; then

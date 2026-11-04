@@ -9,6 +9,8 @@
 #         --acc-limit <%>  can_guard 가속 운용 한계 (기본 30 — 어댑터 acc_max_pct 와 같게)
 #         --out <폴더>     세션 폴더 (기본 ~/a1_race_capture/track_YYYYmmdd_HHMMSS)
 #         --no-adapter     브리지만 — 표 측정(T1~T4)을 lift_cmd 로 직접 할 때(어댑터와 lift_cmd 는 동시에 못 씀)
+#         --estop-required 핸드폰 앱(0x156/0x157)이 시작 전 점검에서 안 보이면 can_guard 시작 거부
+#   can_guard 비상 정지 이벤트는 항상 <세션>/can_guard_events.csv 에 남는다(bsw_test 00 판정용).
 #
 # 끝낼 때: bash tools/track_day/stop.sh   (disarm → 녹화 종료 → 노드 → can_guard → 미러 순서)
 # 띄운 뒤 할 일은 TRACK_MANUAL.md. 어댑터는 disarm 으로 시작하므로 이 스크립트만으로는 차량이 움직이지 않는다.
@@ -18,12 +20,13 @@ REPO=$(cd "$HERE/../.." && pwd)
 WS="$REPO/ros2_ws"
 MODE=""; KV_CH=0; CAN=""; RT=1; ACC_LIMIT=30; OUT=""; ADAPTER=true
 PARAMS="$WS/src/a1_control_adapter/config/track.yaml"
+ESTOP_REQ=()
 GUARD_CPU=8; NODE_CPU=10       # 격리 코어 8-15 (tools/rt). 물리 코어당 한 스레드 원칙으로 8, 10
 while [ $# -gt 0 ]; do case "$1" in
   --sil) MODE=sil;; --kvaser) MODE=kvaser; [ "${2:-}" ] && [[ "$2" != --* ]] && { KV_CH=$2; shift; };;
   --peak) MODE=peak; CAN=${2:?--peak can0}; shift;;
   --params) PARAMS=$(readlink -f "$2"); shift;; --no-rt) RT=0;; --no-adapter) ADAPTER=false;; --acc-limit) ACC_LIMIT=$2; shift;;
-  --out) OUT=$2; shift;; -h|--help) sed -n 2,15p "$0"; exit 0;;
+  --out) OUT=$2; shift;; --estop-required) ESTOP_REQ=(--estop-can-required);; -h|--help) sed -n 2,17p "$0"; exit 0;;
   *) echo "모르는 옵션 $1"; exit 2;; esac; shift; done
 [ -n "$MODE" ] || { sed -n 2,15p "$0"; exit 2; }
 D=${OUT:-$HOME/a1_race_capture/track_$(date +%Y%m%d_%H%M%S)}; mkdir -p "$D"
@@ -61,7 +64,7 @@ fi
 
 # ── 2. can_guard ────────────────────────────────────────
 GUARD=(python3 "$REPO/safety/can_guard/can_guard.py" "${GUARD_IF[@]}" --steer-limit-deg 150 --brake-limit-pct 100
-       --acc-limit-pct "$ACC_LIMIT" --status-interval-s 1)
+       --acc-limit-pct "$ACC_LIMIT" --status-interval-s 1 --event-log "$D/can_guard_events.csv" "${ESTOP_REQ[@]}")
 if [ $RT = 1 ]; then
   sudo -v || die "sudo 필요(격리 코어·SCHED_FIFO). 없이 하려면 --no-rt"
   bg can_guard sudo chrt -f 90 sudo -u "$USER" env PATH="$PATH" PYTHONPATH="${PYTHONPATH:-}" HOME="$HOME" \
@@ -71,6 +74,7 @@ else
 fi
 for _ in $(seq 60); do [ -e /dev/shm/a1_can_guard_cmd ] && break; sleep 0.1; done
 sleep 1.2   # 시작 전 점검(1 s) 대기
+grep -q "앱 연결 후 재실행" "$D/can_guard.log" && die "can_guard 시작 거부 — 핸드폰 앱 0x156/0x157 이 안 보임(--estop-required)"
 grep -q "시작 거부" "$D/can_guard.log" && die "can_guard 시작 거부 — 다른 0x210 송신자(원격조종 0x210? 미확인 송신자?) $(grep '시작 거부' "$D/can_guard.log")"
 [ -e /dev/shm/a1_can_guard_cmd ] || die "can_guard 공유메모리 없음 — $D/can_guard.log"
 say "can_guard 시작: $(grep -m1 '실행 환경' "$D/can_guard.log")"
@@ -96,9 +100,10 @@ if [ $ADAPTER = false ]; then
 
 ✅ 준비 완료(브리지만). 표 측정 명령 도구(다른 터미널):
    python3 $REPO/safety/can_guard/lift_cmd.py ${LC_IF[*]} --steer-limit-deg 150 --brake-limit-pct 100 --acc-limit-pct $ACC_LIMIT --log $D/lift_cmd.log
-   (명령: auto on / steer <핸들각°> / brake <%> / acc <%> / zero / auto off / q — 끝낼 땐 auto off 먼저)
+   (명령: auto on / steer <핸들각°> / brake <%> / acc <%> / zero / auto off / q — 끝낼 땐 brake 100 유지한 채 q)
    메모:  echo "\$(date +%s.%N) \$(date +%H:%M:%S) 내용" >> $D/notes.txt
-   종료:  lift_cmd 에서 auto off → q, 그다음 bash $HERE/stop.sh
+   비상 정지: python3 $REPO/safety/can_guard/estop.py   (해제: --reset, 정지 상태에서만)
+   종료:  lift_cmd 에서 brake 100 → q, 그다음 bash $HERE/stop.sh
 MSG
   exit 0
 fi

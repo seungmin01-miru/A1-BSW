@@ -5,6 +5,7 @@
 | 종류 | 예 | 위치 |
 |---|---|---|
 | CAN 원본 | `20261104_LON-ACC-01_r1.log` | `0X_*/raw/` (git 밖, README 에 위치 기록) |
+| 현장 세션 폴더(bringup `--out`) | `20261104_LON-ACC-01_s1/` — 안에 여러 회차, `notes.txt` 의 `r? 시작/끝` 으로 구분 | `0X_*/raw/` + `.sha256` |
 | rosbag (GNSS RTX fix 시) | `20261104_LON-ACC-01_r1_bag/` | `0X_*/raw/` |
 | 변환 CSV | `20261104_LON-ACC-01_r1.csv` | `0X_*/converted/` |
 | 그래프 | `20261104_LON-ACC-01_r1_speed.png` | `0X_*/results/` |

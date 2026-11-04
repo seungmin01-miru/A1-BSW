@@ -5,6 +5,7 @@
 
 | 근거 문서 | 내용 |
 |---|---|
+| [`bsw_test/FIELD_MANUAL.md`](bsw_test/FIELD_MANUAL.md) | **현장 매뉴얼** — 역할·안전·띄우기/끝내기·테스트별 입력 순서 |
 | [`docs/a1_vehicle_characteristics.md`](docs/a1_vehicle_characteristics.md) | 지연·가감속·조향 범위, 어댑터 클램프 근거 |
 | [`docs/a1_todo.md`](docs/a1_todo.md) 0-1절 | 현장 검증 순위(관문 1~4) |
 | [`measurements/2026-11-03_signal_audit/`](measurements/2026-11-03_signal_audit/) | 11-03 실차 신호 검증(`results.md`, `limits.md`, `vendor_answers.md`) |
