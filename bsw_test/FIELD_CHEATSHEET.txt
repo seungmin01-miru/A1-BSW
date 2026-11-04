@@ -1,14 +1,23 @@
-A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)                         v2 2026-11-04
+#############################################################################################
+##  킬스위치 — "정지" 소리 / 이상하면 바로. 위에서 안 서면 바로 아래 것                     ##
+#############################################################################################
+  1) (앱 담당)  앱 비상 정지 버튼                       # 00 통과 후 1순위
+  2) (PC)      es                                       # 아무 터미널. can_guard ESTOP(브레이크 30 → 82 %, 약 1.3 s)
+               python3 ~/git/A1-BSW/safety/can_guard/estop.py      # field_env 안 했을 때 (= es)
+               pkill -USR1 -f can_guard.py              # estop.py 가 안 먹을 때 (SIGUSR1 = 같은 ESTOP)
+  3) (안전)    물리 E-stop                              # 00 통과 전엔 이게 1순위. ESTOP 인데 브레이크 위치 안 오르면 즉시
+  · gen 실행 중  Enter / Ctrl+C = 끝내기(가속 0, 브레이크 100 %)   ← 비상 정지 아님, 급하면 위 1)~3)
+  · lc  실행 중  lift> acc 0  →  lift> brake 100
+  ✗ 하지 말 것  lift> auto off / auto 000 (페일세이프 브레이크 풀림) · pkill -9 can_guard (끊김 동작 미확인 TODO-2, 00-1 r10 시험 때만)
+                차 움직이는 중 esr
+  선 뒤        esr → (lc: brake 100 → q / gen: q) → down → 브레이크 위치 유지 확인(풀리면 물리 E-stop)
+#############################################################################################
+
+A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)                       v2.1 2026-11-04
 이유·판단 기준은 FIELD_MANUAL.md. 여기는 "무엇을 어떤 순서로 치나"만.
 표기  [T1][T2][T3] = 터미널 번호   lift> = lift_cmd 안에서 입력   <…> = 바꿔 넣을 값
       앱 = 앱 정지 담당   안전 = 물리 E-stop 담당
 =============================================================================================
-
-■ 언제든 — 비상 정지
-  (앱 담당) 앱 비상 정지 버튼                              # 1순위 (00 통과 후)
-  es                                                       # PC 비상 정지 (아무 터미널)
-  (안전) 물리 E-stop                                       # 00 통과 전엔 이게 1순위
-  esr                                                      # 차가 완전히 선 뒤 해제 → 그다음 down
 
 ■ 모든 터미널을 열 때마다 (먼저 한 번)
   source ~/git/A1-BSW/bsw_test/field_env.sh               # up down lc chk gen es esr m app 사용 가능
@@ -17,8 +26,10 @@ A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)         
 0. 전날 — 대회 PC (한 번)
 =============================================================================================
   cd ~/git/A1-BSW && git pull                                          # 최신 코드
-  bash bsw_test/00_SAF_estop/scripts/setup_env.sh --build-ws           # vcan0·패키지·ros2_ws 점검/설치
+  bash bsw_test/00_SAF_estop/scripts/setup_env.sh --check              # 점검만 → "✅ 준비됨" 이면 다음 줄 건너뜀
+  bash bsw_test/00_SAF_estop/scripts/setup_env.sh --build-ws           # 빠진 것 설치(vcan0 는 sudo)
   bash bsw_test/00_SAF_estop/scripts/run_sil_check.sh --rt auto --track
+                                                                       # sudo 비밀번호 물음(코어 8·FIFO 90) — 사람이 터미널에서 직접
                                                                        # 전부 PASS 아니면 현장 안 감
   git add bsw_test/00_SAF_estop/results/sil_* && git commit -m "SIL 대회 PC 결과" && git push
 
@@ -36,7 +47,7 @@ A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)         
   [T2] lc …  또는  gen …                           # 명령 도구(둘 중 하나만)
        … 시험 …
   끝  lc 쓴 경우 :  lift> auto brake on
-                    lift> brake 100                # 상태줄 브레이크 위치 8.2 확인
+                    lift> brake 100                # 상태줄 브레이크 위치 확인 — 11-03 8.2 / 11-04 6.1~6.8 (그날 첫 값 기록)
                     lift> q
       gen 쓴 경우:  끝내기(브레이크 100 %) 뜬 뒤  q + Enter
   [T1] down                                        # stop.sh
@@ -240,4 +251,6 @@ A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)         
   gen "0x201 차속이 안 보임" → Kvaser·kv0 확인, 시작 거부는 정상 보호
   gen "상한 위반"          → --var 값이 yaml limits 밖. 값 낮추기
   ESTOP 인데 브레이크 안 오름 → 물리 E-stop, 그날 중단
+  brake 100 인데 위치 6 대   → 11-04 오전 원격 주행에서도 6.1~6.8(8.2 아님). 그날 첫 값 기록하고 진행, 0 근처면 중단
+  앱 버튼 눌러도 0x156/0x157 그대로 → 11-04 오전 원격 주행 내내 값 고정(En 0·Cmd 0). estop_request 없으면 앱 정지 못 씀 → 물리 E-stop 1순위로 진행
   속도 상한 넘음           → lc: acc 0 + brake 30 / gen: Enter → 안 서면 es → 앱 → 물리

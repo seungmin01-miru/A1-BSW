@@ -127,8 +127,8 @@ out(bool(a) and all(auto(x) == (1, 1, 1) and x['steer_command'] == 30.0 and x['b
         and x['acc_command'] == 0 for x in a),
     f'타이어 4° → 핸들 30.0°(raw 300), −1.0 m/s² → 브레이크 40 %, 가속 0 ({len(a)}프레임)')
 b = win(acc + 0.4, kill)
-out(bool(b) and all(x['acc_command'] == 15 and x['break_command'] == 0 for x in b),
-    f'+0.7 m/s² → 가속 15 %, 브레이크 0 ({sorted({x["acc_command"] for x in b})})')
+out(bool(b) and all(x['acc_command'] == 100 and x['break_command'] == 0 for x in b),
+    f'+0.7 m/s² → 가속 100 % (11-04 표: 0.57 이상 포화), 브레이크 0 ({sorted({x["acc_command"] for x in b})})')
 out('INIT → ACTIVE' in guard and guard.count('→ HOLDING') == 1,
     f'10 Hz 입력 구간 워치독 미발동(HOLDING 전이는 kill 때 1번뿐: {guard.count("→ HOLDING")}회)')
 h = win(kill + 0.35, kill + 3.0)

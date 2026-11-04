@@ -1,0 +1,7 @@
+1793773266.584821 15:21:06 시작 silC: /home/ailab/git/A1-BSW/bsw_test/02_LON_profile/profiles/align_straight.yaml 2회차 → /home/ailab/git/A1-BSW/bsw_test/00_SAF_estop/results/sil_20261104_151347_ubuntu22/sil_02_session/C  (차속 감시 OFF(SIL), 조향 오프셋 +0°, ctrl 기본값(잠정))
+1793773266.625410 15:21:06 ▶ silC_r1 실행 시작 (1/2) {'acc': 3.0, 'vmax': 20.0, 'course': 50.0}
+1793773271.945467 15:21:11 silC_r1 끝내기 단계: 5 s 동안 출발 안 함(가속 3 % — 불감대 아래?) → acc / start_pct 올려서 다시 — 가속 0, 브레이크 → 100% (2.5 s), 조향 +0.0° 유지. 이동 0.0 m
+1793773274.445466 15:21:14 silC_r1 정지 확인 → 다음 회차 silC_r2 대기
+1793773274.485482 15:21:14 ▶ silC_r2 실행 시작 (2/2) {'acc': 3.0, 'vmax': 20.0, 'course': 50.0}
+1793773279.805438 15:21:19 silC_r2 끝내기 단계: 5 s 동안 출발 안 함(가속 3 % — 불감대 아래?) → acc / start_pct 올려서 다시 — 가속 0, 브레이크 → 100% (2.5 s), 조향 +0.0° 유지. 이동 0.0 m
+1793773282.825600 15:21:22 생성기 종료 (명령 812 주기, 마지막 회차 silC_r2). can_guard → 50 ms 뒤 HOLDING(브레이크 유지) → 2 s 뒤 STOPPED. 다음: stop.sh (같은 세션 재사용 불가)

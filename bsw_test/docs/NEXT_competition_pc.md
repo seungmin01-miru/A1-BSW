@@ -22,9 +22,9 @@
 
 ## 1. 대회 PC 에서 할 일 (현장 출발 전)
 
-- [ ] `cd ~/git/A1-BSW && git fetch && git checkout claude/ecstatic-keller-uhtbhe && git pull`
-- [ ] `bash bsw_test/00_SAF_estop/scripts/setup_env.sh --build-ws` → 준비됨
-- [ ] `bash bsw_test/00_SAF_estop/scripts/run_sil_check.sh --rt auto --track` → **전부 PASS**(특히 `sil_02_session` A/B/C). FAIL 이면 현장 안 감 — 로그(`results/sil_*/sil_02_session.log`, 각 시나리오 `profile_gen_stdout.txt`)를 보고 고친다
+- [x] `cd ~/git/A1-BSW && git fetch && git checkout claude/ecstatic-keller-uhtbhe && git pull` — 2026-11-04 `de5f161`
+- [x] `bash bsw_test/00_SAF_estop/scripts/setup_env.sh --build-ws` → 준비됨 — 2026-11-04 `--check` 로 ✅(이미 설치·빌드됨)
+- [ ] `bash bsw_test/00_SAF_estop/scripts/run_sil_check.sh --rt auto --track` → **sudo 비밀번호 필요 — 사람이 `! bash …` 로 실행** → **전부 PASS**(특히 `sil_02_session` A/B/C). FAIL 이면 현장 안 감 — 로그(`results/sil_*/sil_02_session.log`, 각 시나리오 `profile_gen_stdout.txt`)를 보고 고친다
 - [ ] 결과 커밋·푸시: `git add bsw_test/00_SAF_estop/results/sil_* && git commit -m "SIL 대회 PC 결과(v2 세션)" && git push`
 - [ ] `source bsw_test/field_env.sh` → `chk uturn.yaml`, `chk align_straight.yaml --var acc=8`, `chk speed_step.yaml $CTRL` 모두 ✅ (경로가 `~/git/A1-BSW` 인지)
 

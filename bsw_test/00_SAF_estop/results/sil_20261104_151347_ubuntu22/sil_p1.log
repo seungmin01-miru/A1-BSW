@@ -1,0 +1,8 @@
+[P-1] shm=p1_cmd_dd107a60/p1_hb_dd107a60 watchdog_t=50ms period=20ms
+[P-1] ACTIVE 진입 대기(0.5s)...
+[P-1] ACTIVE 확인(24개 프레임 관찰). 제어 노드 kill...
+[P-1] can_guard 로그 중 전이 줄: ['[can_guard] ACTIVE → HOLDING (cmd_age=0.05517809299999499, perception_age=0.015377873998659197, vehicle_speed_kph=None, 차량 0x200=None)']
+[P-1] 0x210 송신 연속 여부: True (주기 2.5배 넘은 간격 0개)
+[P-1] HOLDING 프레임 29개: 조향 [16.5], 가속 [0], 브레이크 32% → 43% (램프)
+
+[P-1] PASS (전이 로그=True, 송신 연속=True, 조향고정·가속0·브레이크램프=True)

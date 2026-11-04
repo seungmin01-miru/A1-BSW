@@ -1,4 +1,9 @@
-# BSW 실차 주행 테스트 — 현장 매뉴얼 (v1, 2026-11-04)
+# BSW 실차 주행 테스트 — 현장 매뉴얼 (v2.1, 2026-11-04)
+
+> **킬스위치 (언제든, 위에서 안 서면 아래)** — ① 앱 비상 정지 버튼(00 통과 후 1순위) ② PC `es` = `python3 ~/git/A1-BSW/safety/can_guard/estop.py`,
+> 안 먹으면 `pkill -USR1 -f can_guard.py` ③ 물리 E-stop(00 통과 전 1순위, ESTOP 인데 브레이크 위치가 안 오르면 즉시).
+> **하지 말 것**: `auto off`/auto 000(페일세이프 브레이크 풀림), `pkill -9 can_guard`(0x210 끊김 동작 미확인 TODO-2), 움직이는 중 `esr`.
+> 메모장 [`FIELD_CHEATSHEET.txt`](FIELD_CHEATSHEET.txt) 맨 위에 같은 내용.
 
 계획·합격 기준은 [`docs/test_plan.md`](docs/test_plan.md)와 각 테스트 `0X_*/docs/goal.md`에 있다. 이 문서는 **현장에서 누가 언제 무엇을 입력하는지**만 다룬다.
 기존 도구를 그대로 쓴다: `tools/track_day/bringup.sh`·`stop.sh`(띄우기·끝내기), `safety/can_guard/lift_cmd.py`(명령 입력), `safety/can_guard/estop.py`(비상 정지).
@@ -7,6 +12,7 @@
 모든 명령은 **대회 차량 PC 기준**(Ubuntu 22.04, `~/git/A1-BSW`, 시스템 `python3`, Kvaser Leaf 채널 0). 다른 PC 결과는 판정에 쓰지 않는다.
 2026-11-04: 02 프로파일 생성기(`bsw_test/common/scripts/profile_gen.py`) 추가 — 03(a)·04(a)·05·07 을 손 입력 대신 yaml 로 반복 입력.
 **2026-11-04 v2: 하루 안에 00~07 — 50 m 직선 + 회차 사이 자율 U턴, 한 세션 여러 회차, 속도 제어기(폐루프). 순서는 5-0절.**
+**2026-11-04 v2.1: 맨 위 킬스위치, 11-04 오전 원격 주행 녹화로 바뀐 사실(0-1절), 대회 PC 준비 상태(3-1절).**
 
 ---
 
@@ -28,6 +34,19 @@
 **하루 순서(권장)**: 준비 → **00(관문)** → 01 → **02-1(생성기 확인)** → 03(a) → 04(a) → 05 → 07. 00 을 통과하지 못하면 아래로 내려가지 않는다.
 02-1 이 안 되면 03(a) 이후는 lift_cmd 손 입력으로 한다(아래 각 절의 lift_cmd 순서).
 
+### 0-1. 11-04 오전 원격 주행 녹화로 바뀐 것 (잠정)
+
+출처: [`measurements/2026-11-04_signal_audit/`](../measurements/2026-11-04_signal_audit/) `results.md`·`limits.md`(judge.py), 녹화 11:40:47 ~ 12:12:46, 프레임 1,113,179, Kvaser ch0 듣기만.
+원격 유닛이 0x210 을 직접 보낸 주행(우리 can_guard 아님) — 0x210 auto 비트 내내 111.
+
+| 관측 | 값 | 현장 절차에 미치는 것 |
+|---|---|---|
+| 브레이크 100 % → 0x200 위치 | 정착 중앙값 **6.1**, 최대 6.8 (100 % 0.75 s 이상 유지 표본 107개) | 11-03 의 "8.2 포화" 와 다름 → 끝내기 확인은 **"브레이크 위치가 0 이 아니고 유지되는지"** 로 보고 그날 첫 값을 기록. 0 근처면 중단. 원인(주행 중·하중·업체 설정)은 V26 으로 업체 질문 |
+| 원격 주행 중 0x156/0x157 | 10 ms 주기로 계속 옴, **값 고정**(EPS_En·ACC_En·AEB_En 0, EPS_Cmd·ACC_Cmd 0) | 원격(앱) 조작이 0x156/0x157 값에 안 나타남 → **앱 정지 버튼 프레임은 여전히 미확인**. 00-0 에서 `estop_request` 가 안 찍히면 앱 정지는 못 쓰는 것으로 보고 물리 E-stop 을 1순위로 |
+| 차속 (0x201 좌우 평균) | 최대 31.6 km/h | 30 km/h 상한 근처까지 원격으로 달렸음 — 상한 감시 그대로 |
+| 조향 0x200 | −156.4 ~ +154.5 핸들 °, 조향 속도 p99 371 °/s | 끝각 ±150 그대로 |
+| 에러 프레임 | 2 개 / 32 분 | 무시 가능 |
+
 ## 1. 역할 (최소 4명)
 
 | 역할 | 하는 일 |
@@ -40,7 +59,7 @@
 ## 2. 안전 규칙 (모든 테스트)
 
 1. **0x210 송신자는 can_guard 하나.** 원격 유닛은 켜져 있으면 0x210 을 직접 보낸다 → 원격 유닛은 끈다(켜져 있으면 can_guard 시작 거부).
-2. **정지 수단 3겹**: ① 앱 비상 정지(0x156/0x157 → can_guard ESTOP) ② PC `estop.py` ③ 물리 E-stop. 00 통과 전에는 ③을 1순위로 본다.
+2. **정지 수단 3겹**(맨 위 킬스위치): ① 앱 비상 정지(0x156/0x157 → can_guard ESTOP) ② PC `estop.py`(안 먹으면 `pkill -USR1 -f can_guard.py`) ③ 물리 E-stop. 00 통과 전에는 ③을 1순위로 본다.
 3. **auto 000 을 보내지 않는다** — 차량 페일세이프 브레이크가 풀린다(11-03). can_guard 는 이제 auto 000 명령을 송신하지 않지만(침묵),
    **끝낼 때는 항상 `brake 100` 유지한 채 `q` → `stop.sh`**.
 4. **속도 상한 30 km/h**(첫날은 테스트별 상한이 더 낮다, 아래 표). **can_guard 에는 속도 제한이 없다** — PC 담당이 상태줄 속도를 보고,
@@ -67,6 +86,9 @@ bash bsw_test/00_SAF_estop/scripts/setup_env.sh --build-ws        # vcan0·pytho
 bash bsw_test/00_SAF_estop/scripts/run_sil_check.sh --rt auto --track   # 단위·E1~E6·P-1/P-2·02 생성기·트랙 리허설 → 전부 PASS
 git add bsw_test/00_SAF_estop/results/sil_* && git commit -m "00 SIL 대회 PC 결과" && git push
 ```
+- `setup_env.sh --check` 로 먼저 보면 아무것도 안 바꾼다. "✅ 준비됨" 이면 `--build-ws` 는 건너뛰어도 된다.
+- `run_sil_check.sh --rt auto` 는 **sudo 비밀번호를 묻는다**(can_guard 를 격리 코어 8 · SCHED_FIFO 90 으로). Claude 세션에서는 `! bash …` 로 사람이 직접 입력.
+- [x] 대회 PC `setup_env.sh --check` ✅ 준비됨 — vcan0 UP, python-can 4.6.1, cantools 44.0.0, ros2_ws 빌드됨, `de5f161` (2026-11-04 15:11)
 - [ ] SIL 전부 PASS (FAIL 이면 현장 가지 않는다)
 - [ ] localization 팀: GNSS 스택 실행 PC·`ROS_DOMAIN_ID`·fix 판정 기준(TODO-5) 받기
 - [ ] 각 테스트 `goal.md` 의 담당자·예정일·비상정지 담당자 채우기
@@ -103,7 +125,7 @@ bash ~/git/A1-BSW/tools/track_day/bringup.sh --kvaser 0 --no-adapter --acc-limit
 ### 4-1. 끝내기 (매 세션)
 ```
 (lift_cmd)  auto brake on
-            brake 100        ← 상태줄 브레이크 위치 8.2 확인
+            brake 100        ← 상태줄 브레이크 위치 확인(11-03 8.2 / 11-04 6.1~6.8, 0-1절 — 그날 첫 값 기록)
             q
 ```
 ```bash
@@ -231,7 +253,7 @@ python3 $G check $P/gen_check.yaml --var acc=6                     # ✅ 검사 
 python3 $G run $P/gen_check.yaml --var acc=6 --run $(date +%Y%m%d)_LON-PROF-01_r1 --interface kvaser --channel 0 --bitrate 500000
 #   대기(브레이크 30 %, auto 111) → 안전 "비었음" → Enter → 사다리꼴 가속 2 s 오름·4 s 유지·2 s 내림 → 끝내기(브레이크 100 %) → q → stop.sh
 ```
-- 확인: 상태줄 `[gen] run` 의 명령 = `0x210` 값(같은 줄 오른쪽), 차속 표시가 나옴, 끝내기에서 브레이크 위치 8.2.
+- 확인: 상태줄 `[gen] run` 의 명령 = `0x210` 값(같은 줄 오른쪽), 차속 표시가 나옴, 끝내기에서 브레이크 위치가 오르고 유지(4-1 값).
 - 아무 줄 Enter / Ctrl+C = 즉시 끝내기. 차속 > yaml `max_speed_kph`, 0x201 0.3 s 끊김이면 자동 끝내기.
 - 기록: 세션 폴더에 `<회차>_cmd.csv`·`_gen.log`·`_profile.yaml`, `notes.txt` 에 시작/끝 자동 기록(메모 `m` 따로 안 해도 됨).
 
@@ -309,6 +331,7 @@ acc 0 → brake 30 → 정지 → steer 0
 | lift_cmd 를 띄워도 0x210 이 안 나감 | `auto on` 을 안 했다(auto 000 은 침묵) — 정상 |
 | ESTOP 인데 브레이크 위치가 안 오름 | 즉시 물리 E-stop. `can_guard.log`·`events.csv` 보관, 그날 주행 중단 |
 | `estop.py --reset` "거부" | 차가 아직 움직임(> 3 km/h) 또는 앱 버튼이 아직 눌림, 또는 0x201 차속 없음 → 재시작(4-1) |
+| 브레이크 100 % 인데 위치 6 대 | 11-04 오전에도 6.1~6.8(0-1절). 그날 첫 값 기록하고 진행. 0 근처면 중단 |
 | `stop.sh` 뒤 브레이크가 풀림 | 물리 E-stop, 시각 기록 → TODO-2 증거. 다음부터 끝내기 전에 고임목 |
 | 속도가 상한을 넘음 | `acc 0` + `brake 30`, 안 서면 `estop.py` / 앱 / 물리 E-stop |
 | 0x201 속도가 0 인데 차가 움직임 | 가감속 시험 중단(속도 감시 불가) |

@@ -17,6 +17,8 @@ TOPICS=(
   /diagnostics
   /gsof_client/odom /gsof_client/navsat /gsof_client/gsof/ins_solution_49 /gsof_client/gsof/ins_solution_rms_50
   /a1_gnss/odom /a1_gnss/navsat /a1_gnss/accel   # A1_localization gnss.launch.py (TODO-5)
+  /localization/odom /localization/accel /lidar_odometry/pose /lidar_odometry/pose_quality   # A1_localization 제어기 출력(11-04)
+  /control/test/event              # 제어 시험 스크립트 표시(단계·측정값, std_msgs/String JSON)
 )
 PIDS=()
 if [ -n "$CH" ] && ip link show "$CH" >/dev/null 2>&1; then

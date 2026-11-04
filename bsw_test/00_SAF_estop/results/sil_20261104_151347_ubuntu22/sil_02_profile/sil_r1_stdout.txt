@@ -1,0 +1,13 @@
+프로파일 LON-PROF-01: 최대 9.5 s, 주기 20 ms, 구간 5개
+  상한  조향 ±15°  브레이크 100%  가속 10%  조향속도 120°/s  차속 10 km/h
+  최대  조향 0.0°  브레이크 0.0%  가속 6.0%
+  대기 {'steer': 0.0, 'brake': 30.0, 'acc': 0.0}  끝내기 브레이크 100% / 2.5 s  vars {'acc': 6.0}
+    0.00~  0.50 s  seg0 브레이크풀기      유지                         시작 조향 +0.0 브레이크 0 가속 0
+    0.50~  2.50 s  seg1 사다리꼴        acc 0→6                    시작 조향 +0.0 브레이크 0 가속 0
+    2.50~  6.50 s  seg1 사다리꼴        유지                         시작 조향 +0.0 브레이크 0 가속 6
+    6.50~  8.50 s  seg1 사다리꼴        acc 6→0                    시작 조향 +0.0 브레이크 0 가속 6
+    8.50~  9.50 s  seg2 hold        유지                         시작 조향 +0.0 브레이크 0 가속 0
+[gen] 시작 sil_r1: /home/ailab/git/A1-BSW/bsw_test/02_LON_profile/profiles/gen_check.yaml 1회차 → /home/ailab/git/A1-BSW/bsw_test/00_SAF_estop/results/sil_20261104_151347_ubuntu22/sil_02_profile  (차속 감시 OFF(SIL), 조향 오프셋 +0°, ctrl 기본값(잠정))
+[gen] ▶ sil_r1 실행 시작 (1/1) {'acc': 6.0}
+[gen] sil_r1 끝내기 단계: 프로파일 완료 — 가속 0, 브레이크 → 100% (2.5 s), 조향 +0.0° 유지. 이동 0.0 m
+[gen] 생성기 종료 (명령 626 주기, 마지막 회차 sil_r1). can_guard → 50 ms 뒤 HOLDING(브레이크 유지) → 2 s 뒤 STOPPED. 다음: stop.sh (같은 세션 재사용 불가)

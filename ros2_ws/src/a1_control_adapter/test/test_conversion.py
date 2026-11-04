@@ -77,8 +77,9 @@ def test_long_values_from_track_yaml():
     assert lm.to_pedals(-4.0) == (0.0, 100.0)
     assert lm.to_pedals(-9.0) == (0.0, 100.0)  # 표 밖 포화
     assert lm.to_pedals(-1.0) == (0.0, pytest.approx(40.0))
-    assert lm.to_pedals(1.3)[0] == pytest.approx(30.0)
-    assert lm.to_pedals(5.0)[0] == pytest.approx(30.0)   # 가속 상한
+    assert lm.to_pedals(0.13)[0] == pytest.approx(80.0)   # 11-04 실차
+    assert lm.to_pedals(0.57)[0] == pytest.approx(100.0)
+    assert lm.to_pedals(5.0)[0] == pytest.approx(100.0)   # 표 끝 포화
 
 
 def test_long_caps():
