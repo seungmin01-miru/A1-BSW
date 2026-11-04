@@ -8,6 +8,8 @@ can_stack_development.md §5.D 참고:
   (모든 상태) 인지 하트비트 끊김 → DEGRADED (§7.2 GPU-crash rule: "decel per team policy")
   DEGRADED 지속 또는 실측 차속 정지 문턱 이하 → STOPPED (2026-09-21 초안, 아래 문서 참고)
   (모든 상태) 재시작 → 항상 INIT 부터
+  (모든 상태) 비상 정지 요청 → ESTOP(최우선, 래치). ESTOP → (해제 요청 + 요청 원천 모두 꺼짐 + 차속 정지) → STOPPED
+    — 2026-11-04 추가(bsw_test 00 SAF-ESTOP). ESTOP 은 명령이 다시 와도 풀리지 않는다.
 """
 import enum
 
@@ -18,6 +20,7 @@ class State(enum.Enum):
     HOLDING = 'HOLDING'
     DEGRADED = 'DEGRADED'
     STOPPED = 'STOPPED'
+    ESTOP = 'ESTOP'
 
 
 DEFAULT_WATCHDOG_T_S = 0.050       # §3-6 제안값 "50 ms" — 팀 확정 필요(설계 §5.D 에 명시)
@@ -36,7 +39,8 @@ def next_state(current, cmd_age_s, holding_duration_s, perception_age_s,
                degraded_duration_s=None,
                perception_lost_stopped_after_s=DEFAULT_PERCEPTION_LOST_STOPPED_AFTER_S,
                vehicle_speed_kph=None,
-               stop_speed_kph=DEFAULT_STOP_SPEED_KPH):
+               stop_speed_kph=DEFAULT_STOP_SPEED_KPH,
+               estop=False, estop_reset=False):
     """현재 상태 + 관측값 → 다음 상태. cmd_age_s/perception_age_s 는 None 이면 "한 번도 못 받음"(무한 나이 취급).
     degraded_duration_s/vehicle_speed_kph 도 마찬가지로 None 이면 "모름" — 새 조건 없이 기존 동작 그대로다
     (호출자가 안 넘기면 완전히 이전 버전과 동일하게 동작, 하위 호환).
@@ -63,10 +67,21 @@ def next_state(current, cmd_age_s, holding_duration_s, perception_age_s,
     **우선순위 설계 결정**: 명령이 stale 이면(cmd_stale) 인지 상태와 무관하게 HOLDING/STOPPED 계열로 간다 —
     조향 유지·감속 램프는 인지 입력이 필요 없는 동작이라, "명령 없음"이 "인지 없음"보다 항상 우선한다.
     즉 DEGRADED 는 "명령은 살아있는데 인지만 없는" 좁은 창에서만 나타난다.
+
+    **비상 정지(2026-11-04)**: `estop`=지금 어떤 원천이든 정지 요청이 켜져 있음, `estop_reset`=이번 주기에 해제 요청이
+    들어옴. ESTOP 은 어느 상태보다 우선하고 래치된다. 해제는 정지 요청이 모두 꺼졌고 **실측 차속이 정지 문턱 이하일
+    때만** 받아 STOPPED(브레이크 유지)로 간다 — 차속을 모르면(None) 해제하지 않는다(can_guard 재시작으로만 빠져나감).
     """
+    vehicle_near_stop = vehicle_speed_kph is not None and vehicle_speed_kph <= stop_speed_kph
+    if current == State.ESTOP:
+        if estop_reset and not estop and vehicle_near_stop:
+            return State.STOPPED
+        return State.ESTOP
+    if estop:
+        return State.ESTOP
+
     perception_lost = perception_age_s is None or perception_age_s > perception_timeout_s
     cmd_stale = cmd_age_s is None or cmd_age_s > watchdog_t_s
-    vehicle_near_stop = vehicle_speed_kph is not None and vehicle_speed_kph <= stop_speed_kph
 
     if current == State.INIT:
         if cmd_stale:

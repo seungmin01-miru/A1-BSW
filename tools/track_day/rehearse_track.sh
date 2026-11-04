@@ -4,7 +4,7 @@
 #
 #   bash tools/track_day/rehearse_track.sh
 #
-# 확인하는 것: disarm 중 auto 0 / 입력 없을 때 arm 거부 / 타이어각→핸들각(조향비 7.5)·가감속→% 변환이 0x210 raw 로 /
+# 확인하는 것: disarm 중 0x210 침묵(auto 000 안 보냄) / 입력 없을 때 arm 거부 / 타이어각→핸들각(조향비 7.5)·가감속→% 변환이 0x210 raw 로 /
 # arm 순간 핸들 속도 제한 / 10 Hz 느린 제어기에서도 can_guard 워치독 미발동 / 제어기 kill → 고장 래치 → HOLDING →
 # STOPPED(조향 고정·가속 0·브레이크) / 래치 중 arm 거부·disarm 해제 / can_guard 재시작 후 자동 재연결 /
 # NaN 입력 → 고장 래치.
@@ -55,7 +55,7 @@ start_guard guard1.log
 wait_topic /control/adapter/status || echo "  (어댑터 토픽이 늦게 뜸 — adapter.log 확인)"
 sleep 1.5
 
-echo; echo "[1] 입력 없음 → arm 거부, disarm 중 auto 0"
+echo; echo "[1] 입력 없음 → arm 거부, disarm 중 0x210 침묵"
 r=$(svc arm_steer SetBool "{data: true}")
 echo "$r" | grep -q "success=False" && ok "제어기 입력 없을 때 arm_steer 거부" || bad "arm 거부 안 됨: $r"
 
@@ -115,11 +115,10 @@ for line in open(sys.argv[2]):
 def out(c, s): print(('OK ' if c else 'NG ') + s)
 def win(a, b): return [d for t, d in f if a <= t < b]
 def auto(d): return (d['steer_is_auto_command'], d['break_is_auto_command'], d['acc_is_auto_command'])
-dts = [b[0] - a[0] for a, b in zip(f, f[1:]) if not (restart - 1 < a[0] < restart + 1)]
+dts = [b[0] - a[0] for a, b in zip(f, f[1:]) if a[0] >= arm_s and not (restart - 1 < a[0] < re1 + 1)]  # 침묵 구간(disarm·재시작 후) 제외
 out(max(dts) < 0.03, f'0x210 주기 중앙값 {statistics.median(dts)*1000:.1f} ms, 최대 {max(dts)*1000:.1f} ms (재시작 구간 제외)')
 d = win(dis0, dis1)
-out(bool(d) and all(auto(x) == (0, 0, 0) and x['steer_command'] == 0 and x['break_command'] == 0 for x in d),
-    f'disarm(shadow): {len(d)}프레임 auto 000·명령 0')
+out(not d, f'disarm(shadow): 0x210 송신 안 함({len(d)}프레임) — auto 000 = 페일세이프 브레이크 해제라 침묵(2026-11-04)')
 first = [x['steer_command'] for x in win(arm_s - 2.5, arm_s + 1.5) if x['steer_is_auto_command']]
 out(bool(first) and first[0] < 29.0 and 30.0 in first,
     f'arm 순간 핸들 속도 제한: 첫 값 {first[0] if first else None}° → 30.0° (120 °/s)')
@@ -138,7 +137,7 @@ out(bool(h) and {x['steer_command'] for x in h} == {30.0} and all(x['acc_command
     f'kill 뒤 조향 {sorted({x["steer_command"] for x in h})}° 고정·가속 0·브레이크 최대 {max((x["break_command"] for x in h), default=None)} %')
 out('→ STOPPED' in guard, 'can_guard STOPPED 도달')
 r = win(restart + 1.8, re1)
-out(bool(r) and all(auto(x) == (0, 0, 0) for x in r), f'can_guard 재시작 후 재연결·disarm auto 000 ({len(r)}프레임)')
+out(not r and 'INIT → ACTIVE' in guard2, f'can_guard 재시작 후 재연결(INIT → ACTIVE)·disarm 침묵 ({len(r)}프레임)')
 n = win(nan + 0.4, nan + 1.2)
 out(('ACTIVE → HOLDING' in guard2 or 'ACTIVE → STOPPED' in guard2) and bool(n) and all(x['acc_command'] == 0 for x in n),
     f'NaN 입력 뒤 can_guard HOLDING/STOPPED(가짜 차량 정지 중이라 바로 STOPPED 가능)·가속 0 (브레이크 {sorted({x["break_command"] for x in n})[-1:] if n else "?"} %)')

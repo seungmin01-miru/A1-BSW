@@ -220,3 +220,98 @@ class HeartbeatChannel:
         self._shm.close()
         if self._owner:
             self._shm.unlink()
+
+
+# --- 비상 정지 채널 (2026-11-04, bsw_test 00 SAF-ESTOP) -------------------------------------------------------------
+ESTOP_SHM_NAME_DEFAULT = 'a1_can_guard_estop'
+
+
+class _EstopPayload(ctypes.Structure):
+    _fields_ = [
+        ('seq', ctypes.c_uint64),
+        ('timestamp_ns', ctypes.c_int64),   # 마지막 trigger() 의 time.monotonic_ns() — 감지 지연 계산용
+        ('request', ctypes.c_uint8),         # 1 = 정지 요청(래치, reset() 전까지 유지)
+        ('_pad', ctypes.c_uint8 * 3),
+        ('reset_seq', ctypes.c_uint32),      # reset() 마다 +1 — can_guard 는 값이 바뀐 것을 "해제 요청"으로 본다
+        ('source', ctypes.c_char * 16),      # 누가 눌렀나(로그용)
+    ]
+
+
+@dataclass
+class EstopState:
+    request: bool
+    trigger_mono_ns: int
+    reset_seq: int
+    source: str
+
+
+class EstopChannel:
+    """정지 요청 → can_guard. `HeartbeatChannel` 과 같은 seqlock. can_guard 가 만들고(`create`), `estop.py` 가 연다.
+
+      guard = EstopChannel.create();  st = guard.read()     # EstopState 또는 None(한 번도 안 씀)
+      tool = EstopChannel.open();     tool.trigger('laptop'); tool.reset()
+    """
+
+    def __init__(self, shm, owner):
+        self._shm = shm
+        self._owner = owner
+        self._payload = _EstopPayload.from_buffer(self._shm.buf)
+
+    @classmethod
+    def create(cls, name=ESTOP_SHM_NAME_DEFAULT):
+        size = ctypes.sizeof(_EstopPayload)
+        try:
+            shm = shared_memory.SharedMemory(name=name, create=True, size=size)
+        except FileExistsError:
+            stale = shared_memory.SharedMemory(name=name)
+            stale.close()
+            stale.unlink()
+            shm = shared_memory.SharedMemory(name=name, create=True, size=size)
+        ch = cls(shm, owner=True)
+        ch._payload.seq = 0
+        return ch
+
+    @classmethod
+    def open(cls, name=ESTOP_SHM_NAME_DEFAULT):
+        shm = shared_memory.SharedMemory(name=name, create=False)
+        _unregister_from_tracker(shm)
+        return cls(shm, owner=False)
+
+    def _write(self, request=None, reset=False, source=None, stamp=False):
+        p = self._payload
+        seq = p.seq if p.seq % 2 == 0 else p.seq + 1
+        p.seq = seq + 1
+        if stamp:
+            p.timestamp_ns = time.monotonic_ns()
+        if request is not None:
+            p.request = int(request)
+        if reset:
+            p.reset_seq = (p.reset_seq + 1) & 0xFFFFFFFF
+        if source is not None:
+            p.source = source.encode()[:15]
+        p.seq = seq + 2
+
+    def trigger(self, source='manual'):
+        self._write(request=True, source=source, stamp=True)
+
+    def reset(self, source='manual'):
+        self._write(request=False, reset=True, source=source)
+
+    def read(self, max_retries=1000):
+        p = self._payload
+        for _ in range(max_retries):
+            seq1 = p.seq
+            if seq1 == 0:
+                return None
+            if seq1 % 2 != 0:
+                continue
+            st = EstopState(bool(p.request), p.timestamp_ns, p.reset_seq, p.source.decode(errors='replace'))
+            if seq1 == p.seq:
+                return st
+        raise TornReadError(f'EstopChannel: {max_retries}번 재시도해도 seqlock 이 안정되지 않음')
+
+    def close(self):
+        del self._payload
+        self._shm.close()
+        if self._owner:
+            self._shm.unlink()

@@ -144,3 +144,23 @@ python3 can_guard.py --interface kvaser --channel 0 --bitrate 500000 --steer-lim
    이면 상태머신이 ACTIVE → STOPPED 로 직행하는데, 조향 고정값을 HOLDING/DEGRADED 진입 때만 캡처해서 STOPPED 가
    초기값 0° 를 보냈다(EAIT 시절엔 STOPPED 가 조향을 놓아 안 드러남). `command_policy.held_steer_on_transition()` 으로
    "ACTIVE/INIT 에서 세 정지 계열 상태로 처음 들어가는 순간 캡처, 그 사이 이동 땐 유지"로 수정 + 유닛테스트 2개.
+
+## 비상 정지 (2026-11-04, bsw_test 00 SAF-ESTOP)
+
+| 항목 | 내용 |
+|---|---|
+| 원천 ① | 공유메모리 `EstopChannel`(`a1_can_guard_estop`) — `python3 estop.py` 누름 / `--reset` 해제 / `--status` |
+| 원천 ② | `pkill -USR1 -f can_guard.py` (도구가 안 될 때 예비) |
+| 원천 ③ | **핸드폰 앱(원격) 0x156/0x157** (`--estop-can remote`, 기본): 0x156 EPS/ACC/AEB_En = 1 **또는** 0x157 ACC_Cmd ≤ `--estop-acc-mps2`(−1.0) 가 `--estop-confirm-frames`(2) 연속. 데드맨 `--estop-can-timeout S`(기본 끔). 시작 전 점검에서 0x156/0x157 이 안 보이면 경고, `--estop-can-required` 면 거부(종료 4). **판정 조건은 잠정 — 앱 비상 정지 버튼이 실제로 무엇을 보내는지 현장 확인** |
+| 상태 | `ESTOP` — 어느 상태보다 우선, 래치. 해제는 정지 요청이 모두 꺼지고 차속 ≤ `--stop-speed-kph` 일 때만 → STOPPED(브레이크 유지). 차속을 모르면 해제 안 됨(재시작) |
+| ESTOP 출력 | 가속 즉시 0, 조향 진입값 고정, **auto 비트 유지(000 금지)**, 브레이크 `--estop-brake-start-pct 30` → `--estop-brake-ramp-pct-s 40` → `--estop-brake-max-pct 82` (휠락 방지로 서서히, 잠정) |
+| 보호 상태 브레이크 | HOLDING/DEGRADED/STOPPED: `--hold-brake-pct 30` 즉시 → `--hold-brake-ramp-pct-s 20` → `--hold-brake-max-pct 60` (명령이 다시 안 들어오면 서서히, 잠정). 제어 노드가 더 세게 밟고 있었으면 줄이지 않음 |
+| INIT | `--init-mode silent`(기본): 첫 유효 명령 전엔 0x210 송신 안 함(auto 000 = 페일세이프 브레이크 해제, 11-03). 예전 동작은 `legacy` |
+| 이벤트 로그 | `--event-log x.csv`: `wall_s,mono_s,event,detail` — `estop_request`(감지 지연 포함), `state`, `estop_first_tx`, `estop_reset accepted/refused` |
+
+```bash
+python3 -m pytest test/ -q                        # 91개 (ESTOP 단위 시험 포함)
+python3 sil_tests/e_estop.py --channel vcan0      # E1~E6 (vcan 필요: sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0)
+```
+
+⚠️ 남은 문제: 제어 노드(어댑터 disarm, `lift_cmd` auto off)가 auto 000 명령을 쓰면 ACTIVE 에서 그대로 나가 브레이크가 풀린다 — silent INIT 은 "첫 명령 전"만 막는다.

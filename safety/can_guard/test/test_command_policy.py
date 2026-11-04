@@ -1,7 +1,7 @@
 """상태별 명령 생성 로직 — 실제 클램프·인코딩 없이 "무엇을 만들어내는가"만 확인. (2026-10-06 실차 0x210 기준)"""
 import pytest
 
-from command_policy import command_for_state
+from command_policy import BrakeProfile, BrakeRamp, command_for_state
 from plausibility import RateLimiter
 from protocol import Command
 from state_machine import State
@@ -11,11 +11,20 @@ AUTO = dict(steer_auto=True, brake_auto=True, acc_auto=True)
 
 def _run(state, last, held=0.0, steer=None, acc=None, brake=None, dt=0.02, **kw):
     return command_for_state(state, last, held, steer or RateLimiter(), acc or RateLimiter(),
-                             brake or RateLimiter(30.0), dt, **kw)
+                             brake or BrakeRamp(), dt, **kw)
 
 
-def test_init_is_manual_and_zero():
-    out = _run(State.INIT, Command(steer_cmd_deg=99, acc_cmd_pct=50, **AUTO))
+HOLD = BrakeProfile(30.0, 20.0, 60.0)
+ESTOP = BrakeProfile(30.0, 40.0, 82.0)
+
+
+def test_init_silent_sends_nothing():
+    """2026-11-04: auto 000 은 페일세이프 브레이크를 푼다(11-03) → 기본 INIT 은 아예 안 보낸다."""
+    assert _run(State.INIT, Command(steer_cmd_deg=99, acc_cmd_pct=50, **AUTO)) is None
+
+
+def test_init_legacy_is_manual_and_zero():
+    out = _run(State.INIT, Command(steer_cmd_deg=99, acc_cmd_pct=50, **AUTO), init_mode='legacy')
     assert out == Command()   # auto 전부 0, 명령 0
 
 
@@ -32,26 +41,41 @@ def test_active_applies_steer_rate_limit():
     assert out.steer_cmd_deg == 1.0   # 0.1 s × 10 deg/s
 
 
-def test_holding_freezes_steer_zeroes_acc_ramps_brake():
-    brake = RateLimiter(30.0)
+def test_holding_freezes_steer_zeroes_acc_steps_then_ramps_brake():
+    """2026-11-04: 진입 즉시 30 %, 명령이 안 돌아오면 20 %/s 로 60 % 까지."""
+    brake = BrakeRamp()
     last = Command(steer_cmd_deg=20.0, brake_cmd_pct=0.0, acc_cmd_pct=8.0, **AUTO)
     _run(State.ACTIVE, last, brake=brake)                       # ACTIVE 에서 브레이크 기준 0 으로 리셋됨
     out = _run(State.HOLDING, Command(steer_cmd_deg=999.0, acc_cmd_pct=8.0, **AUTO), held=20.0,
-               brake=brake, dt=0.1)
+               brake=brake, dt=0.1, hold_profile=HOLD)
     assert out.steer_cmd_deg == 20.0       # 진입 순간 값에 고정(last 가 이상해도 held 기준)
     assert out.acc_cmd_pct == 0.0
-    assert out.brake_cmd_pct == pytest.approx(3.0)   # 0 → 30 % 방향으로 0.1 s × 30 %/s
-    for _ in range(20):
-        out = _run(State.HOLDING, last, held=20.0, brake=brake, dt=0.1)
-    assert out.brake_cmd_pct == pytest.approx(30.0)  # 유지값에서 멈춤
+    assert out.brake_cmd_pct == pytest.approx(32.0)  # 30 으로 바로 + 0.1 s × 20 %/s
+    for _ in range(40):
+        out = _run(State.HOLDING, last, held=20.0, brake=brake, dt=0.1, hold_profile=HOLD)
+    assert out.brake_cmd_pct == pytest.approx(60.0)  # 상한에서 멈춤
 
 
 def test_holding_never_reduces_a_stronger_brake():
-    brake = RateLimiter(30.0)
-    last = Command(brake_cmd_pct=50.0, **AUTO)
+    brake = BrakeRamp()
+    last = Command(brake_cmd_pct=70.0, **AUTO)
     _run(State.ACTIVE, last, brake=brake)
-    out = _run(State.HOLDING, last, brake=brake, dt=0.1)
-    assert out.brake_cmd_pct == 50.0       # 유지값 30 보다 세게 밟고 있었으면 줄이지 않는다
+    out = _run(State.HOLDING, last, brake=brake, dt=0.1, hold_profile=HOLD)
+    assert out.brake_cmd_pct == 70.0       # 상한 60 보다 세게 밟고 있었으면 줄이지 않는다
+
+
+def test_auto_off_command_is_not_sent_by_default():
+    """2026-11-04: 어댑터 disarm·lift_cmd auto off 의 auto 000 은 페일세이프 브레이크를 풀므로 송신 안 함."""
+    off = Command(steer_cmd_deg=3.0, brake_cmd_pct=0.0)
+    for st in (State.ACTIVE, State.HOLDING, State.DEGRADED, State.STOPPED):
+        assert _run(st, off) is None
+    assert _run(State.ACTIVE, off, auto_off_mode='send') == off
+    assert _run(State.STOPPED, off, stopped_mode='manual') == Command()   # 명시적 "사람에게 넘김"은 유지
+
+
+def test_partial_auto_is_still_sent():
+    out = _run(State.ACTIVE, Command(steer_auto=True, steer_cmd_deg=4.0))
+    assert out is not None and out.steer_auto and not out.brake_auto
 
 
 def test_holding_keeps_auto_bits_as_given():
@@ -71,12 +95,12 @@ def test_degraded_same_mechanism_as_holding():
 
 
 def test_stopped_hold_mode_keeps_auto_and_brake():
-    brake = RateLimiter(30.0)
-    brake.reset(30.0)
+    brake = BrakeRamp()
+    brake.reset(60.0)
     last = Command(steer_cmd_deg=7.0, acc_cmd_pct=4.0, **AUTO)
-    out = _run(State.STOPPED, last, held=7.0, brake=brake, stopped_mode='hold')
+    out = _run(State.STOPPED, last, held=7.0, brake=brake, stopped_mode='hold', hold_profile=HOLD)
     assert (out.steer_auto, out.brake_auto, out.acc_auto) == (True, True, True)
-    assert out.brake_cmd_pct == 30.0 and out.acc_cmd_pct == 0.0 and out.steer_cmd_deg == 7.0
+    assert out.brake_cmd_pct == 60.0 and out.acc_cmd_pct == 0.0 and out.steer_cmd_deg == 7.0
 
 
 def test_stopped_manual_mode_hands_back():
@@ -108,3 +132,55 @@ def test_held_steer_kept_between_hold_states():
     assert held_steer_on_transition(State.DEGRADED, State.HOLDING, 12.0, later) == 12.0
     assert held_steer_on_transition(State.HOLDING, State.STOPPED, 12.0, later) == 12.0
     assert held_steer_on_transition(State.ACTIVE, State.ACTIVE, 12.0, later) == 12.0
+
+
+# --- ESTOP (2026-11-04, bsw_test 00 SAF-ESTOP) ---
+
+def test_estop_zeroes_acc_immediately_even_with_rate_limit():
+    acc = RateLimiter(max_delta_per_s=1.0)
+    acc.step(20.0, dt_s=0.02)
+    out = _run(State.ESTOP, Command(acc_cmd_pct=20.0, steer_cmd_deg=5.0, **AUTO), held=5.0, acc=acc,
+               estop_profile=ESTOP)
+    assert out.acc_cmd_pct == 0.0
+
+
+def test_estop_brake_starts_then_ramps_gradually_to_max():
+    """휠락 방지(사용자 결정): 계단 100 % 가 아니라 30 % → 40 %/s → 82 %."""
+    brake = BrakeRamp()
+    last = Command(steer_cmd_deg=-12.0, acc_cmd_pct=15.0, **AUTO)
+    _run(State.ACTIVE, last, brake=brake)
+    outs = [_run(State.ESTOP, last, held=-12.0, brake=brake, dt=0.1, estop_profile=ESTOP) for _ in range(20)]
+    assert outs[0].brake_cmd_pct == pytest.approx(34.0)
+    assert outs[5].brake_cmd_pct == pytest.approx(54.0)
+    assert outs[-1].brake_cmd_pct == pytest.approx(82.0)
+    assert all(b.brake_cmd_pct <= a.brake_cmd_pct + 4.0 + 1e-9 for a, b in zip(outs, outs[1:]))
+    assert all(o.steer_cmd_deg == -12.0 for o in outs)
+
+
+def test_estop_keeps_auto_bits_never_000():
+    out = _run(State.ESTOP, Command(steer_cmd_deg=1.0, **AUTO), held=1.0, estop_profile=ESTOP)
+    assert (out.steer_auto, out.brake_auto, out.acc_auto) == (True, True, True)
+
+
+def test_estop_without_any_auto_sends_nothing():
+    """제어권을 받은 적 없이(INIT 에서) 비상 정지 → auto 000 을 보내면 브레이크가 풀리므로 송신 안 함."""
+    assert _run(State.ESTOP, Command(), estop_profile=ESTOP) is None
+
+
+def test_estop_continues_from_stronger_hold_brake():
+    brake = BrakeRamp()
+    brake.reset(50.0)   # HOLDING 에서 이미 50 % 까지 올라와 있었음
+    out = _run(State.ESTOP, Command(**AUTO), brake=brake, dt=0.1, estop_profile=ESTOP)
+    assert out.brake_cmd_pct == pytest.approx(54.0)
+
+
+def test_brake_never_drops_after_estop_reset_to_stopped():
+    brake = BrakeRamp()
+    brake.reset(82.0)
+    out = _run(State.STOPPED, Command(**AUTO), brake=brake, hold_profile=HOLD)
+    assert out.brake_cmd_pct == 82.0   # STOPPED 상한(60)이 더 낮아도 줄이지 않는다
+
+
+def test_brake_profile_rejects_bad_values():
+    with pytest.raises(ValueError):
+        BrakeProfile(90.0, 10.0, 60.0)

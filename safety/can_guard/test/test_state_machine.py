@@ -115,3 +115,27 @@ def test_active_ignores_vehicle_speed():
     """정상 주행 중 서행/정차(코너·다른 차 대기 등)를 정지로 오판하면 안 된다 — ACTIVE 는 차속을 절대 안 본다."""
     assert next_state(State.ACTIVE, cmd_age_s=0.01, holding_duration_s=0.0,
                       perception_age_s=0.01, vehicle_speed_kph=0.0, stop_speed_kph=3.0) == State.ACTIVE
+
+
+# --- ESTOP (2026-11-04) ---
+import pytest  # noqa: E402
+
+ALL = [State.INIT, State.ACTIVE, State.HOLDING, State.DEGRADED, State.STOPPED]
+
+
+@pytest.mark.parametrize('cur', ALL)
+def test_estop_overrides_every_state(cur):
+    assert next_state(cur, cmd_age_s=0.001, holding_duration_s=0.0, perception_age_s=0.0, estop=True) == State.ESTOP
+
+
+def test_estop_latches_when_request_clears_and_commands_resume():
+    assert next_state(State.ESTOP, cmd_age_s=0.001, holding_duration_s=0.0, perception_age_s=0.0,
+                      estop=False, vehicle_speed_kph=0.0) == State.ESTOP
+
+
+def test_estop_reset_needs_stop_speed_and_no_active_request():
+    kw = dict(cmd_age_s=0.001, holding_duration_s=0.0, perception_age_s=0.0, estop_reset=True)
+    assert next_state(State.ESTOP, estop=False, vehicle_speed_kph=0.0, **kw) == State.STOPPED
+    assert next_state(State.ESTOP, estop=False, vehicle_speed_kph=10.0, **kw) == State.ESTOP   # 아직 달림
+    assert next_state(State.ESTOP, estop=False, vehicle_speed_kph=None, **kw) == State.ESTOP   # 차속 모름
+    assert next_state(State.ESTOP, estop=True, vehicle_speed_kph=0.0, **kw) == State.ESTOP     # 요청 남음

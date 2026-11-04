@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(*bringup.sh*)",
+      "Bash(*stop.sh*)",
+      "Bash(*record.sh*)",
+      "Bash(*rehearse_*)",
+      "Bash(*can_guard.py*)",
+      "Bash(*lift_cmd.py*)",
+      "Bash(*kvaser_mirror.py*)",
+      "Bash(*measure_latency.py*)",
+      "Bash(*cansend*)",
+      "Bash(*ip link set*)",
+      "Bash(*sil_tests/*)",
+      "Bash(*pytest*)",
+      "Bash(*bsw_test/*/run_*)",
+      "Edit(ros2_ws/src/a1_control_adapter/config/track.yaml)",
+      "Edit(safety/can_guard/**)"
+    ],
+    "deny": [
+      "Edit(bsw_test/*/raw/**)",
+      "Write(bsw_test/*/raw/**)"
+    ]
+  }
+}

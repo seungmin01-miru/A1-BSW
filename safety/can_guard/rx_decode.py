@@ -35,3 +35,91 @@ def decode_control_info(data):
         'brake_pos': int.from_bytes(d[2:4], 'little', signed=True) * 0.1,
         'steer_auto': d[4] & 1, 'brake_auto': (d[4] >> 1) & 1, 'acc_auto': (d[4] >> 2) & 1,
     }
+
+
+# --- 원격(핸드폰 앱) 0x156/0x157 — 비상 정지 원천 (2026-11-04) -------------------------------------------------------
+# 배치는 tools/signal_audit/dbc_lite.remote_messages() 와 같다(10-07 녹화로 확인, A1 DBC 에는 없음).
+# 10-07 녹화(candump-2026-10-07_102708.log): 평소 0x156 En 000 + 0x157 ACC_Cmd 0.00, 앱 조작 시 En=1·ACC_Cmd 음수.
+FRAME_ID_REMOTE_01 = 0x156
+FRAME_ID_REMOTE_02 = 0x157
+
+
+def decode_remote_156(data):
+    d = bytes(data[:8])
+    return {'eps_en': d[0] & 1, 'acc_en': d[2] & 1, 'aeb_en': (d[2] >> 6) & 1, 'alive': d[7]}
+
+
+def decode_remote_157(data):
+    d = bytes(data[:8])
+    return {'eps_cmd_deg': int.from_bytes(d[0:2], 'little', signed=True) * 0.1,
+            'acc_cmd_mps2': round(int.from_bytes(d[3:5], 'little') * 0.01 - 10.23, 2)}
+
+
+class RemoteEstopDetector:
+    """원격 프레임을 먹여서 "지금 정지 요청인가"를 낸다. 순수 로직(시각은 호출자가 넘김) — 테스트 가능.
+
+    정지 조건(잠정, 앱의 비상 정지 버튼이 실제로 무엇을 보내는지 현장 확인 후 확정):
+      0x156 EPS_En / ACC_En / AEB_En 중 하나라도 1   (앱이 제어권을 가져감 = 사람이 개입)
+      또는 0x157 ACC_Cmd ≤ acc_threshold_mps2         (앱이 감속을 요구)
+    `confirm_frames` 프레임 연속이어야 인정(단발 비트 오류로 급정지하지 않게, 10 ms 주기면 2 프레임 ≈ 10~20 ms).
+    `timeout_s` > 0 이면 데드맨: 한 번이라도 원격 프레임을 본 뒤 그만큼 끊기면 정지 요청으로 본다(기본 끔)."""
+
+    def __init__(self, acc_threshold_mps2=-1.0, confirm_frames=2, timeout_s=0.0):
+        self.acc_threshold_mps2 = acc_threshold_mps2
+        self.confirm_frames = max(1, confirm_frames)
+        self.timeout_s = timeout_s
+        self.last_156 = None
+        self.last_157 = None
+        self.last_seen_t = None
+        self._run = 0
+        self._run_start_t = None
+        self.condition = False
+        self.trigger_t = None       # 인정된 연속 구간의 첫 프레임 시각(감지 지연 계산용)
+        self.reason = ''
+        self.lost = False
+
+    def _cond(self):
+        reasons = []
+        if self.last_156 and (self.last_156['eps_en'] or self.last_156['acc_en'] or self.last_156['aeb_en']):
+            reasons.append('remote_en')
+        if self.last_157 and self.last_157['acc_cmd_mps2'] <= self.acc_threshold_mps2:
+            reasons.append(f'acc_cmd {self.last_157["acc_cmd_mps2"]:+.2f}')
+        return reasons
+
+    def feed(self, arbitration_id, data, t):
+        if arbitration_id == FRAME_ID_REMOTE_01:
+            self.last_156 = decode_remote_156(data)
+        elif arbitration_id == FRAME_ID_REMOTE_02:
+            self.last_157 = decode_remote_157(data)
+        else:
+            return
+        self.last_seen_t = t
+        self.lost = False
+        reasons = self._cond()
+        if reasons:
+            if self._run == 0:
+                self._run_start_t = t
+            self._run += 1
+            if self._run >= self.confirm_frames and not self.condition:
+                self.condition = True
+                self.trigger_t = self._run_start_t
+                self.reason = ', '.join(reasons)
+        else:
+            self._run = 0
+            self.condition = False
+
+    def update(self, now):
+        """데드맨 시간 초과 판정. 매 주기 호출."""
+        if self.timeout_s > 0 and self.last_seen_t is not None and now - self.last_seen_t > self.timeout_s:
+            if not self.lost:
+                self.lost = True
+                self.trigger_t = now
+                self.reason = f'remote lost > {self.timeout_s:g}s'
+
+    @property
+    def asserted(self):
+        return self.condition or self.lost
+
+    @property
+    def seen(self):
+        return self.last_seen_t is not None

@@ -66,7 +66,7 @@ if mode == 'session':
     med = statistics.median(dts) * 1000
     out(19 <= med <= 21 and max(dts) < 0.05, f'0x210 주기 중앙값 {med:.2f} ms, 최대 간격 {max(dts)*1000:.1f} ms')
     pre = win(0, m_auto)
-    out(bool(pre) and all(zero(d) for d in pre), f'C1: auto on 전 {len(pre)}프레임 전부 auto 0·명령 0')
+    out(not pre, f'C1: auto on 전 0x210 송신 안 함({len(pre)}프레임) — silent INIT·auto 000 침묵(2026-11-04)')
     c2 = win(m_auto + 0.15, m_steer10)
     out(bool(c2) and all(auto(d) == (1, 1, 1) and d['steer_command'] == 0 for d in c2), f'C2: auto on 뒤 auto 111·조향 0 ({len(c2)}프레임)')
     c3 = win(m_steer10 + 0.15, m_steer45)
