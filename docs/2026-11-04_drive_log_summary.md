@@ -297,6 +297,8 @@
 | `tables/long_accel_map.csv`, `long_coast.csv`, `long_launch.csv` | 가속 % × 속도 → 가속도, 타행 감속, 정지 출발 지연(43건) |
 | `tables/long_brake_map.csv`, `brake_steps.csv`, `brake_position_static.csv`, `brake_position_by_session.csv` | 브레이크 % → 감속, 계단 응답(39건), 위치 정적값 |
 | `tables/timing_can_ids.csv`, `timing_canguard_tx.csv`, `timing_ros.csv`, `wheel_speed_vs_gnss.csv`, `canguard_events.csv` | CAN ID 주기, can_guard 송신 간격, ROS 토픽 주기·어댑터 입력 나이, 0x201 배율, can_guard 이벤트 원문 |
+| `raw_can/` | **CAN 원본**(Kvaser 로그, zstd 압축 30개, 17 MB) — 원격·자율 5세션·빠른 시험 9세션. 원본과 같은지 sha256 으로 확인함 |
+| `RAW_SOURCES.md` | 원본 전체 목록·크기·sha256(올리지 않은 bag·로그 포함, 보관 위치) |
 | `scripts/` | `extract.py`(bag → CSV, A1_Total 메시지 정의 필요), `hdr.py`(bag 헤더 지연), `iface.py`(5장 표), `sheets.py`(그림), `remote.py`·`auto.py`·`autocan.py`(1~2장 수치), `minidf.py`(pandas 대용) |
 
 다시 만들기: `extract.py` 로 각 `bsw*/bag` 에서 `out/<세션>/` CSV 를 뽑은 뒤 `python3 iface.py tables` → `python3 sheets.py tables sheets` 순서로 돌린다. 스크립트 안의 원본 경로는 대회 차량 PC 기준(`~/a1_race_capture/...`)이다.
