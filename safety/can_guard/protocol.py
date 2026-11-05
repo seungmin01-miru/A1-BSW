@@ -2,7 +2,7 @@
 
 §7.2: "명령은 작은 공유메모리 ring(seq + timestamp) 으로 온다. ROS2/DDS 는 hot loop 에 안 넣는다."
 실제로 필요한 건 **최신값 하나**뿐이다 — 제어 명령은 새 값이 오면 이전 값이 의미가 없다(큐가 아니다).
-그래서 "ring" 대신 **seqlock 단일 슬롯**으로 구현한다(설계와의 차이는 can_stack_development.md §5.D 에 기록).
+그래서 "ring" 대신 **seqlock 단일 슬롯**으로 구현한다(설계와의 차이는 docs/can_stack_development.md §5.D 에 기록).
 
 seqlock 프로토콜:
   쓰기: seq 를 홀수로(쓰는 중 표시) → 페이로드 기록 → seq 를 +1(짝수, 완료 표시)

@@ -6,7 +6,7 @@
 > 메모장 [`FIELD_CHEATSHEET.txt`](FIELD_CHEATSHEET.txt) 맨 위에 같은 내용.
 
 계획·합격 기준은 [`docs/test_plan.md`](docs/test_plan.md)와 각 테스트 `0X_*/docs/goal.md`에 있다. 이 문서는 **현장에서 누가 언제 무엇을 입력하는지**만 다룬다.
-기존 도구를 그대로 쓴다: `tools/track_day/bringup.sh`·`stop.sh`(띄우기·끝내기), `safety/can_guard/lift_cmd.py`(명령 입력), `safety/can_guard/estop.py`(비상 정지).
+**자율 주행(모델 명령으로 달리기)은 `tools/bsw/bsw_up.sh` / `bsw_down.sh` 하나로 한다(2026-11-05, 자동 arm·CAN 로그 자동 녹화 — `tools/bsw/README.md`).** 아래 시험(00~07)은 기존 도구를 그대로 쓴다: `tools/track_day/bringup.sh`·`stop.sh`(띄우기·끝내기), `safety/can_guard/lift_cmd.py`(명령 입력), `safety/can_guard/estop.py`(비상 정지).
 배경 절차는 [`tools/track_day/TRACK_MANUAL.md`](../tools/track_day/TRACK_MANUAL.md) T0~T4, [`tools/signal_audit/AUDIT_MANUAL.md`](../tools/signal_audit/AUDIT_MANUAL.md) 2단계.
 **현장에서는 입력 순서만 모은 [`FIELD_CHEATSHEET.txt`](FIELD_CHEATSHEET.txt)(메모장)를 띄워 두고 복사·붙여넣기한다.** 터미널마다 `source ~/git/A1-BSW/bsw_test/field_env.sh` 하면 `up`/`down`/`lc`/`gen`/`es`/`m` 단축 명령을 쓴다. 이 문서는 이유·판단 기준용.
 모든 명령은 **대회 차량 PC 기준**(Ubuntu 22.04, `~/git/A1-BSW`, 시스템 `python3`, Kvaser Leaf 채널 0). 다른 PC 결과는 판정에 쓰지 않는다.

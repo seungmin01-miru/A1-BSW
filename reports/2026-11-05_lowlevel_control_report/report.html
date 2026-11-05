@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A1 BSW 인터페이스 보고서</title>
+<style>
+:root { --ink:#000; --gray:#555; --rule:#000; --paper:#fff; }
+@page { size: A4; margin: 17mm 16mm 17mm 16mm; }
+html { background: var(--paper); }
+body { font-family: "Noto Serif CJK KR", "Noto Serif KR", "Times New Roman", serif; color: var(--ink);
+       background: var(--paper); font-size: 9.2pt; line-height: 1.55; margin: 0 auto; max-width: 178mm;
+       text-align: justify; word-break: keep-all; overflow-wrap: anywhere; }
+h1 { font-size: 16pt; text-align: center; margin: 0 0 4pt; line-height: 1.3; font-weight: 700; }
+.subtitle { text-align: center; font-size: 10pt; margin: 0 0 3pt; }
+.byline { text-align: center; font-style: italic; font-size: 9pt; color: #222; margin-bottom: 10pt; }
+.abstract { font-size: 8.8pt; margin: 0 6mm 10pt; line-height: 1.5; }
+.abstract b { font-style: italic; }
+h2 { font-size: 10.5pt; font-weight: 700; margin: 14pt 0 5pt; text-transform: none; letter-spacing: .02em;
+     break-after: avoid; }
+h3 { font-size: 9.6pt; font-weight: 700; font-style: italic; margin: 9pt 0 3pt; break-after: avoid; }
+p { margin: 0 0 5pt; text-indent: 0; }
+code, .mono { font-family: "DejaVu Sans Mono", "Noto Sans Mono CJK KR", monospace; font-size: 7.9pt; }
+ul, ol { margin: 2pt 0 6pt 0; padding-left: 15pt; }
+li { margin: 1pt 0; }
+.tbl { margin: 10pt 0 10pt; }
+.tbl.keep { break-inside: avoid; }
+.tbl .tno, .tbl .ttl { break-after: avoid; }
+tr { break-inside: avoid; }
+.tbl .tno { text-align: center; font-size: 8.2pt; letter-spacing: .06em; }
+.tbl .ttl { text-align: center; font-size: 8.4pt; font-variant: small-caps; margin-bottom: 3pt; }
+table { width: 100%; border-collapse: collapse; font-size: 7.8pt; line-height: 1.38; }
+thead th { border-top: 1.1px solid var(--rule); border-bottom: 0.7px solid var(--rule); font-weight: 600;
+           padding: 3pt 4pt; text-align: left; vertical-align: bottom; }
+tbody td { padding: 2.2pt 4pt; vertical-align: top; text-align: left; }
+tbody tr:last-child td { border-bottom: 1.1px solid var(--rule); }
+td.c, th.c { text-align: center; } td.r, th.r { text-align: right; }
+tr.grp td { font-style: italic; font-weight: 600; padding-top: 4pt; border-top: 0.4px solid #999; }
+.tnote { font-size: 7.2pt; color: #222; margin-top: 3pt; line-height: 1.4; text-align: left; }
+figure { margin: 10pt 0 10pt; break-inside: avoid; }
+figure img { width: 100%; display: block; }
+figure.half img { width: 58%; margin: 0 auto; }
+figcaption { font-size: 7.9pt; line-height: 1.42; margin-top: 4pt; text-align: justify; }
+figcaption b { font-weight: 400; }
+.st-ok { font-weight: 700; } .st-g { } .st-w { font-style: italic; } .st-n { color: var(--gray); }
+.box { border: 0.7px solid #000; padding: 5pt 8pt; margin: 8pt 0; font-size: 8.6pt; break-inside: avoid; }
+.box .bt { font-weight: 700; margin-bottom: 2pt; }
+.pb { break-before: page; }
+figure.sheet img { width: auto; max-width: 100%; max-height: 226mm; margin: 0 auto; }
+figure.fig80 img { width: 86%; margin: 0 auto; }
+.small { font-size: 8pt; }
+sup { font-size: 6.5pt; }
+pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height: 1.35; border-top: .7px solid #000;
+      border-bottom: .7px solid #000; padding: 4pt 2pt; white-space: pre-wrap; margin: 4pt 0 8pt; }
+@media screen { body { padding: 16px; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#fff; } }
+:root[data-theme="dark"] { --paper:#fff; }
+</style>
+</head>
+<body>
+
+<h1>A1 자율주행 차량 저수준 제어(BSW) 인터페이스<br>— 구조, 변환표, 실차 검증 결과</h1>
+<p class="subtitle">모델 팀(인지·계획·제어)을 위한 기술 보고서</p>
+<p class="byline">A1-BSW 팀 · 2026-11-05 · 기준 커밋 <span class="mono">1f4d36b</span> (+ 11-05 미커밋 분석)</p>
+
+<p class="abstract"><b>요약 —</b> A1 차량의 by-wire 명령은 메인 PC 한 대가 안전 MCU 없이 보낸다. 모델 팀은 ROS2 토픽 <code>/control/target</code> 하나에 목표 가감속(m/s²)과 앞 타이어각(°)만 발행하고, <code>a1_control_adapter</code> 가 이를 변환표로 가속 %·브레이크 %·핸들각으로 바꿔 공유메모리에 쓰며, 격리 RT 코어 위의 <code>can_guard</code> 가 20 ms 주기로 CAN 0x210 을 보내는 유일한 송신자다. 이 보고서는 그 경로의 구조와 안전 동작, CAN 신호 정의, 그리고 2026-11-04 실차 주행(원격 4.96 km ★, 자율 연속 2.0 km ★)에서 잰 변환표를 정리한다. 결론은 다음과 같다. (1) 조향 부호(+ = 좌)는 확정이다. 그러나 직진 핸들각이 −13.7 핸들 ° 이고 유효 조향비가 7.5 가 아니라 우 10.9·좌 13.6 이어서, 명령한 각의 55–85 % 만 실제로 돈다. (2) 가속은 정지 출발 문턱이 70–80 % 이고 % → m/s² 가 속도에 따라 크게 달라 2차원 표가 필요하다. 100 % 의 가속도는 5–10 km/h 에서 +0.67, 25–35 km/h 에서 +0.09 m/s² 이다. (3) 브레이크 100 % 는 약 3.0 m/s² 로, 현재 표의 4.0 보다 작다. (4) 앱 비상정지가 들어오면 차량은 can_guard 가 아니라 원격 앱 명령을 따른다. 모든 값은 <i>잠정</i>이며, 제안한 표는 <code>track.yaml</code> 에 아직 적용하지 않았다.</p>
+
+<h2>1. 개요</h2>
+<p>BSW(Basic Software) 계층은 상위 제어기와 차량 CAN 사이에서 실시간성·통신·안전을 맡는다(<code>README.md</code>). 차량 쪽 프로토콜의 기준은 업체 DBC 에서 0x200 <code>steer_is_auto</code> 배율 오타 1곳만 고친 <code>DBC/A1_dbc_fixed.dbc</code> 이다. 모델 팀과 BSW 의 경계는 TABLE I 의 토픽들이다. 2026-10-26 에 제어기는 <b>목표 가감속과 타이어각 두 값만</b> 낸다고 정했다(<code>a1_control_adapter/README.md</code>). %·핸들각·auto 비트·클램프·고장 처리는 모두 BSW 가 맡는다.</p>
+
+<div class="tbl keep">
+<div class="tno">TABLE I</div><div class="ttl">모델 팀 ↔ BSW 인터페이스 계약</div>
+<table>
+<thead><tr><th>토픽 / 서비스</th><th>방향</th><th>타입·필드</th><th>규칙</th></tr></thead>
+<tbody>
+<tr><td><code>/control/target</code></td><td>모델 → BSW</td><td><code>a1_can_msgs/ControllerOutput</code>: <code>header.stamp</code>, <code>accel_mps2</code>(+가속/−감속), <code>steer_tire_deg</code>(+좌)</td><td>10–100 Hz(어댑터가 50 Hz 로 다시 씀). 150 ms 넘게 끊기면 고장 래치. NaN/inf, |a| &gt; 15 m/s², |δ| &gt; 45° 는 버림. QoS RELIABLE·BEST_EFFORT 모두 가능</td></tr>
+<tr><td><code>/control/adapter/arm_steer</code>, <code>arm_long</code>, <code>disarm</code></td><td>운용자 → 어댑터</td><td>SetBool / Trigger</td><td>신선한 입력이 있을 때만 arm 된다. 래치는 자동으로 풀리지 않고 <code>disarm</code> 으로만 풀린다</td></tr>
+<tr><td><code>/control/adapter/status</code></td><td>BSW → 모델</td><td><code>AdapterStatus</code>, 50 Hz</td><td>arm 상태, 입력 나이, 거부, 기록 여부</td></tr>
+<tr><td><code>/control/status/control_info</code>, <code>wheel_info</code></td><td>BSW → 모델</td><td>0x200(핸들각·브레이크 위치·auto), 0x201(후륜 속도·rpm)</td><td><b>감시 등급</b>이다. 제어 루프에서 직접 구독하지 않는다. 11-04 bag 에서 최대 52 s 지연이 있었다(6장)</td></tr>
+<tr><td><code>/localization/odom</code></td><td>localization → 모델</td><td>GNSS 100 Hz + LiDAR odometry 보정</td><td>속도·자세 피드백은 이 토픽이 우선이다(CLAUDE.md 5절 원천 우선순위)</td></tr>
+</tbody></table>
+<div class="tnote">출처: <code>ros2_ws/src/a1_control_adapter/README.md</code>, <code>ros2_ws/README.md</code>, <code>measurements/2026-11-04_drive_log/README.md</code> 2.1·2.7절.</div>
+</div>
+
+<div class="box"><div class="bt">모델 팀이 지금 알아야 할 것 (요약)</div>
+<ol>
+<li>타이어각 명령은 현재 표(÷7.5)로 변환된다. 실제로 도는 양은 우 약 0.69배(7.5/10.9 ★), 좌 약 0.55배(7.5/13.6 ★)이고, 핸들 0 이면 타이어가 +1.5° 좌로 간다(4.1절).</li>
+<li>핸들 150° 에서 유효 타이어각은 약 −10.6°(우)다. 따라서 follower 의 <code>max_steer_tire_deg = 20</code> 은 실제로 낼 수 없다. 최소 회전 반경은 약 12.6 m ★ 이다.</li>
+<li>20 km/h 이상에서 +0.6 m/s² 는 낼 수 없다(100 % 에서 +0.16). 가속 0 만으로도 −0.3 ~ −0.6 m/s² 로 감속한다(4.2절).</li>
+<li>브레이크 최대 감속은 약 3.0 m/s² 다. 60–95 % 구간은 아직 측정하지 않았다(4.3절).</li>
+<li>지연 보상값으로는 조향 약 150 ms, 브레이크 걸기 약 110 ms·풀기 약 330 ms, 정지 출발 약 0.5–0.6 s 를 쓴다(4.4절).</li>
+</ol></div>
+
+<p><b>표기.</b> CAN 입출력은 <i>핸들 °</i>, 분석·보정·합격 기준은 <i>타이어 °</i> 로 쓴다. 부호는 좌회전이 + 다. ★ 는 로그에서 계산한 값, <i>잠정</i>은 1회 측정이거나 조건이 제한된 값이다. 항목 상태는 interface_status.csv 의 4단계(<b>확정</b> / 잠정·근거 충분 / <i>잠정·근거 부족</i> / 미측정)를 따른다. 여기서 “확정”은 표본과 재현성이 충분하다는 뜻이고, 합격 판정은 아니다.</p>
+
+<h2>2. 시스템 구성</h2>
+<h3>2.1 명령·피드백 경로</h3>
+<figure class="fig80">
+<img src="figs/fig1_architecture.png" alt="BSW 신호 경로">
+<figcaption>Fig. 1. 명령·피드백 경로. 모델 팀은 <code>/control/target</code> 만 발행한다. <code>can_guard</code> 는 ROS2 밖에서 격리 코어(CPU 8, SCHED_FIFO 90)에 올라가 0x210 을 보내는 유일한 송신자다. 대회 원격 앱(0x156/0x157)이 enable 되면 차량은 원격을 우선한다. 회색 점선은 감시 등급 피드백과 ESTOP 감지 경로다.</figcaption>
+</figure>
+<p><b>a1_control_adapter</b>(ROS2, Python)는 <code>config/track.yaml</code> 의 표로 단위를 바꾼다. 조향은 <code>steer_map</code>(타이어 ° → 핸들 °, <code>steer_sign</code>) 뒤에 120 °/s 레이트 제한과 ±150° 클램프를 건다. 종방향은 데드밴드 ±0.1 m/s² 바깥에서 <code>accel_map</code> 또는 <code>brake_map</code> 중 하나만 쓴다. 결과는 50 Hz 로 <code>can_guard</code> 공유메모리(seqlock 단일 슬롯)에 쓴다. 축별 arm 상태에서 입력이 0.15 s 넘게 끊기거나 불량이면 기록과 하트비트를 멈춘다(래치). 그러면 can_guard 가 HOLDING → STOPPED 로 넘어간다. 인지 프로세스가 아직 없어서 하트비트는 어댑터가 대신 보낸다.</p>
+<p><b>can_guard</b>(표준 라이브러리 + python-can)는 20 ms 마다 최신 명령을 읽어 DBC 범위와 운용 한계(<code>--steer-limit-deg</code>, <code>--brake-limit-pct</code>, <code>--acc-limit-pct</code>)로 클램프한다. 가속과 브레이크가 같이 들어오면 브레이크를 우선한다. 결과는 0x210 으로 인코딩해 Kvaser Leaf 채널 0 으로 보낸다. 시작 전 점검에서 다른 0x210 송신자(원격 유닛 등)가 보이면 시작을 거부한다(종료 코드 3). 0x201 은 직접 읽어 차속 기반 STOPPED 판정에 쓰고, 0x156/0x157 도 직접 읽어 ESTOP 원천으로 쓴다(<code>safety/can_guard/README.md</code>).</p>
+
+<h3>2.2 상태기계와 안전 사실</h3>
+<figure class="fig80">
+<img src="figs/fig2_states.png" alt="can_guard 상태기계">
+<figcaption>Fig. 2. <code>can_guard</code> 상태기계. INIT 은 기본이 silent 여서 첫 유효 명령 전에는 0x210 을 보내지 않는다. 보호 상태(HOLDING/DEGRADED/STOPPED)와 ESTOP 은 auto 비트를 그대로 두고, 가속 0·조향 고정·브레이크 램프를 낸다. 브레이크 %·시간 값은 모두 CLI 기본값이며 잠정이다.</figcaption>
+</figure>
+<ul>
+<li><b>원격과 자율은 공존할 수 없다.</b> 원격 유닛이 켜져 있으면 0x210 을 직접 47 Hz(auto 111)로 보낸다. 이 경우 can_guard 는 시작을 거부하고, 자율 중에는 원격으로 개입할 수 없다(<code>vendor_answers.md</code> V21, CLAUDE.md 1.4).</li>
+<li><b>auto 000 은 페일세이프 브레이크를 푼다.</b> 11-03 정지 시험에서 위치가 8.2 → 0.1 로 떨어졌고, 다시 걸리기까지 0.9 s 틈이 있었다(<code>paper_data/04</code> §7). 그래서 종료는 항상 <i>브레이크 100 을 유지한 채</i> <code>stop.sh</code> 로 한다. silent INIT 은 “첫 명령 전”만 막는다. 어댑터 disarm 이나 <code>lift_cmd auto off</code> 가 auto 000 을 쓰면 그 값이 그대로 나간다(남은 문제).</li>
+<li><b>0x210 이 끊겼을 때의 차량 동작은 문서끼리 다르다.</b> 10-07 리프트에서는 59.9 s 동안 끊겨도 auto 가 유지됐고, 11-03 에서는 약 0.4 s 뒤 브레이크 8.2 로 잡혔다. 실무자 확인 전까지 차량 자체 타임아웃에 기대지 않는다(TODO-2).</li>
+<li><b>ESTOP 원천</b>은 세 가지다. ① 공유메모리 <code>estop.py</code>, ② SIGUSR1, ③ 원격 앱 0x156 EPS/ACC/AEB_En = 1 이거나 0x157 ACC_Cmd ≤ −1.0 이 2프레임 연속인 경우. 11-04 에 앱 ESTOP 감지 지연은 5.8 ms / 18.3 ms 였다(<code>canguard_events.csv</code>). 다만 차량이 앱 원격을 우선했다(6장 ①).</li>
+</ul>
+
+<h3>2.3 실시간성·SIL 검증 요약</h3>
+<div class="tbl">
+<div class="tno">TABLE II</div><div class="ttl">BSW 실시간성·안전 검증 결과 요약</div>
+<table>
+<thead><tr><th>항목</th><th class="c">결과</th><th>조건 · 출처</th></tr></thead>
+<tbody>
+<tr class="grp"><td colspan="3">RT 커널 (6.8.1-1059-realtime, 격리 코어 8–15)</td></tr>
+<tr><td>최악 지연, 30 min</td><td class="c">467 → 27 µs</td><td>cyclictest, 기본 RT 튜닝 → 운용 설정(eco 800 + ondemand) · A1_BSW_Figures_Tables.pdf TABLE I·II</td></tr>
+<tr><td>400 µs 초과 사건, 8 h</td><td class="c">231 → 26</td><td>cyclictest · 같은 출처 (8 h 최악은 828 → 920 µs 로 줄지 않음)</td></tr>
+<tr><td>유휴 전력</td><td class="c">35.0 → 14.2 W</td><td>RAPL · 같은 출처</td></tr>
+<tr class="grp"><td colspan="3">can_guard SIL (vcan0)</td></tr>
+<tr><td>송신 루프 자체측정 지연</td><td class="c">평균 17.0 / 최대 29.1 µs</td><td>A-3(격리 + FIFO 90), EAIT 시절 10 ms 주기 · 2026-09-21 브리핑</td></tr>
+<tr><td>8 h 연속 운전</td><td class="c">2,880,000 주기, 스푸리어스 전이 0, 최대 44.6 µs</td><td>같은 시기 · A1 DBC 코드로는 soak 미실시</td></tr>
+<tr><td>P-1 제어 노드 kill -9</td><td class="c">69 ms 뒤 HOLDING</td><td>A1 DBC, 2026-10-07 · 송신 끊김 0</td></tr>
+<tr><td>P-2 인지 kill -9</td><td class="c">주기 20.00 ms 유지, DEGRADED</td><td>같은 날 · 최대 간격 20.45 ms</td></tr>
+<tr><td>단위 시험 / 리프트 리허설</td><td class="c">91 개 / 31 / 31</td><td>ESTOP 시험 포함 · <code>safety/can_guard/README.md</code></td></tr>
+<tr><td>제어기 출력 → 버스 0x210</td><td class="c">최대 33.6 ms (중앙값 23.7)</td><td>SIL, vcan, 비격리, n = 200 · <code>a1_vehicle_characteristics.md</code> §4</td></tr>
+<tr class="grp"><td colspan="3">실차</td></tr>
+<tr><td>프레임 검증 (10-07 리프트)</td><td class="c">890,611 프레임, DLC·범위 위반 0</td><td>73 min · <code>paper_data/02</code></td></tr>
+<tr><td>0x210 송신 (11-04, 11 세션)</td><td class="c">중앙값 19.98–20.00 ms, p99.9 ≤ 22.8 ms</td><td>Kvaser 수신 시각 · 40 ms 넘는 공백 1회(bsw3 시작 시 5.6 s, 주행 전) · <code>timing_canguard_tx.csv</code></td></tr>
+<tr><td>자율 5 세션 송신 실패</td><td class="c"><code>tx_fail = 0</code> (88,509 주기 ★)</td><td>INIT→ACTIVE 5회 · <code>canguard_events.csv</code></td></tr>
+</tbody></table>
+<div class="tnote">주의: A1 DBC 코드 기준의 격리 코어 지연(A-3)은 아직 다시 재지 않았다. 11-04 오후 빠른 시험은 bringup sudo 문제로 <code>--no-rt</code>(비격리)로 돌렸다(<code>quick_lon.md</code> 3절). 자율 세션은 CPU 8·SCHED_FIFO 90 으로 돌렸다.</div>
+</div>
+
+<h2>3. CAN 인터페이스</h2>
+<p>우리 버스(500 kbit/s classic)에서 제어에 쓰는 ID 는 명령 0x210 하나와 상태 0x200·0x201 두 개다. DBC 에 있는 SYS 계열(0x100, 0x110–0x114, 0x301)은 11-03·11-04 녹화 어디에도 나오지 않았다. DBC 에 없는 0x128·0x202·0x710–0x712 는 차량이 21 ms 로 보내지만 의미는 아직 모른다(TODO-1).</p>
+<div class="tbl">
+<div class="tno">TABLE III</div><div class="ttl">제어용 CAN 신호 (DBC/A1_dbc_fixed.dbc)</div>
+<table>
+<thead><tr><th>ID · 신호</th><th class="c">비트 | 길이</th><th>형식 · 배율</th><th>범위</th><th>비고</th></tr></thead>
+<tbody>
+<tr class="grp"><td colspan="5">0x210 USER_control_command (우리 → 차량, can_guard 만 송신)</td></tr>
+<tr><td><code>steer_command</code></td><td class="c">0 | 16</td><td>int16 × 0.1 = 핸들 °</td><td>±150</td><td>×0.1 은 10-07 실차로 확정(raw +80/+100 → +8.8/+11.0°)</td></tr>
+<tr><td><code>break_command</code></td><td class="c">16 | 16</td><td>uint16, %</td><td>0–100</td><td>위치는 82 % 에서 포화(4.3절)</td></tr>
+<tr><td><code>acc_command</code></td><td class="c">32 | 8</td><td>uint8, %</td><td>0–100</td><td>정지 출발 문턱 70–80 %(4.2절)</td></tr>
+<tr><td><code>steer/break/acc_is_auto_command</code></td><td class="c">40/41/42 | 1</td><td>1 = auto</td><td>0/1</td><td>축별로 따로 수락(약 17 ms). 000 이면 페일세이프 브레이크 해제</td></tr>
+<tr class="grp"><td colspan="5">0x200 USER_control_info (차량 → 우리, 21.0 ms)</td></tr>
+<tr><td><code>steer_postion</code></td><td class="c">0 | 16</td><td>int16 × 0.1 = 핸들 °</td><td>관측 −156.8 ~ +154.9</td><td>원격 끝각 기준(<code>paper_data/04</code> §2)</td></tr>
+<tr><td><code>break_postion</code></td><td class="c">16 | 16</td><td>int16 × 0.1 (0–10)</td><td>≈ 명령 % ÷ 10</td><td>82 % 이하에서만 맞다. 피드백으로 쓰지 않는다</td></tr>
+<tr><td><code>*_is_auto</code>, <code>*_live_counter</code></td><td class="c">32–34, 40/48/56</td><td>1 bit / 8 bit</td><td>—</td><td>차량 heartbeat 는 없고, 축별 카운터만 있다</td></tr>
+<tr class="grp"><td colspan="5">0x201 USER_right_wheel_info (차량 → 우리, 21.0 ms) — 후륜 엔코더, 부호 없음</td></tr>
+<tr><td><code>right_speed</code> / <code>left_speed</code></td><td class="c">0 | 12, 24 | 12</td><td>× 0.1 km/h</td><td>0–409.5</td><td>GNSS 대비 0.958배(÷0.958 보정, 4.4절). 0이 아닌 최솟값 0.1 km/h</td></tr>
+<tr><td><code>right_rpm</code> / <code>left_rpm</code></td><td class="c">12 | 12, 36 | 12</td><td>× 1 rpm</td><td>0–4095</td><td>speed ÷ rpm 으로 역산한 바퀴 지름 56.0 cm(11-03)</td></tr>
+</tbody></table>
+<div class="tnote">출처: <code>reports/2026-11-03_paper_data/01_dbc_syntax_audit.md</code> 3절·라인 대조, <code>safety/can_guard/README.md</code>. 업체 원본 대비 수정은 0x200 <code>steer_is_auto</code> 배율(0.1 → 1) 한 곳이다. 남은 경고: 단위 없음 4개, 0x100 ×1 과 0x210 ×0.1 의 <code>steer_command</code> 배율 불일치, 0x113 신호 이름 <code>wheel_right_size</code>. 철자(postion·break)는 호환을 위해 그대로 둔다.</div>
+</div>
+
+<div class="tbl keep">
+<div class="tno">TABLE IV</div><div class="ttl">메시지 주기 (Kvaser 수신 시각, 11-04)</div>
+<table>
+<thead><tr><th>ID</th><th>송신자</th><th class="r">중앙값 [ms]</th><th class="r">p1–p99 [ms]</th><th class="r">최대 [ms]</th><th>세션</th></tr></thead>
+<tbody>
+<tr><td>0x200 / 0x201</td><td>차량</td><td class="r">20.99 / 20.99</td><td class="r">20.61–21.38</td><td class="r">21.72</td><td>오전 원격 (1,919 s)</td></tr>
+<tr><td>0x200 / 0x201</td><td>차량</td><td class="r">21.0</td><td class="r">19.96–22.06</td><td class="r">28.18 / 31.51</td><td>자율 bsw5 (467 s)</td></tr>
+<tr><td>0x210</td><td>원격 유닛</td><td class="r">21.16</td><td class="r">20.65–22.27</td><td class="r">23.04</td><td>오전 원격</td></tr>
+<tr><td>0x210</td><td>can_guard</td><td class="r">19.98</td><td class="r">2.22–21.14</td><td class="r">30.6</td><td>자율 bsw5 (p1 은 늦은 프레임 뒤 바로 보낸 프레임)</td></tr>
+<tr><td>0x156 / 0x157</td><td>원격 앱</td><td class="r">10.0</td><td class="r">8.6–11.4</td><td class="r">21.2</td><td>자율 bsw5</td></tr>
+<tr><td>0x128, 0x202, 0x710–0x712</td><td>차량 (DBC 밖)</td><td class="r">21.0</td><td class="r">19.8–22.2</td><td class="r">≤ 41.9</td><td>자율 bsw5</td></tr>
+</tbody></table>
+<div class="tnote">출처: <code>timing_can_ids.csv</code>. 버스 부하는 10-07 기준 평균 6.4 %, 최대 20.3 %(재연결 몰림)다(<code>paper_data/README.md</code>). 프레임 1개 전송 시간은 0.22–0.27 ms ★, 0x210 의 최악 중재 대기는 약 1.35 ms ★ 다(<code>a1_vehicle_characteristics.md</code> §2).</div>
+</div>
+
+<h2>4. 인터페이스 변환표</h2>
+<p>이 장은 어댑터·follower·can_guard 의 파라미터마다 현재 설정값, 11-04 실측값, 표본, 상태를 함께 적는다. 11-04 자료는 오전 원격 1개, 오후 빠른 시험 9 세션, 자율 5 세션의 Kvaser 원본 전부다. 자율 세션에는 GNSS-RTK(INS) bag 을 함께 썼다. 앱 원격이 켜진 구간(0x156 En = 1, 앞뒤 2 s)은 차량이 0x210 을 따르지 않으므로 뺐다. 항목은 모두 24개이고, 확정 7 · 잠정·근거 충분 8 · 잠정·근거 부족 5 · 미측정 4 다(<code>interface_status.csv</code>, 부록 Fig. 8).</p>
+
+<h3>4.1 조향</h3>
+<figure>
+<img src="figs/fig3_steer_map.png" alt="핸들각 대 유효 타이어각">
+<figcaption>Fig. 3. (a) 0x200 핸들각과 유효 타이어각 δ = atan(L·r/v)의 관계. L = 2.36 m, r 은 INS 요레이트, v 는 INS 속도다. 조건은 자율 5 세션, RTK fix, v &gt; 5.4 km/h, 횡가속 &lt; 2 m/s², 준정상 구간이다. 점은 구간 평균, 막대는 p10–p90 이다. 실측 기울기가 현재 표(점선)보다 완만하고, 직진(δ = 0)은 핸들 −13.7° 에서 일어난다. (b) 직진 오프셋을 보정한 유효 조향비. 미끄럼각과 언더스티어가 포함된 “유효” 값이다. 출처: <code>steer_ratio_gnss.csv</code>, <code>steer_ratio_fit.csv</code>.</figcaption>
+</figure>
+
+<div class="tbl">
+<div class="tno">TABLE V</div><div class="ttl">조향 파라미터: 현재 설정 대 실측</div>
+<table>
+<thead><tr><th>항목</th><th>현재 설정</th><th>실측 (조건)</th><th>표본</th><th>상태 · 지금 쓸 값</th></tr></thead>
+<tbody>
+<tr><td>부호</td><td><code>steer_sign</code> +1</td><td>핸들각과 INS 요레이트의 상관 +0.988 ★ (11-04 주행)</td><td>12,243 점</td><td class="st-ok">확정 — + = 좌. “부호 미확인” 표시를 해제한다</td></tr>
+<tr><td>직진 0 점</td><td>타이어 0 = 핸들 0</td><td>직진 핸들 <b>−13.7°</b>. 핸들 0 이면 타이어 +1.5° 좌. 직선 주행 중 명령 타이어각 −1.63 / −1.79°</td><td>|핸들| &lt; 40° 10,252 점</td><td>잠정·근거 충분 — 01 에서 노면·맵 오프셋과 분리해 확정</td></tr>
+<tr><td>핸들 → 타이어 (우)</td><td>÷ 7.5 (150 ↔ 20°)</td><td>유효 조향비 <b>10.9</b>(회귀). 큰 각에서 8.6–14</td><td>11,303 점</td><td>잠정·근거 충분 — 05(저속 우 최대)에서 확인</td></tr>
+<tr><td>핸들 → 타이어 (좌)</td><td>÷ 7.5</td><td>유효 조향비 <b>13.6</b>. 측정 최대 핸들 +96°</td><td>700 점</td><td class="st-w">잠정·근거 부족 — 05 좌(+150) 저속</td></tr>
+<tr><td>최대 타이어각</td><td>follower 20°</td><td>핸들 −145.3° → −10.57° (우). 좌는 미측정</td><td>114 점</td><td class="st-w">잠정·근거 부족 — 우 약 10.6° 로 제한</td></tr>
+<tr><td>불감대</td><td>(없음)</td><td>10-07 리프트 ±1.5° / 11-03 정지 ±2° / <b>11-04 주행 중 |명령−위치| 4.0°(p50, p75 5.7°)에서 한 번에 움직임</b>, 위치가 멈춰 있는 시간 84–86 %</td><td>자율 2 세션 698 정체 구간</td><td>잠정·근거 충분 — 주행 오차 예산에는 <b>±4 핸들 ° ≈ ±0.3–0.4 타이어 °</b> 를 쓴다</td></tr>
+<tr><td>무반응 시간</td><td>follower 모델 175 ms</td><td>10-07 리프트 167–190 ms / 11-03 정지 0.20 ± 0.01 s / 11-04 계단 <b>107 ms</b>(n = 26) / 연속 추종 <b>130–160 ms</b>(10–40 km/h)</td><td>계단 34, 추종 4 세션</td><td class="st-ok">확정 — 지연 보상값 150 ms</td></tr>
+<tr><td>조향 속도</td><td>어댑터 120 °/s</td><td>10-07 126 °/s(리프트) / 11-03 150° 계단 210–255 °/s / 11-04 계단 10–90 % <b>240 °/s</b>, 원격 p99.9 440 °/s</td><td>계단 34</td><td class="st-ok">확정 — 120 은 능력의 약 절반이다. 07 시험 전까지 유지</td></tr>
+<tr><td>정적 정확도</td><td>—</td><td>명령을 1 s 유지한 뒤 오차 평균 −1.3 ~ +1.1°, p5–p95 대략 ±2°. 명령 0 일 때 위치 평균 −1.3°</td><td>정적 구간 12개 대역</td><td>참고</td></tr>
+</tbody></table>
+<div class="tnote">출처: <code>2026-11-04_drive_log_summary.md</code> 5.0·5.1절, <code>steer_steps.csv</code>(무반응 107 ms 는 양수 26건의 중앙값이다. 명령 시점에 이미 움직이던 음수 8건은 뺐다), <code>steer_tracking.csv</code>, <code>steer_deadband_driving.csv</code>, <code>steer_static.csv</code>. 리프트·정지 값은 <code>a1_vehicle_characteristics.md</code> §3, <code>paper_data/04</code> §2. 조건이 다른 값이 함께 있으면 <b>11-04 주행 값을 쓴다</b>. 리프트·정지 값은 바퀴 하중과 차속이 없는 조건에서 잰 것이다.</div>
+</div>
+
+<p>측정 대응점에서 좌우 모두 현재 표보다 덜 돈다는 것을 알 수 있다. 우회전은 핸들 −145° 에서 −10.6 타이어 ° 로, 표가 가정한 −19.4° ★ 의 약 55 % 다. 이 결과는 11-04 자율 주행의 두 현상을 함께 설명한다. 첫째, 모든 회차에서 횡편차가 좌측 +0.29 ~ +0.56 m 로 치우쳤다. 둘째, 곡선에서는 경로가 요구한 타이어각보다 크게 명령했다(회귀 명령 = 1.52 × 요구 − 1.77° ★). 헤어핀(경로 최소 반경 10.3 m)에서 −19.2° 로 거의 포화된 것도 같은 원인이다. 좌회전 쪽은 표본이 우회전의 6 % 수준이다. 그리고 핸들 +96° 의 값이 +78° 보다 작게 나와서(저속 6.9 km/h, n = 106) 05 에서 다시 재야 한다.</p>
+
+<h3>4.2 가속(구동)</h3>
+<figure>
+<img src="figs/fig4_accel_map.png" alt="가속 % 대 가속도">
+<figcaption>Fig. 4. (a) 가속 명령 % 에 대한 종가속도. 명령은 0.5 s 전 값이고, 그 전 1 s 동안 ±3 % 안에서 유지된 구간만 썼다. 브레이크는 0 이다. 속도 대역마다 원격(0x201 ÷ 0.958)·자율(INS)·빠른 시험 값을 표본 수로 가중 평균했다 ★. 1–50 %·50–70 % 는 폭이 넓은 구간이고, 경사는 보정하지 않았다. 현재 <code>accel_map</code>(×)은 20 km/h 이상에서 실제보다 크게 잡혀 있다. (b) 타행 감속. 전체 최소제곱 맞춤은 a = −0.57 + 0.0010·v² (v: m/s, n = 959)다. 출처: <code>long_accel_map.csv</code>, <code>long_coast.csv</code>.</figcaption>
+</figure>
+
+<div class="tbl keep">
+<div class="tno">TABLE VI</div><div class="ttl">가속 % × 속도 → 종가속도 [m/s²] (11-04, 잠정)</div>
+<table>
+<thead><tr><th>가속 %</th><th class="r">0–10 km/h</th><th class="r">10–20 km/h</th><th class="r">20 km/h 이상</th><th>현재 <code>accel_map</code></th></tr></thead>
+<tbody>
+<tr><td>0 (타행)</td><td class="r">−0.51</td><td class="r">−0.32</td><td class="r">−0.59</td><td>— (항 없음)</td></tr>
+<tr><td>1–50</td><td class="r">−0.32 (n=15)</td><td class="r">−0.80</td><td class="r">−0.58</td><td>—</td></tr>
+<tr><td>50–70</td><td class="r">−0.34</td><td class="r">−0.15</td><td class="r">+0.12 (n=29)</td><td>—</td></tr>
+<tr><td>70–75</td><td class="r">−0.10</td><td class="r">+0.04</td><td class="r">—</td><td>—</td></tr>
+<tr><td>75–80</td><td class="r">—</td><td class="r">+0.04</td><td class="r">−0.01</td><td>75 % → 0.10</td></tr>
+<tr><td>80–85</td><td class="r">+0.07</td><td class="r">+0.04</td><td class="r">+0.00</td><td>80 % → 0.13</td></tr>
+<tr><td>85–90</td><td class="r">+0.32</td><td class="r">+0.08</td><td class="r">−0.02</td><td>—</td></tr>
+<tr><td>90–95</td><td class="r">+0.39</td><td class="r">+0.16</td><td class="r">+0.03 (n=15)</td><td>—</td></tr>
+<tr><td>95–100</td><td class="r"><b>+0.63</b></td><td class="r"><b>+0.55</b></td><td class="r"><b>+0.16</b></td><td>100 % → 0.57</td></tr>
+</tbody></table>
+<div class="tnote">★ <code>make_figs.py</code> 가 <code>long_accel_map.csv</code> 의 구간 중앙값을 표본 수(0.05 s 단위)로 가중 평균해 계산했다. 요약 문서 5.2절 표와 같다. n 은 0.05 s 표본 수이고 30 미만만 적었다. 20 km/h 이상 100 % 의 +0.16 은 원격 25–35 km/h(+0.09)와 20–25 km/h(+0.51)가 섞인 값이다.</div>
+</div>
+
+<figure>
+<img src="figs/fig5_launch.png" alt="출발 문턱">
+<figcaption>Fig. 5. (a) 정지 출발 시도. 1 s 정지한 뒤 브레이크 0 + 가속을 준 경우다. 빠른 시험(평지)에서는 70 % 가 5 s 동안 출발하지 못했고 80 % 는 출발했다. 원격에서 출발 전 최대가 75 % 이상인데도 출발하지 못한 4건(95–100 %)은 브레이크 0 + 가속 유지 시간(<code>hold_s</code>)이 0.47–1.05 s 이고 고 % 는 그중 일부 순간뿐이었다 — 출발 지연(약 0.5–0.6 s, 4.4절)을 채우기 전에 명령이 내려간 것으로 본다. (b) 주행 중 유지 구간(±4 %, ≥ 0.8 s). 55–60 % 부터 감속이 줄고 60–65 % 에서 약 0 이 된다. 50–80 % 는 구간마다 3–7개뿐이다. 출처: <code>launch_attempts.csv</code>, <code>launch_rolling_bins.csv</code>(11-05, 개발 PC 분석 — 참고값).</figcaption>
+</figure>
+
+<div class="tbl">
+<div class="tno">TABLE VII</div><div class="ttl">가속 관련 파라미터: 날짜·조건별 비교</div>
+<table>
+<thead><tr><th>항목</th><th>값 (조건 · 출처)</th><th>상태 · 지금 쓸 값</th></tr></thead>
+<tbody>
+<tr><td>정지 출발 문턱</td><td>10–70 % 는 4–5 s 동안 출발 못 함. 80 % 출발(평지, 각 1회, <code>quick_lon.md</code>). 원격도 75 % 미만으로 출발한 적이 없다</td><td class="st-w">잠정·근거 부족 — 70 % 초과 ~ 80 % 이하. 출발에는 ≥ 80 %</td></tr>
+<tr><td>토크가 나오기 시작하는 %</td><td>정지 60·70 % 에서 뒷바퀴 1 rpm 움찔(40 % 이하 없음). 주행 중 55–60 % 부터 감속 감소. 타 팀 문의값 48–60 %</td><td class="st-w">잠정·근거 부족 — 50–60 %</td></tr>
+<tr><td>100 % 가속도</td><td>11-03 원격 저속(≤ 2.9 m/s) +0.82 ± 0.04 (n = 8) / 11-04 빠른 시험 0→3.5 km/h 1.9 s ★ 0.57 / 어댑터 출발 후 평균 0.86·0.88 / 11-04 주행: 5–10 km/h +0.67, 15–20 +0.50, 25–35 +0.09 (원격)</td><td>잠정·근거 충분 — <b>속도별 값(TABLE VI)</b>을 쓴다. 저속 값들(0.6–0.9)은 서로 크게 어긋나지 않는다</td></tr>
+<tr><td>타행 감속</td><td>11-03 전진 −0.36 ± 0.07 (저속) / 11-04 −0.3 ~ −0.6, 맞춤 −0.57 + 0.0010·v²</td><td>잠정·근거 충분 — 피드포워드 약 −0.5 m/s². 경사 미보정이므로 평지 왕복으로 확인</td></tr>
+<tr><td>출발 지연</td><td>11-03 0.62 ± 0.05 s / 11-04 원격 462 ms (n = 32), 자율·어댑터 552 ms (n = 11). 브레이크 해제 직후 625 ms, 오래전 해제 530 ms</td><td class="st-ok">확정 — 브레이크 풀림(무반응 329 ms)이 주 원인. 0.5–0.6 s 로 둔다</td></tr>
+<tr><td>출발 후 유지</td><td>바퀴가 구르면(≈ 0.6 s) 60 % 이상으로 유지하면 된다. 0.5–8 km/h × 50–80 % 는 표본 없음</td><td class="st-n">미측정 — 03(a) 내림 시험</td></tr>
+</tbody></table>
+<div class="tnote">출처: <code>drive_log_summary.md</code> 5.0·5.2·6.1절, <code>quick_lon.md</code>, <code>paper_data/04</code> §4, <code>long_launch.csv</code>.</div>
+</div>
+
+<h3>4.3 브레이크</h3>
+<figure class="half">
+<img src="figs/fig6_brake_map.png" alt="브레이크 % 대 감속">
+<figcaption>Fig. 6. 브레이크 명령 % 에 대한 감속도(타행 포함 전체 감속). 명령은 0.3 s 전 값이고 0.5 s 유지했으며, 가속은 0 이다. 속도 대역을 표본 수로 가중했다 ★. 1–20 % 는 타행과 구별되지 않는다. 55 % 는 표보다 세고, 100 % 는 4.0 이 아니라 3.0 이다. 60–95 % 는 깨끗한 표본이 없다. 출처: <code>long_brake_map.csv</code>(“all”).</figcaption>
+</figure>
+<div class="tbl">
+<div class="tno">TABLE VIII</div><div class="ttl">브레이크 파라미터: 현재 설정 대 실측</div>
+<table>
+<thead><tr><th>항목</th><th>현재 설정</th><th>실측 (조건 · 출처)</th><th>상태 · 지금 쓸 값</th></tr></thead>
+<tbody>
+<tr><td>% → m/s² (0–60 %)</td><td>0 → 0.1, 40 → 1.0</td><td>1–20 % 0.25–0.34 / 20–40 % 0.56–0.60 / 40–50 % 0.87 / 50–60 % <b>1.91</b> (11-04 자율·빠른 시험)</td><td>잠정·근거 충분 — 04(a)에서 재확인</td></tr>
+<tr><td>% → m/s² (60–95 %)</td><td>70 → 2.0, 90 → 3.0</td><td>원격은 대부분 100 % 만 썼고, 자율은 55 % 다음이 100 %(정지 유지)여서 표본이 없다</td><td class="st-n">미측정 — 04(a) 60/70/80/90 % 계단</td></tr>
+<tr><td>100 %</td><td>4.0 m/s² (follower <code>hold_decel</code> 도 4.0)</td><td>10-08 타 팀 이미지 3.97 / 4.11 (순간) / 11-03 저속 a = −0.64·v − 0.99 (1.2–2.7 m/s) / <b>11-04 2.99–3.07</b> (2–35 km/h)</td><td>잠정·근거 충분 — <b>3.0</b>. 10-08 값은 이미지 판독 순간값이라 쓰지 않는다</td></tr>
+<tr><td>걸기 지연</td><td>10-07 리프트 56–112 ms</td><td>11-04 무반응 109 ms (n = 12), 90 % 593 ms (n = 5)</td><td class="st-ok">확정</td></tr>
+<tr><td>풀기 지연</td><td>—</td><td>11-04 무반응 329 ms (n = 24), 90 % 777 ms. 걸기보다 약 3배 느리다</td><td class="st-ok">확정 — 가속 전환 시 0.5 s 이상 겹침을 예상한다</td></tr>
+<tr><td>위치 피드백 0x200</td><td>명령 ÷ 10</td><td>82 % 이하에서는 맞다(55 % → 5.4). 정지 100 % 포화값이 세션마다 5.0–8.3 이다(10-07 리프트는 10.0). 원격 주행 중 최대 6.8</td><td class="st-ok">확정 — <b>제동력 판단에 쓰지 않는다</b>. 정지 확인은 차속으로 한다</td></tr>
+</tbody></table>
+<div class="tnote">출처: <code>long_brake_map.csv</code>, <code>brake_steps.csv</code>, <code>brake_position_by_session.csv</code>, <code>a1_vehicle_characteristics.md</code> §3·§5, <code>paper_data/04</code> §3. 1.3절의 원격 82–100 % 구간 중앙값 −2.70 m/s²(p10 −3.12, 505 구간)는 0.3 s 지연 정렬만 한 값이다. 3.0 은 0.5 s 유지 조건의 값이다.</div>
+</div>
+
+<h3>4.4 공통·타이밍</h3>
+<figure>
+<img src="figs/fig7_delays.png" alt="지연 분포">
+<figcaption>Fig. 7. 명령 계단에서 응답까지의 시간 분포(11-04, Kvaser 수신 시각). 조향은 0x200 위치가 2° 넘게 움직인 시점, 브레이크는 위치가 0.2 넘게 바뀐 시점, 출발은 0x201 의 첫 0 아닌 값을 기준으로 했다. 점선 상자는 10-07 리프트 범위다. 조향은 주행 중 무반응이 리프트보다 짧고, 브레이크 풀기는 걸기보다 약 3배 느리다. 출처: <code>steer_steps.csv</code>, <code>brake_steps.csv</code>, <code>long_launch.csv</code>.</figcaption>
+</figure>
+<div class="tbl keep">
+<div class="tno">TABLE IX</div><div class="ttl">공통 파라미터와 종단 지연 예산</div>
+<table>
+<thead><tr><th>항목</th><th>현재 설정</th><th>실측</th><th>상태 · 조치</th></tr></thead>
+<tbody>
+<tr><td>0x201 속도 배율</td><td>1.0</td><td>GNSS 대비 0.958 (2–25 km/h 일정, 5 세션). 좌우 개별 0.89–0.99</td><td class="st-ok">확정 — 속도·거리 ÷ 0.958. 바퀴 지름 설정 확인(V10)</td></tr>
+<tr><td>0x210 송신 주기</td><td>20 ms</td><td>중앙값 19.98 ms, p99.9 22.8 ms</td><td class="st-ok">확정</td></tr>
+<tr><td>어댑터 stale</td><td>0.15 s</td><td><code>/control/target</code> 최대 공백 약 340 ms(세션마다 1–4회). bsw3 에서 입력 나이 406 ms 로 stale 2회</td><td>잠정·근거 충분 — 원인은 같은 시각의 odom 공백</td></tr>
+<tr><td>follower odom 타임아웃</td><td>0.2 s</td><td><code>/localization/odom</code> 최대 공백 336–348 ms</td><td>원인 확인 전에는 값을 늘리지 않는다</td></tr>
+<tr><td colspan="4" style="padding-top:5pt"><i>종단 지연 예산 (움직임 시작까지)</i>: 제어기 → 0x210 ≤ 33.6 ms(SIL) + 버스 ≤ 1.4 ms + 차량 수락 ≤ 22 ms + 액추에이터 무반응(조향 107–150 ms, 브레이크 걸기 109 ms, 구동 출발 462–552 ms) ★ ≈ 조향 0.2 s, 브레이크 0.17 s, 출발 0.6 s. 50 km/h 에서 0.2 s 는 약 2.8 m ★ 다.</td></tr>
+</tbody></table>
+<div class="tnote">출처: <code>wheel_speed_vs_gnss.csv</code>, <code>timing_canguard_tx.csv</code>, <code>timing_ros.csv</code>, <code>a1_vehicle_characteristics.md</code> §1·§4.</div>
+</div>
+
+<h3>4.5 권장 변환표 (제안 · 미적용)</h3>
+<p>아래 표는 근거만 정리한 것이다. <code>track.yaml</code> 과 follower 설정은 바꾸지 않았다. 바꾸려면 사용자 승인이 필요하고(CLAUDE.md 1.2), 바꾼 뒤에는 대회 PC 에서 SIL 을 다시 통과해야 한다. “적용 시점”은 그 값을 확정하는 시험이다.</p>
+<div class="tbl">
+<div class="tno">TABLE X</div><div class="ttl">권장 변환표 — 제안(미적용)</div>
+<table>
+<thead><tr><th>파라미터 (파일)</th><th>현재</th><th>제안 (잠정)</th><th>근거 상태</th><th>적용 시점</th></tr></thead>
+<tbody>
+<tr><td><code>steer_map</code> (track.yaml)</td><td>tire [−20, 0, 20]<br>wheel [−150, 0, 150]</td><td>tire [−10.6, −6.9, −5.7, −3.6, −2.1, 0, +2.9, +5.7, +8.0]<br>wheel [−145, −97, −76, −49, −32, <b>−13.7</b>, +16, +47, +78]<br>(측정 대응점: 우 n ≥ 100, 좌 +78 은 n = 88. 0 점은 회귀 절편)</td><td>우 충분 / 좌 부족</td><td>01 → 05 → 07</td></tr>
+<tr><td>follower <code>max_steer_tire_deg</code></td><td>20</td><td>우 10.6 (좌는 05 전까지 8.0, 실측 최대)</td><td>부족</td><td>05</td></tr>
+<tr><td>follower 조향 지연 보상</td><td>175 ms</td><td>150 ms</td><td>확정</td><td>즉시 가능</td></tr>
+<tr><td><code>steer_rate_limit_deg_s</code></td><td>120</td><td>유지 (능력 240 °/s)</td><td>확정</td><td>07 뒤 재검토</td></tr>
+<tr><td><code>accel_map</code></td><td>1차원 [0.10, 0.13, 0.57] ↔ [75, 80, 100] %</td><td>속도 × % 2차원 표(TABLE VI). 정지 출발은 ≥ 80 %, 구르기 시작하면 ≥ 60 %</td><td>80–100 % 충분, 50–80 % 미측정</td><td>03(a)</td></tr>
+<tr><td>타행 피드포워드</td><td>없음</td><td>가속 0 일 때 약 −0.5 m/s² 를 감속 능력으로 반영. 0.5 m/s² 미만의 감속은 브레이크 대신 가속 0 으로 처리</td><td>충분</td><td>03(a)·04(a)</td></tr>
+<tr><td><code>long_deadband_mps2</code></td><td>0.1</td><td>데드밴드 + 가속↔제동 히스테리시스 + 최소 유지 시간 (값은 미정)</td><td>문제 확정(216 회/분)</td><td>02 SIL 후 실차</td></tr>
+<tr><td>follower <code>a_max_mps2</code></td><td>+0.6</td><td>20 km/h 이상에서 ≤ +0.3</td><td>충분</td><td>즉시 가능</td></tr>
+<tr><td><code>brake_map</code></td><td>[0.1, 1, 2, 3, 4] ↔ [0, 40, 70, 90, 100] %</td><td>40 % 점 유지, 55 % ≈ 1.9, <b>100 % = 3.0</b>, 60–95 % 는 04(a) 뒤 채움</td><td>0–60 % 충분, 60–95 % 미측정</td><td>04(a)</td></tr>
+<tr><td>follower <code>hold_decel_mps2</code></td><td>4.0</td><td>3.0 (<code>brake_map</code> 100 % 를 따라감)</td><td>충분</td><td><code>brake_map</code> 과 함께</td></tr>
+<tr><td>0x201 속도 배율</td><td>1.0</td><td>÷ 0.958</td><td>확정</td><td>즉시 가능</td></tr>
+</tbody></table>
+<div class="tnote">근거: TABLE V–IX, <code>drive_log_summary.md</code> 3장(다음 할 일) 2·3·5·7번. 핸들 150° 를 넘는 좌회전 요구(약 +8 타이어 ° 초과)는 05 전까지 실측 근거가 없다. 제안 표에서는 핸들 +150° 에서 포화로 둔다.</div>
+</div>
+
+<h2>5. 검증·데이터 근거</h2>
+<div class="tbl keep">
+<div class="tno">TABLE XI</div><div class="ttl">시험 매트릭스</div>
+<table>
+<thead><tr><th>날짜 · 표기</th><th>조건</th><th>원본 · 규모</th><th>이 보고서에서 쓴 곳</th></tr></thead>
+<tbody>
+<tr><td>10-07 [L]</td><td>리프트, 우리 송신(비격리)</td><td>Kvaser 2 파일 890,611 프레임, 10:25:09–11:38:06</td><td>0x210 배율, auto 수락, 리프트 지연·불감대</td></tr>
+<tr><td>10-08 [C]</td><td>타 팀 주행 이미지·GNSS bag</td><td>이미지 판독, bag 2개(CAN 없음)</td><td>조향비 7.5 와 brake_map 의 초기 근거(참고만)</td></tr>
+<tr><td>11-03 [R]</td><td>원격 0/100 % 저속 주행 ≤ 2.9 m/s</td><td>442,631 프레임, 15:56:09–16:33:07</td><td>100 % 가속·타행·출발 지연(저속)</td></tr>
+<tr><td>11-03 [S]</td><td>정지 차량, can_guard 0x210 (21:41~)</td><td><code>raw/l4h</code></td><td>auto 000 동작, 0x210 끊김 0.4 s, 82 % 포화, 정지 조향 응답</td></tr>
+<tr><td>11-04 오전</td><td>원격 주행 (외곽 랩 2회)</td><td>1,113,179 프레임, 11:40:47–12:12:46, 4.96 km ★, 최고 31.6 km/h</td><td>가감속 분포, 브레이크 100 %, 조향 계단</td></tr>
+<tr><td>11-04 오후</td><td>빠른 시험(lift_cmd·어댑터), 평지·저속</td><td>9 세션 (<code>QUICK-*</code>, <code>ADAPTER-*</code>)</td><td>출발 문턱, 어댑터 경로, 정지 브레이크</td></tr>
+<tr><td>11-04 오후</td><td>자율(follower → 어댑터 → can_guard), RTK fix</td><td>5 세션 <code>bsw</code>–<code>bsw5</code>, 16:40–17:12. 연속 자율 2.0 km ★</td><td>조향비·오프셋(GNSS), 추종 지연, 떨림, ESTOP</td></tr>
+</tbody></table>
+<div class="tnote">출처: <code>paper_data/02</code>·<code>04</code>, <code>measurements/2026-11-03_signal_audit/results.md</code>, <code>measurements/2026-11-04_signal_audit/{results.md, quick_lon.md}</code>, <code>drive_log_summary.md</code> 0–2장. 11-04 CAN 원본(zstd, 30개)은 <code>measurements/2026-11-04_drive_log/raw_can/</code> 에 있다.</div>
+</div>
+<p><b>계산 원칙.</b> (1) 시각은 전부 Kvaser 수신 시각을 썼다. bag 의 <code>/control/status/*</code> 는 최대 52 s 늦게 기록돼 쓰지 않았다. (2) 앱 원격 enable 구간은 뺐다. (3) 유효 타이어각의 기준은 GNSS-RTK(INS) 요레이트·속도다. 0x201 은 GNSS 가 없는 원격·빠른 시험에서만 ÷ 0.958 로 보정해 썼고, 부호가 없으므로 전진 구간만 썼다. (4) 경사·바람은 보정하지 않았다. (5) 11-05 추가 분석(출발 민감도, 인터페이스 완성도)은 개발 PC 에서 했으므로 CLAUDE.md 규칙에 따라 <i>참고값</i>으로 둔다. (6) 모든 값은 판정이 아니다. 합격 판정은 각 테스트의 <code>goal.md</code> 기준으로 따로 한다.</p>
+
+<h2>6. 알려진 문제와 한계</h2>
+<div class="tbl">
+<div class="tno">TABLE XII</div><div class="ttl">알려진 문제</div>
+<table>
+<thead><tr><th>#</th><th>문제</th><th>관측 (출처)</th><th>영향 · 임시 대응</th></tr></thead>
+<tbody>
+<tr><td>①</td><td>앱 비상정지 때 원격이 우선된다</td><td>17:00:43, 14.2 km/h 에서 ESTOP 진입. 감지 5.8 ms, 첫 송신 브레이크 30.8 %. 그러나 차량은 앱 명령을 따랐다. 조향 −53 → +7.6° 로 0.25 s 만에 복귀, 브레이크 위치 4.2 → 0.3. 앱 ACC_Cmd −3.0 을 1.5 s 보낸 뒤 14.5 → 0 km/h 까지 약 5 s(평균 0.8 m/s² ★) (요약 2.6)</td><td>실제 제동력은 앱 ACC_Cmd 가 정한다. 곡선 중 비상정지하면 조향이 0° 로 돌아가 경로를 벗어날 수 있다. 00 SAF-ESTOP 기준을 다시 정해야 한다</td></tr>
+<tr><td>②</td><td>위치 추정 공백·계단</td><td><code>/localization/odom</code> 공백 336–348 ms(세션당 1–4회). LO 보정 계단 0.57–1.00 m(재동기 9회, 점프 경고 27회) (요약 2.5)</td><td>follower 0.2 s 타임아웃을 넘는다(이번에는 정지로 이어지지 않음). 횡편차 튐의 일부일 수 있다. localization 팀에 전달</td></tr>
+<tr><td>③</td><td>bag 의 CAN 토픽 지연</td><td>can_raw_bridge 504 프레임/s(버스 약 580/s)로 큐가 쌓임. 수신 − 헤더 시각 최대 52.1 s (요약 2.7)</td><td>제어에는 영향이 없다. bag 시각으로 분석하면 수십 초 어긋난다 → 헤더 stamp 또는 candump 를 쓴다</td></tr>
+<tr><td>④</td><td>종방향 명령 떨림</td><td>랩 2회차 가속·제동·무명령 전환 1,520 회(216 회/분), 약 0.3 s 주기 (요약 2.4)</td><td>마모·승차감·속도 출렁임. 원인은 75 % 문턱 + 타행 미반영 + 데드밴드 경계로 추정. TABLE X 제안</td></tr>
+<tr><td>⑤</td><td>좌측 쏠림과 조향 이득 부족</td><td>횡편차 평균 +0.29 – +0.56 m(모든 회차), p95 0.53–0.56 m, 최대 1.08 m(헤어핀) (요약 2.2–2.3)</td><td>4.1절. pure pursuit 는 적분이 없어 정상상태 오차가 남는다. 01 에서 맵 오프셋과 분리</td></tr>
+<tr><td>⑥</td><td>U턴 계획과 실측의 충돌</td><td><code>uturn.yaml</code> 은 <code>acc: 6</code> %, <code>accmax: 15</code>. 방위 추정은 조향비 7.5 를 쓴다. 실제 요레이트는 추정의 약 0.5배(추정 180° → 실제 약 90–95° ★). 최소 반경 약 12.6 m ★ (요약 6.3)</td><td>출발 문턱 아래라 출발하지 못한다. “두 차선 약 13 m 간격” U턴은 실측상 불가능하다 → 01·02 의 U턴 절차를 재검토</td></tr>
+<tr><td>⑦</td><td>0x210 끊김 동작 미확정</td><td>10-07 타임아웃 없음 vs 11-03 0.4 s 뒤 브레이크 8.2</td><td>TODO-2. 차량 타임아웃에 기대지 않는다</td></tr>
+<tr><td>⑧</td><td>auto 000 경로</td><td>어댑터 disarm·<code>lift_cmd auto off</code> 가 auto 000 을 쓰면 ACTIVE 에서 그대로 나간다</td><td>페일세이프 브레이크가 풀린다. 종료 절차로 막고 있으며, 코드 차원의 방지는 아직 없다</td></tr>
+<tr><td>⑨</td><td>bringup RT 실패 · SIL E2</td><td><code>setsid</code> 안의 <code>sudo chrt</code> 가 비밀번호를 다시 요구해 can_guard 가 뜨지 않음(오후 빠른 시험은 <code>--no-rt</code>). <code>--rt</code> 에서 SIGUSR1 시험 E2 FAIL (<code>quick_lon.md</code> 3절)</td><td>격리 실행이 보장되지 않는다. 공유메모리·앱 ESTOP 경로는 PASS</td></tr>
+<tr><td>⑩</td><td>측정 공백</td><td>가속 저속 × 50–80 %, 브레이크 60–95 %, 좌 100° 이상, 30 km/h 이상, 경사 (요약 6.2)</td><td>해당 변환표 칸은 외삽하지 않는다</td></tr>
+</tbody></table>
+</div>
+
+<h2>7. 다음 작업</h2>
+<p>사용자가 고른 세 갈래로 정리한다. 실차·CAN 에 닿는 실행과 <code>track.yaml</code> 변경은 모두 승인을 받고 한다.</p>
+<div class="tbl">
+<div class="tno">TABLE XIII</div><div class="ttl">다음 작업 (세 갈래)</div>
+<table>
+<thead><tr><th>갈래</th><th>할 일</th><th>완료 조건</th></tr></thead>
+<tbody>
+<tr><td>(1) 앱 비상정지 재정의</td><td>업체·대회측 확인: 앱 정지 버튼의 실제 프레임, ACC_Cmd −3 을 정지까지 유지하는지, 원격 enable 중에 0x210 이 의미가 있는지. 00 SAF-ESTOP 의 원천과 기준(감지 ≤ 100 ms, 제동 시작 ≤ 200 ms)을 원격 우선 전제로 다시 쓴다. 물리 E-stop 은 계속 병행한다</td><td>00 <code>goal.md</code> 갱신 → SIL → 저속(≤ 10 km/h) 실차</td></tr>
+<tr><td>(2) 인터페이스 개선 시험</td><td>03(a): 정지 계단 50–75 %(5 % 간격) × 10 s, 100 % 1.0/1.5/2.0 s → 50–70 % 내림 × 8 s, 평지 왕복(경사 상쇄). 04(a): 60/70/80/90 % 계단. 05: 좌(+150)·우(−150) 저속 + GNSS. 01: 직선 50 m 오프셋과 실제 조향 위치(불감대) 기록</td><td>TABLE X 의 “미측정·부족” 칸을 채운 뒤 <code>track.yaml</code> 갱신(승인) → 대회 PC SIL 재통과</td></tr>
+<tr><td>(3) 도구 정비</td><td>can_raw_bridge 지연(C++ 화 또는 0x200/0x201/0x210 만 발행), 분석 도구는 헤더 stamp 사용. bringup sudo/chrt(sudoers NOPASSWD 또는 sudo 를 setsid 밖으로). SIL E2 신호 대상 수정. A-3 지연 재측정과 새 코드 8 h soak</td><td>bag 지연 &lt; 1 s, <code>bringup.sh</code> RT 기동, <code>run_sil_check.sh --rt</code> 전부 PASS</td></tr>
+</tbody></table>
+<div class="tnote">출처: <code>drive_log_summary.md</code> 3장·6.1절, <code>quick_lon.md</code> 3절, <code>a1_todo.md</code>, <code>safety/can_guard/README.md</code> “다음 단계”.</div>
+</div>
+
+<h2>부록 A. 0x210 필드 용어</h2>
+<div class="tbl keep">
+<div class="tno">TABLE XIV</div><div class="ttl">0x210 USER_control_command 필드와 BSW 처리</div>
+<table>
+<thead><tr><th>필드</th><th>물리 → raw</th><th>BSW 처리</th></tr></thead>
+<tbody>
+<tr><td><code>steer_command</code></td><td>핸들 ° × 10 (예: −49.8° → −498 ★)</td><td>어댑터: 타이어 ° → <code>steer_map</code> → 120 °/s 제한 → ±150°. can_guard: <code>--steer-limit-deg</code> 클램프. 보호 상태·ESTOP 에서는 진입 순간 값으로 고정</td></tr>
+<tr><td><code>break_command</code></td><td>% 그대로</td><td>어댑터: 감속 &gt; 데드밴드이면 <code>brake_map</code>. can_guard: <code>--brake-limit-pct</code>, 가속과 겹치면 브레이크 우선. 보호 상태 30 → 60 %, ESTOP 30 → 82 %</td></tr>
+<tr><td><code>acc_command</code></td><td>% 그대로</td><td>어댑터: 가속 &gt; 데드밴드이면 <code>accel_map</code>(상한 <code>acc_max_pct</code> 100). can_guard: <code>--acc-limit-pct</code>. 보호 상태·ESTOP 에서 즉시 0</td></tr>
+<tr><td><code>*_is_auto_command</code></td><td>축별 1/0</td><td>어댑터: 축별 arm 일 때 1. can_guard: 보호 상태·ESTOP 에서 마지막 값 유지(000 금지). INIT silent 이면 미송신</td></tr>
+</tbody></table>
+</div>
+
+<h2>부록 B. 다시 만들기</h2>
+<pre># 이 보고서의 그림 (Fig. 1–7) — 저장소 루트에서
+python3 make_figs.py . &lt;출력 폴더&gt;          # measurements/2026-11-04_drive_log/tables/*.csv, track.yaml 을 읽음
+
+# 11-04 표·데이터시트 (measurements/2026-11-04_drive_log/)
+python3 scripts/extract.py …                 # bag → out/&lt;세션&gt;/ CSV (A1_Total 메시지 정의 필요)
+python3 scripts/iface.py tables && python3 scripts/sheets.py tables sheets
+python3 scripts/cannpz.py raw_can &lt;npz&gt;      # 11-05 추가분
+python3 scripts/launch_sens.py &lt;npz&gt; tables sheets
+python3 scripts/coverage.py &lt;npz&gt; tables sheets
+
+# 10-07/11-03 논문 자료 (reports/2026-11-03_paper_data/)
+python3 tools/paper_data/dbc_lint.py DBC/A1_dbc.dbc DBC/A1_dbc_fixed.dbc --out reports/2026-11-03_paper_data
+python3 tools/paper_data/datasheet_figs.py --out reports/2026-11-03_paper_data
+
+# 하드웨어 없는 확인
+python3 -m pytest -q safety/can_guard/test ros2_ws/src/a1_control_adapter/test</pre>
+
+<h2 class="pb">부록 C. 11-04 인터페이스 데이터시트</h2>
+<p class="small">원본 데이터시트 그림을 그대로 옮겼다(컬러 원본). 같은 폴더의 <code>sheet4_timing.png</code>(타이밍·센서)와 <code>sheet5_launch.png</code>(출발 민감도)는 본문 Fig. 5·7 과 TABLE IV·IX 로 대신한다.</p>
+<figure class="sheet"><img src="figs/sheet0_interface_status.png" alt="인터페이스 완성도">
+<figcaption>Fig. 8. 인터페이스 완성도(11-05 정리). 항목별 상태, 영역별 상태 수, 가속·브레이크·조향의 차속별 표본 시간과 빈 칸, 핸들 → 타이어 현재 표와 실측. 출처: <code>sheets/sheet0_interface_status.png</code>(<code>coverage.py</code>).</figcaption></figure>
+<figure class="sheet pb"><img src="figs/sheet1_steer.png" alt="조향 데이터시트">
+<figcaption>Fig. 9. 조향 인터페이스 데이터시트(11-04). 출처: <code>sheets/sheet1_steer.png</code>.</figcaption></figure>
+<figure class="sheet pb"><img src="figs/sheet2_accel.png" alt="가속 데이터시트">
+<figcaption>Fig. 10. 가속 인터페이스 데이터시트(11-04). 출처: <code>sheets/sheet2_accel.png</code>.</figcaption></figure>
+<figure class="sheet pb"><img src="figs/sheet3_brake.png" alt="브레이크 데이터시트">
+<figcaption>Fig. 11. 브레이크 인터페이스 데이터시트(11-04). 출처: <code>sheets/sheet3_brake.png</code>.</figcaption></figure>
+
+</body>
+</html>

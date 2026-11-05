@@ -1,7 +1,7 @@
 """can_guard 상태머신 — 순수 함수로 만들어서(입력 상태 + 관측값 → 다음 상태) 하드웨어·타이밍 없이
 결정론적으로 테스트한다. 실제 시각·CAN·공유메모리는 can_guard.py(메인 루프)의 몫이다.
 
-can_stack_development.md §5.D 참고:
+docs/can_stack_development.md §5.D 참고:
   INIT(En=0, 안전 상태) → 첫 유효 명령 → ACTIVE(클램프해서 전달)
   ACTIVE → 명령 나이 > watchdog_t → HOLDING(조향 유지, 감속 램프)
   HOLDING → 명령 재개 → ACTIVE | HOLDING 지속 또는 실측 차속 정지 문턱 이하 → STOPPED(En=0)

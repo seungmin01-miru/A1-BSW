@@ -18,6 +18,9 @@
   - arm 중 입력이 stale_timeout_s(기본 150 ms) 넘게 끊기거나 NaN·범위 밖 값이 오면 **고장 래치**: 공유메모리 기록과
     하트비트를 멈춘다 → can_guard 가 50 ms 뒤 HOLDING(조향 고정·가속 0·브레이크 램프) → 2 s 뒤 STOPPED.
     입력이 돌아와도 자동 복귀하지 않는다. 운영자가 disarm 을 불러야 풀린다(STOPPED 였다면 can_guard 재시작 필요).
+  - auto_arm:=true(2026-11-05, tools/bsw 경주 모드): 제어기 입력이 auto_arm_fresh_s(0.3 s) 동안 계속 신선하고
+    can_guard·0x200 이 준비되면 **두 축을 자동으로 한 번** arm 한다 → 모델이 명령을 내기 시작하면 바로 움직인다.
+    한 번뿐이다: 운영자가 disarm 하거나 고장 래치가 나면 다시 자동으로 arm 하지 않는다(arm 서비스로만).
   - 인지 하트비트: 인지 프로세스가 아직 없으므로(can_guard README) 이 노드가 대신 보낸다 — disarm 중엔 항상,
     arm 중엔 입력이 신선할 때만. perception_heartbeat:=false 로 끌 수 있다(진짜 인지 프로세스가 생기면).
 """
@@ -73,6 +76,10 @@ class CmdAdapter(Node):
             brake_max_pct=p('brake_max_pct', 100.0).value)
         self.lim = InputLimits(p('input_accel_abs_mps2', 15.0).value, p('input_steer_tire_abs_deg', 45.0).value)
         self.slew = SlewLimiter(p('steer_rate_limit_deg_s', 120.0).value)
+        self.auto_arm = bool(p('auto_arm', False).value)
+        self.auto_arm_fresh_s = float(p('auto_arm_fresh_s', 0.3).value)
+        self.auto_arm_spent = False   # 자동 arm 은 노드 생애에 한 번
+        self.fresh_since = None
 
         self.cmd_ch = self.hb_ch = None
         self.cmd_ino = None
@@ -81,6 +88,7 @@ class CmdAdapter(Node):
         self.last_rx = None         # 그 수신 시각(monotonic)
         self.steer_armed = self.long_armed = False
         self.fault = ''             # 비어 있지 않으면 고장 래치
+        self.wait_restart = False   # 래치 상태에서 disarm 됨 → can_guard 재시작(공유메모리 새로 생김) 전까지 안 씀
         self.rejected = 0
         self.note = ''
         self.meas_wheel_deg = None  # 0x200 실측 핸들각 — arm 순간 속도 제한 시작점
@@ -100,7 +108,8 @@ class CmdAdapter(Node):
         self.get_logger().info(
             f'시작(disarm). shm={self.cmd_shm}, 주기 {self.period_s * 1000:.0f} ms, stale {self.stale_s * 1000:.0f} ms, '
             f'조향 표 {self.steer.tire_deg}→{self.steer.wheel_deg} sign {self.steer.sign:g}, '
-            f'가속 상한 {self.long.acc_max_pct:g} %, 하트비트 {"대신 보냄" if self.hb_enabled else "끔"}')
+            f'가속 상한 {self.long.acc_max_pct:g} %, 하트비트 {"대신 보냄" if self.hb_enabled else "끔"}, '
+            f'자동 arm {"켬(첫 명령 " + format(self.auto_arm_fresh_s, "g") + " s 뒤 1회)" if self.auto_arm else "끔"}')
 
     # ── 입력 ───────────────────────────────────────────────
     def on_target(self, msg):
@@ -127,26 +136,39 @@ class CmdAdapter(Node):
         return age is not None and age <= self.stale_s
 
     # ── 서비스 ─────────────────────────────────────────────
+    def _arm_check(self, axis):
+        """arm 해도 되나 — (True, '') 또는 (False, 이유). 서비스와 auto_arm 이 같은 조건을 쓴다."""
+        if self.fault:
+            return False, f'고장 래치 중({self.fault}) — disarm 으로 먼저 해제'
+        if self.wait_restart:
+            return False, '래치 해제 뒤 can_guard 재시작 대기 — bsw_down → bsw_up'
+        if self.cmd_ch is None:
+            return False, 'can_guard 공유메모리 없음 — can_guard 를 먼저 띄울 것'
+        if not self._fresh(time.monotonic()):
+            return False, '제어기 입력이 없거나 오래됨 — /control/target 확인'
+        if axis == 'steer' and (self.meas_rx is None or time.monotonic() - self.meas_rx > 0.5):
+            # 현재 핸들 위치를 모르면 속도 제한의 출발점이 없다(목표로 바로 튐) — 상태 브리지가 떠 있어야 arm
+            return False, '0x200 조향 위치 없음 — a1_status_decoder(브리지) 확인'
+        return True, ''
+
+    def _do_arm(self, axis):
+        if axis == 'steer' and not self.steer_armed:
+            self.slew.reset(self.meas_wheel_deg)   # 지금 핸들 위치에서 목표까지 속도 제한으로 이동
+        setattr(self, f'{axis}_armed', True)
+
     def on_arm(self, axis, req, res):
         if not req.data:
             setattr(self, f'{axis}_armed', False)
+            self.auto_arm_spent = True
             res.success, res.message = True, f'{axis} disarm'
             self.get_logger().warn(res.message)
             return res
-        if self.fault:
-            res.success, res.message = False, f'고장 래치 중({self.fault}) — disarm 으로 먼저 해제'
-        elif self.cmd_ch is None:
-            res.success, res.message = False, 'can_guard 공유메모리 없음 — can_guard 를 먼저 띄울 것'
-        elif not self._fresh(time.monotonic()):
-            res.success, res.message = False, '제어기 입력이 없거나 오래됨 — /control/target 확인'
-        elif axis == 'steer' and (self.meas_rx is None or time.monotonic() - self.meas_rx > 0.5):
-            # 현재 핸들 위치를 모르면 속도 제한의 출발점이 없다(목표로 바로 튐) — 상태 브리지가 떠 있어야 arm
-            res.success, res.message = False, '0x200 조향 위치 없음 — a1_status_decoder(브리지) 확인'
-        else:
-            if axis == 'steer' and not self.steer_armed:
-                self.slew.reset(self.meas_wheel_deg)   # 지금 핸들 위치에서 목표까지 속도 제한으로 이동
-            setattr(self, f'{axis}_armed', True)
+        ok, why = self._arm_check(axis)
+        if ok:
+            self._do_arm(axis)
             res.success, res.message = True, f'{axis} arm'
+        else:
+            res.success, res.message = False, why
         if res.success:   # rclpy 는 같은 호출 위치에서 심각도를 바꾸면 ValueError — 호출을 나눠 둔다
             self.get_logger().warn(res.message)
         else:
@@ -156,9 +178,17 @@ class CmdAdapter(Node):
     def on_disarm(self, req, res):
         was = self.fault
         self.steer_armed = self.long_armed = False
+        self.auto_arm_spent = True   # 운영자가 내렸으면 다시 자동으로 올리지 않는다
         self.fault = ''
+        self.note = ''
+        if was:
+            # 2026-11-05: 래치 중 disarm 하면 auto 000 명령이 "명령 재개"로 보여 can_guard 가 HOLDING → ACTIVE 로 돌아가
+            # 침묵(브레이크 해제)했다(보고서 시나리오 hold_disarm). 래치 해제 뒤에는 can_guard 가 재시작될 때까지 쓰지 않는다
+            # → can_guard 는 HOLDING → STOPPED 로 계속 가고 브레이크를 유지한다.
+            self.wait_restart = True
         res.success = True
-        res.message = 'disarm' + (f' (고장 래치 해제: {was} — can_guard 가 STOPPED 면 재시작 필요)' if was else '')
+        res.message = 'disarm' + (f' (고장 래치 해제: {was} — can_guard 재시작 전까지 공유메모리에 쓰지 않음, '
+                                  f'브레이크는 can_guard 가 유지)' if was else '')
         self.get_logger().warn(res.message)
         return res
 
@@ -166,6 +196,7 @@ class CmdAdapter(Node):
     def _latch(self, why):
         if not self.fault:
             self.fault = why
+            self.auto_arm_spent = True
             self.get_logger().error(f'고장 래치 — 기록 중단, can_guard HOLDING 으로: {why}')
         self._set_note(why)
 
@@ -190,6 +221,7 @@ class CmdAdapter(Node):
             if self._shm_inode() == self.cmd_ino:
                 return True
             self._set_note('can_guard 공유메모리가 바뀜(재시작?) — 다시 연결')
+            self.wait_restart = False
             self._close()
         try:
             self.cmd_ino = self._shm_inode()
@@ -209,6 +241,18 @@ class CmdAdapter(Node):
         self.last_tick = now
         armed = self.steer_armed or self.long_armed
         fresh = self._fresh(now)
+        self.fresh_since = (self.fresh_since or now) if fresh else None
+        if self.auto_arm and not self.auto_arm_spent and not armed and self.cmd_ch is not None \
+                and self.fresh_since is not None and now - self.fresh_since >= self.auto_arm_fresh_s:
+            oks = [self._arm_check(a) for a in ('steer', 'long')]
+            if all(ok for ok, _ in oks):
+                self._do_arm('steer')
+                self._do_arm('long')
+                self.auto_arm_spent = True
+                armed = True
+                self.get_logger().warn(f'자동 arm(조향·종방향) — 제어기 입력 {now - self.fresh_since:.2f} s 신선')
+            else:
+                self._set_note('자동 arm 대기: ' + '; '.join(w for ok, w in oks if not ok))
         if armed and not fresh and not self.fault:
             age = self._age(now)
             self._latch('제어기 입력 끊김' + (f' ({age * 1000:.0f} ms)' if age is not None else ''))
@@ -223,7 +267,10 @@ class CmdAdapter(Node):
             wheel = wheel_target       # disarm 중에는 표시용으로 속도 제한 없이
 
         writing = False
-        if not self.fault and self._ensure_open(now):
+        if self.wait_restart:
+            self._ensure_open(now)   # 재시작 감지(inode 변화)만 — 쓰지 않는다
+            self._set_note('래치 해제됨 — can_guard 재시작 대기(그동안 기록 안 함, can_guard 가 브레이크 유지)')
+        if not self.fault and not self.wait_restart and self._ensure_open(now):
             cmd = self.proto.Command(
                 steer_auto=self.steer_armed, brake_auto=self.long_armed, acc_auto=self.long_armed,
                 steer_cmd_deg=wheel if self.steer_armed else 0.0,

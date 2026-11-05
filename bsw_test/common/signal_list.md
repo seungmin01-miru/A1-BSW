@@ -12,4 +12,5 @@
 | 자세·위치 | GNSS/IMU 위치·속도·요레이트·가속도 — **토픽·시간 동기 미정(TODO-5, localization 팀 전달 대기)** | rosbag | RTX fix 구간만 사용 |
 | 상태 | `*_is_auto`, `*_live_counter` | 0x200·0x201 | 차량 heartbeat 없음 |
 | 상태 | heartbeat, 상태 전이, 비상 정지 | can_guard 로그 | 우리 쪽 기준 |
-| 미확인 | 0x128, 0x202, 0x710~0x712 | DBC 밖 | TODO-1 |
+| 무관 | 0x128, 0x710~0x712 | DBC 밖 — 대회측이 심은 프레임, 자율주행과 무관(2026-11-05 사용자 확인) | 분석 안 함 |
+| 미확인 | 0x202 | DBC 밖 | TODO-1 (우선순위 낮음) |

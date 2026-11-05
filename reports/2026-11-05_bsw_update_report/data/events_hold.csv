@@ -1,0 +1,7 @@
+wall_s,mono_s,event,detail
+1793884668.509654,11448.617886,start,"virtual:rf3a958 init=silent estop_can=remote"
+1793884668.910275,11449.018508,state,"INIT->ACTIVE cmd_age=0.0002176769994548522 speed_kph=15.0"
+1793884669.929793,11450.038025,estop_request,"remote remote_en detect_lag_ms=14.9"
+1793884669.929844,11450.038077,state,"ACTIVE->ESTOP cmd_age=0.004658252000808716 speed_kph=15.0"
+1793884669.929914,11450.038146,estop_first_tx,"brake=30.8 acc=0.0 auto=111"
+1793884672.930156,11453.038389,stop,"cycles=222 tx_fail=0"

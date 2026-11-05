@@ -184,3 +184,56 @@ def test_brake_never_drops_after_estop_reset_to_stopped():
 def test_brake_profile_rejects_bad_values():
     with pytest.raises(ValueError):
         BrakeProfile(90.0, 10.0, 60.0)
+
+
+# --- 2026-11-05: ESTOP 중 원격(앱) En=1 동안 조향 고정값이 실제 핸들각을 따라감 ---------------------------------------
+from command_policy import held_steer_follow_remote  # noqa: E402
+
+
+def test_estop_held_steer_follows_actual_while_remote_enabled():
+    """11-04 bsw4: 앱 En 동안 차량은 앱(0°)을 따랐고, 해제 순간 우리 진입값 −49.8° 로 튀었다 → 실제값을 따라간다."""
+    assert held_steer_follow_remote(State.ESTOP, -49.8, True, 1.9) == 1.9
+
+
+def test_estop_held_steer_kept_when_remote_released_or_unknown():
+    assert held_steer_follow_remote(State.ESTOP, 1.9, False, -30.0) == 1.9      # 해제 뒤 = 마지막 값 고정
+    assert held_steer_follow_remote(State.ESTOP, -49.8, True, None) == -49.8    # 0x200 없음
+    assert held_steer_follow_remote(State.ESTOP, -49.8, True, 1.9, mode='hold') == -49.8
+
+
+def test_only_estop_follows_remote():
+    for st in (State.ACTIVE, State.HOLDING, State.STOPPED, State.DEGRADED):
+        assert held_steer_follow_remote(st, -10.0, True, 5.0) == -10.0
+
+
+def test_estop_output_uses_followed_steer():
+    held = held_steer_follow_remote(State.ESTOP, -49.8, True, 2.0)
+    out = _run(State.ESTOP, Command(steer_cmd_deg=-49.8, acc_cmd_pct=80, **AUTO), held=held, estop_profile=ESTOP)
+    assert out.steer_cmd_deg == pytest.approx(2.0) and out.acc_cmd_pct == 0
+
+
+# --- 2026-11-05: ESTOP·STOPPED 는 disarm(auto 000 명령)으로 풀리지 않는다 ---------------------------------------------
+def test_estop_ignores_disarm_and_keeps_auto_and_brake():
+    armed = Command(steer_cmd_deg=-10.0, brake_cmd_pct=0, acc_cmd_pct=40, **AUTO)
+    disarmed = Command()   # 어댑터 disarm = auto 000·명령 0
+    ramp = BrakeRamp()
+    _run(State.ESTOP, armed, held=-10.0, brake=ramp, estop_profile=ESTOP, dt=0.5, last_auto_cmd=armed)
+    out = _run(State.ESTOP, disarmed, held=-10.0, brake=ramp, estop_profile=ESTOP, dt=0.5, last_auto_cmd=armed)
+    assert out is not None and (out.steer_auto, out.brake_auto, out.acc_auto) == (True, True, True)
+    assert out.acc_cmd_pct == 0 and out.brake_cmd_pct >= 30 and out.steer_cmd_deg == pytest.approx(-10.0)
+
+
+def test_stopped_hold_ignores_disarm():
+    armed = Command(steer_cmd_deg=3.0, **AUTO)
+    out = _run(State.STOPPED, Command(), held=3.0, last_auto_cmd=armed)
+    assert out is not None and out.brake_auto and out.brake_cmd_pct >= 30
+
+
+def test_holding_disarm_still_silent_by_design():
+    """HOLDING 은 명령 재개 시 ACTIVE 로 가는 설계 — 상태머신이 ACTIVE 로 바꾼 뒤 침묵. 여기선 ACTIVE 에서 침묵만 확인."""
+    armed = Command(**AUTO)
+    assert _run(State.ACTIVE, Command(), last_auto_cmd=armed) is None
+
+
+def test_never_armed_estop_still_sends_nothing():
+    assert _run(State.ESTOP, Command(), last_auto_cmd=None, estop_profile=ESTOP) is None

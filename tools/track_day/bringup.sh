@@ -10,6 +10,8 @@
 #         --out <폴더>     세션 폴더 (기본 ~/a1_race_capture/track_YYYYmmdd_HHMMSS)
 #         --no-adapter     브리지만 — 표 측정(T1~T4)을 lift_cmd 로 직접 할 때(어댑터와 lift_cmd 는 동시에 못 씀)
 #         --estop-required 핸드폰 앱(0x156/0x157)이 시작 전 점검에서 안 보이면 can_guard 시작 거부
+#         --auto-arm       어댑터 자동 arm(제어기 입력 0.3 s 신선 → 두 축 1회). 경주 모드 tools/bsw/bsw_up.sh 가 씀
+#         --no-bag         ROS bag 녹화 안 함(다른 팀이 딴다) — CAN 로그(Kvaser 원본 + candump)만
 #   can_guard 비상 정지 이벤트는 항상 <세션>/can_guard_events.csv 에 남는다(bsw_test 00 판정용).
 #
 # 끝낼 때: bash tools/track_day/stop.sh   (disarm → 녹화 종료 → 노드 → can_guard → 미러 순서)
@@ -18,7 +20,7 @@ set -u
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
 WS="$REPO/ros2_ws"
-MODE=""; KV_CH=0; CAN=""; RT=1; ACC_LIMIT=30; OUT=""; ADAPTER=true
+MODE=""; KV_CH=0; CAN=""; RT=1; ACC_LIMIT=30; OUT=""; ADAPTER=true; AUTO_ARM=false; NO_BAG=0
 PARAMS="$WS/src/a1_control_adapter/config/track.yaml"
 ESTOP_REQ=()
 GUARD_CPU=8; NODE_CPU=10       # 격리 코어 8-15 (tools/rt). 물리 코어당 한 스레드 원칙으로 8, 10
@@ -26,7 +28,8 @@ while [ $# -gt 0 ]; do case "$1" in
   --sil) MODE=sil;; --kvaser) MODE=kvaser; [ "${2:-}" ] && [[ "$2" != --* ]] && { KV_CH=$2; shift; };;
   --peak) MODE=peak; CAN=${2:?--peak can0}; shift;;
   --params) PARAMS=$(readlink -f "$2"); shift;; --no-rt) RT=0;; --no-adapter) ADAPTER=false;; --acc-limit) ACC_LIMIT=$2; shift;;
-  --out) OUT=$2; shift;; --estop-required) ESTOP_REQ=(--estop-can-required);; -h|--help) sed -n 2,17p "$0"; exit 0;;
+  --out) OUT=$2; shift;; --estop-required) ESTOP_REQ=(--estop-can-required);;
+  --auto-arm) AUTO_ARM=true;; --no-bag) NO_BAG=1;; -h|--help) sed -n 2,19p "$0"; exit 0;;
   *) echo "모르는 옵션 $1"; exit 2;; esac; shift; done
 [ -n "$MODE" ] || { sed -n 2,15p "$0"; exit 2; }
 D=${OUT:-$HOME/a1_race_capture/track_$(date +%Y%m%d_%H%M%S)}; mkdir -p "$D"
@@ -68,8 +71,17 @@ GUARD=(python3 "$REPO/safety/can_guard/can_guard.py" "${GUARD_IF[@]}" --steer-li
        --acc-limit-pct "$ACC_LIMIT" --status-interval-s 1 --event-log "$D/can_guard_events.csv" "${ESTOP_REQ[@]}")
 if [ $RT = 1 ]; then
   sudo -v || die "sudo 필요(격리 코어·SCHED_FIFO). 없이 하려면 --no-rt"
-  bg can_guard sudo chrt -f 90 sudo -u "$USER" env PATH="$PATH" PYTHONPATH="${PYTHONPATH:-}" HOME="$HOME" \
-     "${GUARD[@]}" --cpu $GUARD_CPU --rt-priority 90
+  # 11-04: `setsid sudo …` 는 터미널이 없는 새 세션이라 sudo 가 방금 받은 인증(터미널별 기록)을 못 쓰고
+  # 비밀번호를 다시 물어 can_guard 가 안 떴다. → sudo 를 **setsid 밖**(이 터미널)에서 부르고, 분리는 sudo 안의
+  # `setsid -f`(항상 fork)가 한다. sudo 는 바로 돌아오고 can_guard 는 이 세션과 끊긴 채 계속 돈다.
+  sudo -n setsid -f chrt -f 90 sudo -u "$USER" env PATH="$PATH" PYTHONPATH="${PYTHONPATH:-}" HOME="$HOME" \
+     "${GUARD[@]}" --cpu $GUARD_CPU --rt-priority 90 > "$D/can_guard.log" 2>&1 < /dev/null \
+     || die "sudo -n 실패(인증 만료?) — 다시 실행하거나 --no-rt"
+  for _ in $(seq 30); do
+    gpid=$(pgrep -n -u "$USER" -f "^(/usr/bin/)?python3 .*safety/can_guard/can_guard.py") && break; sleep 0.1
+  done
+  [ -n "${gpid:-}" ] || die "can_guard 프로세스가 안 보임 — $D/can_guard.log"
+  echo "can_guard=$gpid" >> "$PIDS"
 else
   bg can_guard "${GUARD[@]}"; say "⚠️ --no-rt: can_guard 비격리 실행 — 이 세션의 지연 값은 '비격리'"
 fi
@@ -79,9 +91,16 @@ grep -q "앱 연결 후 재실행" "$D/can_guard.log" && die "can_guard 시작 �
 grep -q "시작 거부" "$D/can_guard.log" && die "can_guard 시작 거부 — 다른 0x210 송신자(원격조종 0x210? 미확인 송신자?) $(grep '시작 거부' "$D/can_guard.log")"
 [ -e /dev/shm/a1_can_guard_cmd ] || die "can_guard 공유메모리 없음 — $D/can_guard.log"
 say "can_guard 시작: $(grep -m1 '실행 환경' "$D/can_guard.log")"
+if [ $RT = 1 ]; then   # 실제로 격리 실행됐는지 커널에 직접 묻는다(로그 문구가 아니라)
+  pol=$(chrt -p "$gpid" 2>/dev/null | grep -o "SCHED_[A-Z]*" | head -1)
+  cpu=$(taskset -cp "$gpid" 2>/dev/null | awk '{print $NF}')
+  if [ "$pol" = SCHED_FIFO ] && [ "$cpu" = "$GUARD_CPU" ]; then say "✅ can_guard RT: pid $gpid $pol CPU $cpu"
+  else say "⚠️ can_guard RT 아님(pid $gpid, $pol, CPU $cpu) — 이 세션 지연 값은 '비격리'로 표기"; fi
+fi
 
 # ── 3. 브리지 + 어댑터 ──────────────────────────────────
-LAUNCH=(ros2 launch a1_control_adapter track.launch.py channel:="$CH" params:="$D/track_params.yaml" adapter:=$ADAPTER)
+LAUNCH=(ros2 launch a1_control_adapter track.launch.py channel:="$CH" params:="$D/track_params.yaml" adapter:=$ADAPTER
+        auto_arm:=$AUTO_ARM)
 if [ $RT = 1 ]; then bg nodes taskset -c $NODE_CPU "${LAUNCH[@]}"; else bg nodes "${LAUNCH[@]}"; fi
 if [ $ADAPTER = true ]; then
   for _ in $(seq 40); do ros2 topic list 2>/dev/null | grep -q "^/control/adapter/status$" && break; sleep 0.25; done
@@ -93,8 +112,13 @@ else
 fi
 
 # ── 4. 녹화 ────────────────────────────────────────────
-bg record bash "$HERE/record.sh" "$D" "$CH"
-say "녹화 시작: $D/bag (+ candump/Kvaser 원본)"
+if [ $NO_BAG = 1 ]; then
+  bg record bash "$HERE/record.sh" "$D" "$CH" --can-only
+  say "녹화 시작: CAN 로그만 — $D/candump_${CH}.log$( [ "$MODE" = kvaser ] && echo " + kvaser_ch${KV_CH}.log(원본)") (ROS bag 없음)"
+else
+  bg record bash "$HERE/record.sh" "$D" "$CH"
+  say "녹화 시작: $D/bag (+ candump/Kvaser 원본)"
+fi
 if [ $ADAPTER = false ]; then
   LC_IF=(--channel "$CH"); [ "$MODE" = kvaser ] && LC_IF=(--interface kvaser --channel "$KV_CH" --bitrate 500000)
   cat <<MSG | tee -a "$D/bringup.log"
@@ -107,6 +131,15 @@ if [ $ADAPTER = false ]; then
    메모:  echo "\$(date +%s.%N) \$(date +%H:%M:%S) 내용" >> $D/notes.txt
    비상 정지: python3 $REPO/safety/can_guard/estop.py   (해제: --reset, 정지 상태에서만)
    종료:  lift_cmd 에서 brake 100 → q, 그다음 bash $HERE/stop.sh
+MSG
+  exit 0
+fi
+if [ $AUTO_ARM = true ]; then
+  cat <<MSG | tee -a "$D/bringup.log"
+
+✅ 준비 완료(자동 arm) — 모델이 /control/target 을 0.3 s 넘게 계속 내면 조향·종방향이 자동 arm 되고 **바로 움직인다**.
+   자동 arm 은 한 번뿐: disarm·고장 래치(입력 150 ms 끊김 등) 뒤에는 다시 자동으로 올라가지 않는다(arm 서비스로만).
+   상태:  ros2 topic echo /control/adapter/status   |  비상 정지: python3 $REPO/safety/can_guard/estop.py
 MSG
   exit 0
 fi

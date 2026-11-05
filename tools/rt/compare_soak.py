@@ -4,7 +4,7 @@
   python3 tools/rt/compare_soak.py <RT 로그> <generic 로그>
   python3 tools/rt/compare_soak.py measurements/2026-09-12_rt/soak_20260912_174708.log tools/rt/logs/soak_2026….log
 
-판정 규칙 (2026-09-14_can_verification_checklist.md 1-1):
+판정 규칙 (docs/2026-09-14_can_verification_checklist.md 1-1):
   RT 유지 = generic 최악 > 2 × RT 최악  또는  generic 의 100 µs 초과 횟수 > 3 × RT 의 횟수
   그 외   = RT 가 비지원 NVIDIA 빌드를 감수할 만큼 낫지 않음 → generic + preempt=full 로 복귀
 """

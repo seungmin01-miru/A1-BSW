@@ -39,8 +39,8 @@
 
 ## 10-07 로 시험
 
-    python3 tools/signal_audit/judge.py /tmp/s1007 --raw a1_race_capture/vehicle_20261007
-    python3 tools/signal_audit/plot.py  /tmp/s1007 --raw a1_race_capture/vehicle_20261007 --from 11:26:00 --to 11:34:00 --tag lift
+    python3 tools/signal_audit/judge.py /tmp/s1007 --raw measurements/2026-10-07_vehicle_lift/capture
+    python3 tools/signal_audit/plot.py  /tmp/s1007 --raw measurements/2026-10-07_vehicle_lift/capture --from 11:26:00 --to 11:34:00 --tag lift
 
 조향 +1/+3/+8/+10° → +0.7/+2.3/+8.8/+11.0°, 브레이크 20/50/30 % → 2.0/5.0/2.8, auto 수락 10~22 ms 로
 `measurements/2026-10-07_vehicle_lift/README.md` 와 같은 숫자가 나온다.

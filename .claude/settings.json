@@ -1,6 +1,9 @@
 {
   "permissions": {
     "ask": [
+      "Bash(*bsw_up.sh*)",
+      "Bash(*bsw_down.sh*)",
+      "Bash(*estop.py*)",
       "Bash(*bringup.sh*)",
       "Bash(*stop.sh*)",
       "Bash(*record.sh*)",

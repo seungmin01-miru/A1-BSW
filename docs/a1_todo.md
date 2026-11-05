@@ -152,11 +152,11 @@
 - [ ] 진짜 인지 프로세스 하트비트 결선. 그 뒤 어댑터 `perception_heartbeat: false`
 - [ ] `can_guard.service` 설치(제어 노드가 생긴 뒤), 실 버스 벤치 시험 P-3/4/6/9/10/11
 - [ ] 제어기 완성: 출력 `/control/target`(가감속 m/s², 타이어각 °). 피드백 `/control/status/control_info` + GNSS
-- [ ] 제어기 차량 파라미터를 MA F4 값에서 A1 값으로 바꾸기(`VEHICLE_SPEC_TODO.md`): 축거, 질량, 조향 한계, 조향 속도, 가감속 한계, 지연 tap
+- [ ] 제어기 차량 파라미터를 MA F4 값에서 A1 값으로 바꾸기(`docs/VEHICLE_SPEC_TODO.md`): 축거, 질량, 조향 한계, 조향 속도, 가감속 한계, 지연 tap
 
 ## 6. 데이터·보고서·논문
 
-- [ ] **주행 보고서 생성 도구** — `1000002569.png` 형식(속도·종/횡가속·핸들/타이어각 명령 vs 실측·요레이트·페달·
+- [ ] **주행 보고서 생성 도구** — `docs/reference/drive_report_example/1000002569.png` 형식(속도·종/횡가속·핸들/타이어각 명령 vs 실측·요레이트·페달·
   브레이크·AUTO·GPS 궤적·고도·브레이크 이벤트). 입력은 `record.sh` 녹화(bag + CAN 원본). 신호 대응표는 `a1_vehicle_characteristics.md` 6절
 - [ ] 주행할 때마다 보고서 생성 + `a1_vehicle_characteristics.md` 범위표 갱신
 - [ ] 논문 체크리스트(`paper_data_checklist.md`) 5절 실차 행: 실물 송신 주기 편차(정지/주행), 주행 중 격리 코어 지연,
@@ -166,4 +166,4 @@
 ## 7. 정리
 
 - [ ] 미커밋 변경 정리 커밋(사용자 요청 시 한 번에): 10-07 분석, 9/17→10/07 기준 전환, 어댑터·`track_day`·문서
-- [ ] 저장소 안 잡파일 정리 여부 결정: 루트 PNG·PDF·zip, `a1_race_capture/`(원본 녹화 — 저장소 밖으로?), docx 잠금 파일
+- [x] 저장소 안 잡파일 정리 — 2026-11-05: 루트 문서 → `docs/`, PNG·PDF·zip → `docs/reference/`, `a1_race_capture/vehicle_20261007` → `measurements/2026-10-07_vehicle_lift/capture/`, 11-04 주행 로그 → `measurements/2026-11-04_drive_log/`(코드 `tools/drive_log/`), 논문 자료 → `reports/`

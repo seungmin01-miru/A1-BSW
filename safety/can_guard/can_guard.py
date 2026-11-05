@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-can_guard — 안전 임계 CAN TX 메인 루프 (§7.2, can_stack_development.md §5.D).
+can_guard — 안전 임계 CAN TX 메인 루프 (§7.2, docs/can_stack_development.md §5.D).
 
   python3 can_guard.py --channel vcan0
   sudo python3 can_guard.py --channel can0 --cpu 8 --rt-priority 90   # A-3 레시피(§5.C 에서 효과 실측됨)
@@ -43,7 +43,7 @@ import can
 import kvaser_compat
 import sd_notify
 from command_policy import BrakeProfile, BrakeRamp, command_for_state
-from command_policy import AUTO_OFF_MODES, INIT_MODES, STOPPED_MODES, held_steer_on_transition
+from command_policy import AUTO_OFF_MODES, INIT_MODES, STOPPED_MODES, held_steer_follow_remote, held_steer_on_transition
 from plausibility import Limits, RateLimiter, clamp_range
 from protocol import Command, CommandChannel, EstopChannel, HeartbeatChannel, TornReadError
 from rt_setup import apply as apply_rt
@@ -89,10 +89,10 @@ def parse_args(argv=None):
     ap.add_argument('--stop-speed-kph', type=float, default=DEFAULT_STOP_SPEED_KPH,
                     help='실측 차속(0x201 좌우 평균)이 이 이하면 정지로 간주 (2026-09-21 초안, 팀 확인 필요)')
     ap.add_argument('--steer-limit-deg', type=float, default=150.0, help='조향 운용 한계 ±deg (DBC 150)')
-    ap.add_argument('--brake-limit-pct', type=float, default=100.0, help='브레이크 운용 한계 % (DBC 100)')
-    ap.add_argument('--acc-limit-pct', type=float, default=100.0, help='가속 운용 한계 % (DBC 100)')
+    ap.add_argument('--brake-limit-pct', type=float, default=100.0, help='브레이크 운용 한계 %% (DBC 100)')
+    ap.add_argument('--acc-limit-pct', type=float, default=100.0, help='가속 운용 한계 %% (DBC 100)')
     ap.add_argument('--hold-brake-pct', type=float, default=30.0,
-                    help='HOLDING/DEGRADED/STOPPED 진입 즉시 거는 브레이크 % (시작값)')
+                    help='HOLDING/DEGRADED/STOPPED 진입 즉시 거는 브레이크 %% (시작값)')
     ap.add_argument('--hold-brake-ramp-pct-s', type=float, default=20.0,
                     help='명령이 다시 안 들어오면 그다음 올리는 속도 %%/s (2026-11-04: 30 시작 → 서서히, 잠정)')
     ap.add_argument('--hold-brake-max-pct', type=float, default=60.0, help='보호 상태 브레이크 상한 %% (잠정)')
@@ -119,6 +119,9 @@ def parse_args(argv=None):
                     help='hold=auto 유지+브레이크 유지(기본), manual=auto 0·명령 0(사람에게 넘김)')
     ap.add_argument('--steer-rate-limit', type=float, default=None, help='deg/s, 미정이면 무제한(§5.D 참고)')
     ap.add_argument('--acc-rate-limit', type=float, default=None, help='%%/s, 미정이면 무제한')
+    ap.add_argument('--estop-remote-steer', choices=('follow', 'hold'), default='follow',
+                    help='ESTOP 중 앱 En=1 동안 고정 조향각: follow=0x200 실제 핸들각을 따라감(기본, 앱 해제 순간 튐 방지 — '
+                         '11-04 −53° 튐), hold=진입 순간 값(예전)')
     ap.add_argument('--precheck-s', type=float, default=1.0,
                     help='시작 전 이만큼 듣고 다른 0x210 송신자가 있으면 시작 거부. 0=점검 안 함')
     ap.add_argument('--status-interval-s', type=float, default=0.0,
@@ -232,6 +235,7 @@ def run(a):
 
         state = State.INIT
         last_valid_cmd = Command()
+        last_auto_cmd = None   # auto 비트가 있던 마지막 명령 — ESTOP·STOPPED 가 disarm(auto 000)에 풀리지 않게(2026-11-05)
         last_cmd_mono = None       # 마지막으로 "성공 확인된" 명령 timestamp 의 monotonic 절대시각
         last_hb_mono = None
         holding_entered_at = None
@@ -292,6 +296,8 @@ def run(a):
                 cmd, cmd_age = None, None
             if cmd is not None:
                 last_valid_cmd = cmd
+                if cmd.steer_auto or cmd.brake_auto or cmd.acc_auto:
+                    last_auto_cmd = cmd
                 last_cmd_mono = now - cmd_age
             cmd_age_s = (now - last_cmd_mono) if last_cmd_mono is not None else None
 
@@ -327,6 +333,9 @@ def run(a):
                     if foreign_warned_at is None or now - foreign_warned_at >= 1.0:
                         log(f'[can_guard] ⚠️ 다른 0x210 송신자 감지(누적 {foreign_n}) {bytes(msg.data).hex()} '
                             f'— 명령 충돌 중', file=sys.stderr)
+                        # 11-04 bsw5: 원격 유닛이 can_guard 실행 중에 켜져 124 s 동안 0x210 이 두 송신자로 섞였는데
+                        # 이벤트 로그에는 안 남았다 → 00 분석(analysis.py)이 잡도록 1 초에 한 줄 남긴다(동작은 그대로)
+                        ev('foreign_0x210', f'n={foreign_n} data={bytes(msg.data).hex()} state={state.value}', now)
                         foreign_warned_at = now
             vs_age_s = (now - last_vs_mono) if last_vs_mono is not None else None
 
@@ -385,6 +394,10 @@ def run(a):
                 sd_notify.status(new_state.value)
             # 조향 고정값: ACTIVE/INIT → (HOLDING|DEGRADED|STOPPED) 첫 진입 순간에만 캡처(command_policy 설명 참고)
             held_steer_deg = held_steer_on_transition(state, new_state, held_steer_deg, last_valid_cmd)
+            # ESTOP 중 앱 En=1 이면 차량은 앱을 따른다 → 고정값을 실제 핸들각으로(앱 해제 순간 조향 튐 방지, 11-04 bsw4)
+            held_steer_deg = held_steer_follow_remote(
+                new_state, held_steer_deg, a.estop_can == 'remote' and remote.remote_enabled,
+                last_info['steer_pos_deg'] if last_info else None, a.estop_remote_steer)
             if new_state == State.HOLDING and state != State.HOLDING:
                 holding_entered_at = now
             elif new_state != State.HOLDING:
@@ -397,7 +410,7 @@ def run(a):
 
             # --- 3. 명령 생성 → 방어 클램프 → 인코딩 → 전송 ---
             out = command_for_state(state, last_valid_cmd, held_steer_deg, steer_limiter, acc_limiter, brake_ramp,
-                                    a.period, hold_profile=hold_profile, estop_profile=estop_profile,
+                                    a.period, last_auto_cmd=last_auto_cmd, hold_profile=hold_profile, estop_profile=estop_profile,
                                     stopped_mode=a.stopped_mode, init_mode=a.init_mode,
                                     auto_off_mode=a.auto_off_mode)
             if out is not None:

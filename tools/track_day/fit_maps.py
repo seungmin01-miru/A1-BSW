@@ -6,7 +6,11 @@
   # T2: 정지 상태 실측표(CSV: wheel_deg,left_tire_deg,right_tire_deg — 각도계로 잰 값)
   python3 tools/track_day/fit_maps.py steer t2_steer.csv
   # T2 보조: 주행 bag 에서 요레이트로 역산(δ = atan(r·L/v), 정상 선회 구간만) — 정적 표 검증용
-  python3 tools/track_day/fit_maps.py steer-dyn ~/a1_race_capture/track_latest/bag --wheelbase 1.6
+  python3 tools/track_day/fit_maps.py steer-dyn ~/a1_race_capture/track_latest/bag --wheelbase 2.36
+
+시각(2026-11-05): 기본은 메시지 **헤더 stamp**(`--time header`). bag 기록 시각은 11-04 에 can_raw_bridge 밀림으로
+`/control/status/*` 가 최대 52 s 늦게 찍혔다(measurements/2026-11-04_drive_log/README.md 2.7절). 헤더가 없는
+메시지만 bag 시각을 쓴다. 예전 동작은 `--time bag`.
 
 출력 끝의 YAML 조각을 세션 폴더의 track_params.yaml 에 붙여 넣고 어댑터를 재시작한다(bringup --params).
 명령은 버스 위 0x210(/control/status/command_on_bus — 어댑터든 lift_cmd 든), 속도는 GNSS(/gsof_client/odom
@@ -21,6 +25,17 @@ import sys
 import numpy as np
 
 
+TIME_SOURCE = 'header'
+
+
+def _stamp(t_ns, m):
+    if TIME_SOURCE == 'header':
+        h = getattr(m, 'header', None)
+        if h is not None and (h.stamp.sec or h.stamp.nanosec):
+            return h.stamp.sec + h.stamp.nanosec * 1e-9
+    return t_ns * 1e-9
+
+
 def read_bag(uri, topics):
     import rosbag2_py
     from rclpy.serialization import deserialize_message
@@ -33,7 +48,10 @@ def read_bag(uri, topics):
     out = {t: [] for t in topics}
     while r.has_next():
         name, data, t_ns = r.read_next()
-        out[name].append((t_ns * 1e-9, deserialize_message(data, get_message(types[name]))))
+        m = deserialize_message(data, get_message(types[name]))
+        out[name].append((_stamp(t_ns, m), m))
+    for v in out.values():
+        v.sort(key=lambda x: x[0])   # 헤더 시각은 기록 순서와 다를 수 있다
     return out
 
 
@@ -146,6 +164,8 @@ def cmd_steer_dyn(a):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--time', choices=('header', 'bag'), default='header',
+                    help='시각 기준: header=메시지 헤더 stamp(기본, 11-04 bag 밀림 대응), bag=bag 기록 시각(예전)')
     sub = ap.add_subparsers(dest='cmd', required=True)
     p = sub.add_parser('long')
     p.add_argument('bag')
@@ -163,6 +183,8 @@ def main():
     p.add_argument('--min-speed', type=float, default=3.0)
     p.set_defaults(fn=cmd_steer_dyn)
     a = ap.parse_args()
+    global TIME_SOURCE
+    TIME_SOURCE = a.time
     a.fn(a)
 
 

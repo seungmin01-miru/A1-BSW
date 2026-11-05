@@ -117,6 +117,12 @@ class RemoteEstopDetector:
                 self.reason = f'remote lost > {self.timeout_s:g}s'
 
     @property
+    def remote_enabled(self):
+        """앱이 지금 제어권을 쥐고 있나(0x156 EPS/ACC/AEB_En 중 하나라도 1) — 이때 차량은 0x210 을 무시한다(11-04)."""
+        f = self.last_156
+        return bool(f and (f['eps_en'] or f['acc_en'] or f['aeb_en'])) and not self.lost
+
+    @property
     def asserted(self):
         return self.condition or self.lost
 

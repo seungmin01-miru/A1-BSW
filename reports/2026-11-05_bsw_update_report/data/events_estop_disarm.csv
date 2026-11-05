@@ -1,0 +1,7 @@
+wall_s,mono_s,event,detail
+1793884695.010019,11475.118252,start,"virtual:r143ad0 init=silent estop_can=remote"
+1793884695.411305,11475.519538,state,"INIT->ACTIVE cmd_age=0.0004703129998233635 speed_kph=15.0"
+1793884696.430309,11476.538542,estop_request,"shm source=bsw_down trigger_mono=11476.524683 detect_lag_ms=13.6"
+1793884696.430371,11476.538603,state,"ACTIVE->ESTOP cmd_age=0.0034341430000495166 speed_kph=15.0"
+1793884696.430513,11476.538745,estop_first_tx,"brake=30.8 acc=0.0 auto=111"
+1793884698.930220,11479.038453,stop,"cycles=197 tx_fail=0"

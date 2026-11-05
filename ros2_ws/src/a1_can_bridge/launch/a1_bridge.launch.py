@@ -20,6 +20,7 @@ def generate_launch_description():
     interface = LaunchConfiguration('interface')
     cpu_affinity = LaunchConfiguration('cpu_affinity')
     rt_priority = LaunchConfiguration('rt_priority')
+    ids = LaunchConfiguration('ids')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -35,6 +36,11 @@ def generate_launch_description():
             'rt_priority', default_value='0',
             description='can_raw_bridge SCHED_FIFO 우선순위, 0=미적용',
         ),
+        DeclareLaunchArgument(
+            'ids', default_value='0x200,0x201,0x210',
+            description='raw 토픽으로 내보낼 CAN ID(커널 필터). 빈 값 = 전부. 11-04 전부(약 580 /s) 내보내다 52 s 밀림 → '
+                        '디코더가 쓰는 0x200/0x201/0x210 만(약 145 /s). 앱 0x156/0x157(각 100 Hz)·원본 전체는 candump/Kvaser 로그',
+        ),
         Node(
             package='a1_can_bridge', executable='can_raw_bridge', name='can_raw_bridge',
             # ParameterValue 로 타입을 강제한다 — 안 하면 "cpu_affinity:=8" 처럼 숫자로 보이는
@@ -45,6 +51,7 @@ def generate_launch_description():
                 'interface': ParameterValue(interface, value_type=str),
                 'cpu_affinity': ParameterValue(cpu_affinity, value_type=str),
                 'rt_priority': ParameterValue(rt_priority, value_type=int),
+                'ids': ParameterValue(ids, value_type=str),
             }],
             output='screen',
         ),

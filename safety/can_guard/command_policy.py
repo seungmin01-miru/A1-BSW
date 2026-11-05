@@ -17,6 +17,7 @@
       HOLDING/DEGRADED/STOPPED(hold): 기본 30 % → 20 %/s → 60 % (잠정)
       ESTOP:                          기본 30 % → 40 %/s → 82 % (82 % 이상은 차량 위치 8.2 포화, 잠정)
   - **ESTOP**: 가속 즉시 0(변화율 제한 무시), 조향 진입 순간 값 고정, auto 비트 유지.
+    단 원격(앱) En=1 동안은 차량이 앱을 따르므로 고정값을 0x200 실제 핸들각으로 갱신(2026-11-05, held_steer_follow_remote).
   - **보내지 않음(None)**: auto 000 을 보내면 페일세이프 브레이크가 풀리므로,
       INIT(`init_mode='silent'`, 기본) — 첫 유효 명령 전에는 0x210 을 아예 보내지 않는다.
       ESTOP 인데 마지막 명령의 auto 가 전부 0(제어권을 받은 적 없음) — 역시 보내지 않는다(차량 페일세이프에 맡김).
@@ -82,24 +83,46 @@ def held_steer_on_transition(prev_state, new_state, held_steer_deg, last_valid_c
     return held_steer_deg
 
 
+def held_steer_follow_remote(state, held_steer_deg, remote_enabled, actual_steer_deg, mode='follow'):
+    """ESTOP 중 원격(앱) En=1 이면 고정 조향각을 차량 실제 핸들각(0x200)으로 계속 갱신한다(2026-11-05).
+
+    11-04 17:00:43(bsw4): 앱 En 이 켜지면 차량은 우리 0x210 을 무시하고 앱(EPS_Cmd 0°)을 따른다 — 조향이 −53 → +7.6°.
+    can_guard 는 ESTOP 진입 순간 값(−49.8°)을 계속 보냈고, 50 s 뒤 앱을 끄자 차량이 다시 우리 0x210 을 따라
+    1 s 만에 핸들이 −53° 튀었다(그때 1.5 km/h). 원격이 쥐고 있는 동안은 실제 위치를 따라가 두면 해제 순간 튐이 없다.
+    En 이 꺼진 뒤에는 마지막 실제 위치에 고정(원래 규칙). mode='hold' 면 예전 동작(진입값 고정)."""
+    if mode == 'follow' and state == State.ESTOP and remote_enabled and actual_steer_deg is not None:
+        return actual_steer_deg
+    return held_steer_deg
+
+
 def _has_any_auto(cmd):
     return cmd.steer_auto or cmd.brake_auto or cmd.acc_auto
 
 
 def command_for_state(state, last_valid_cmd, held_steer_deg, steer_limiter, acc_limiter, brake_ramp, dt_s,
                       hold_profile=DEFAULT_HOLD_PROFILE, estop_profile=DEFAULT_ESTOP_PROFILE,
-                      stopped_mode='hold', init_mode='silent', auto_off_mode='silent'):
+                      stopped_mode='hold', init_mode='silent', auto_off_mode='silent', last_auto_cmd=None):
     """state: 이번 주기에 확정된 상태(state_machine.next_state 의 결과).
     last_valid_cmd: 마지막으로 성공적으로 받은 제어 명령.
     held_steer_deg: 보호 상태 진입 시점에 얼린 조향각(호출자가 `held_steer_on_transition` 으로 캡처).
     steer_limiter/acc_limiter: `plausibility.RateLimiter` — 제어 노드 명령의 변화율 제한(기본 무제한).
     brake_ramp: `BrakeRamp` — can_guard 가 스스로 거는 브레이크.
-    반환: 클램프 전 `Command`, 또는 **None = 이번 주기는 0x210 을 보내지 않는다**."""
+    last_auto_cmd: auto 비트가 있던 마지막 명령(없으면 None).
+    반환: 클램프 전 `Command`, 또는 **None = 이번 주기는 0x210 을 보내지 않는다**.
+
+    2026-11-05 수정 — **ESTOP·STOPPED(hold) 는 disarm 으로 풀리지 않는다**: 예전에는 래치 상태에서 어댑터가 disarm
+    (auto 000 명령)을 쓰면 last_valid_cmd 의 auto 가 0 이 되어 침묵 → 우리 브레이크가 사라졌다(보고서 2026-11-05
+    시나리오 stop_disarm·estop_disarm). 두 상태는 재시작으로만 빠져나가는 래치이므로 auto 비트·명령 바닥값을
+    last_auto_cmd 에서 가져온다. HOLDING 은 "명령 재개 → ACTIVE" 가 설계이므로 그대로(운용 규칙: 래치 중 disarm 금지)."""
     if state == State.INIT:
         steer_limiter.reset(0.0)
         acc_limiter.reset(0.0)
         brake_ramp.reset(0.0)
         return None if init_mode == 'silent' else Command()
+
+    if state in (State.ESTOP, State.STOPPED) and not _has_any_auto(last_valid_cmd) \
+            and last_auto_cmd is not None and _has_any_auto(last_auto_cmd):
+        last_valid_cmd = last_auto_cmd   # 래치 상태: disarm(auto 000)을 무시하고 마지막 auto 비트·브레이크 바닥 유지
 
     if auto_off_mode == 'silent' and state != State.ESTOP and not _has_any_auto(last_valid_cmd) \
             and not (state == State.STOPPED and stopped_mode == 'manual'):

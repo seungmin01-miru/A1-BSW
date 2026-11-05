@@ -91,7 +91,7 @@ python3 can_guard.py --channel can0 --cpu 8 --rt-priority 90 2>~/a1_race_capture
 ```
 
 **분석은 이 저장소가 있는 컴퓨터로 가져와서 진행** — 이 패키지는 수집까지만 담당한다. `can/*.csv`는
-`TalkFile_kf-1600_CAN_GPSINS_CSV.zip.zip`의 `can.csv`와 같은 컬럼(`wall_time,arbitration_id_hex,raw_hex`)
+`docs/reference/kf1600_gps_can/kf1600_CAN_GPSINS_CSV.zip`의 `can.csv`와 같은 컬럼(`wall_time,arbitration_id_hex,raw_hex`)
 이라 그때 쓴 방식(raw_hex ↔ 실차 프로토콜 대조)을 그대로 이어서 쓸 수 있다.
 
 ## 다른 PC(남의 노트북 등)에서 급하게 돌려야 할 때

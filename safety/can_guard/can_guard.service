@@ -1,7 +1,7 @@
 # can_guard systemd 유닛 (초안, 미설치) — §7.2 "생존성" 규칙을 그대로 옮긴 것.
 # 설치 전 확인할 것: ExecStart 경로, WatchdogSec 값(can_guard.py 의 sd_notify 주기와 맞춰야 함 — 아직 미구현),
 # 실행 계정의 rtprio/memlock ulimit(A-3 처럼 sudo chrt 로 상속시킬지, 이 유닛 전용으로 CAP_SYS_NICE 를
-# AmbientCapabilities 로 줄지는 별도 결정 — can_stack_development.md §5.C 의 A-3 결론 참고).
+# AmbientCapabilities 로 줄지는 별도 결정 — docs/can_stack_development.md §5.C 의 A-3 결론 참고).
 #
 # 설치(아직 하지 말 것 — 팀 확인 후):
 #   sudo cp can_guard.service /etc/systemd/system/

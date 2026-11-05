@@ -93,3 +93,14 @@ def test_estop_channel_trigger_and_reset_roundtrip():
     finally:
         tool.close()
         guard.close()
+
+
+def test_remote_enabled_matches_11_04_frames():
+    """11-04 모든 세션의 0x156 은 '00 96 00'(대기)과 '01 96 01'(EPS/ACC En) 두 가지뿐이었다."""
+    det = RemoteEstopDetector()
+    det.feed(0x156, bytes.fromhex('0096000000000027'), 0.0)
+    assert not det.remote_enabled
+    det.feed(0x156, bytes.fromhex('01960100000000B0'), 0.01)
+    assert det.remote_enabled
+    det.feed(0x156, bytes.fromhex('00960000000000D7'), 0.02)
+    assert not det.remote_enabled

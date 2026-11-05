@@ -18,7 +18,7 @@ echo "-- 1) verify";  bash "$RT/a1_rt.sh" verify > "$R/verify.txt" 2>&1; grep -E
 if [[ ${A1_QUICK:-0} != 1 ]]; then echo "-- 2) bench (~5분)"; bash "$RT/a1_rt.sh" bench > "$R/bench.txt" 2>&1; tail -15 "$R/bench.txt"; fi
 echo "-- 3) soak ${SOAK_MIN}분";  bash "$RT/a1_rt.sh" soak "$SOAK_MIN" > "$R/soak.txt" 2>&1; tail -15 "$R/soak.txt"
 
-echo "-- 4) can_guard 유닛테스트 + SIL(P-1/P-2 + 비상 정지 E1~E6)"
+echo "-- 4) can_guard 유닛테스트 + SIL(P-1/P-2 + 비상 정지 E1~E7)"
 if [[ -d $REPO/safety/can_guard ]]; then
   ( modprobe vcan 2>/dev/null; bash "$REPO/sil/vcan/vcan_up.sh" vcan0 ) >/dev/null 2>&1 && ok "vcan0 up" || warn "vcan0 생성 실패(모듈 vcan?)"
   ( cd "$REPO/safety/can_guard"

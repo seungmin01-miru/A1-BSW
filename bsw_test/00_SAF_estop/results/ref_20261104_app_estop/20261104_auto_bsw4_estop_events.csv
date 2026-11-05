@@ -1,0 +1,3 @@
+# 00 SAF-ESTOP analysis.py — 원본 measurements/2026-11-04_drive_log/raw_can/auto_bsw4/kvaser_ch0.log.zst, 0x201 ÷ 0.958, 판정 아님
+t0,sources,v0_kph,detect_ms,guard_tx_ms,app_en_s,app_acc_min,app_acc_le_m1_s,decel_start_ms,stop_s,stop_m,mean_decel,wheel_lock,brake_pos0,brake_pos_rise_ms,steer_jump_deg,follows_remote,release_s,release_v_kph,release_steer_jump_deg,release_guard_brake,two_senders,auto000_after
+1793779243.137784,app_en+guard:remote+app_acc,15.14,5.9,5.9,49.99,-3.0,1.59,211,4.85,10.2,0.87,0,4.2,,66.1,1,49.99,1.51,-53.0,100.0,0,0

@@ -1,6 +1,6 @@
 # safety/can_guard — 안전 임계 CAN TX (MCU 대체)
 
-`can_stack_development.md` §5.D / §7 의 구현. **`ros2_ws/` 밖**에 독립적으로 둔다 — ROS2/DDS 를 hot loop 에
+`docs/can_stack_development.md` §5.D / §7 의 구현. **`ros2_ws/` 밖**에 독립적으로 둔다 — ROS2/DDS 를 hot loop 에
 넣지 않는다는 §7.2 규칙을 디렉터리 경계로도 강제한다. 런타임 의존은 표준 라이브러리 + `python-can` 뿐이다
 (`sil_tests/`·`test/` 는 시험 도구라 `cantools` 를 써도 된다).
 
@@ -152,6 +152,10 @@ python3 can_guard.py --interface kvaser --channel 0 --bitrate 500000 --steer-lim
 | 원천 ① | 공유메모리 `EstopChannel`(`a1_can_guard_estop`) — `python3 estop.py` 누름 / `--reset` 해제 / `--status` |
 | 원천 ② | `pkill -USR1 -f can_guard.py` (도구가 안 될 때 예비) |
 | 원천 ③ | **핸드폰 앱(원격) 0x156/0x157** (`--estop-can remote`, 기본): 0x156 EPS/ACC/AEB_En = 1 **또는** 0x157 ACC_Cmd ≤ `--estop-acc-mps2`(−1.0) 가 `--estop-confirm-frames`(2) 연속. 데드맨 `--estop-can-timeout S`(기본 끔). 시작 전 점검에서 0x156/0x157 이 안 보이면 경고, `--estop-can-required` 면 거부(종료 4). **판정 조건은 잠정 — 앱 비상 정지 버튼이 실제로 무엇을 보내는지 현장 확인** |
+| 원격 우선(11-04 실차) | 앱 En = 1 이면 **차량은 0x210 을 무시하고 앱을 따른다**(조향·제동 모두). 앱 "비상 정지"는 사실상 원격 인수이고 감속은 약하다(15 km/h → 4.85 s·10.2 m, 0.87 m/s²). can_guard 의 몫은 감지(5.9 / 18.6 ms)·래치·**앱을 놓은 뒤 인계**. 근거 `bsw_test/00_SAF_estop/docs/goal.md` 0절 |
+| 앱 En 중 조향 | `--estop-remote-steer follow`(기본, 2026-11-05): ESTOP 중 앱 En = 1 동안 고정 조향각을 0x200 실제 핸들각으로 갱신 → 앱 해제 순간 튐 없음(11-04 수정 전 −53°). `hold` = 진입값 고정(예전) |
+| disarm 에 안 풀림 | ESTOP·STOPPED 는 어댑터 disarm(auto 000 명령)이 와도 **마지막 auto 비트·브레이크로 계속 송신**(2026-11-05, `command_policy.command_for_state(last_auto_cmd=…)`). 예전엔 침묵해 브레이크가 사라졌다. HOLDING 은 어댑터가 래치 해제 뒤 재시작 전까지 안 써서 막는다 |
+| 실행 중 다른 0x210 | stderr 경고 + 이벤트 로그 `foreign_0x210`(1 s 한 줄, 2026-11-05). 11-04 bsw5 에서 원격 유닛이 실행 중에 켜져 124 s 섞였다. 제어 동작은 바꾸지 않음 |
 | 상태 | `ESTOP` — 어느 상태보다 우선, 래치. 해제는 정지 요청이 모두 꺼지고 차속 ≤ `--stop-speed-kph` 일 때만 → STOPPED(브레이크 유지). 차속을 모르면 해제 안 됨(재시작) |
 | ESTOP 출력 | 가속 즉시 0, 조향 진입값 고정, **auto 비트 유지(000 금지)**, 브레이크 `--estop-brake-start-pct 30` → `--estop-brake-ramp-pct-s 40` → `--estop-brake-max-pct 82` (휠락 방지로 서서히, 잠정) |
 | 보호 상태 브레이크 | HOLDING/DEGRADED/STOPPED: `--hold-brake-pct 30` 즉시 → `--hold-brake-ramp-pct-s 20` → `--hold-brake-max-pct 60` (명령이 다시 안 들어오면 서서히, 잠정). 제어 노드가 더 세게 밟고 있었으면 줄이지 않음 |
@@ -159,8 +163,8 @@ python3 can_guard.py --interface kvaser --channel 0 --bitrate 500000 --steer-lim
 | 이벤트 로그 | `--event-log x.csv`: `wall_s,mono_s,event,detail` — `estop_request`(감지 지연 포함), `state`, `estop_first_tx`, `estop_reset accepted/refused` |
 
 ```bash
-python3 -m pytest test/ -q                        # 91개 (ESTOP 단위 시험 포함)
-python3 sil_tests/e_estop.py --channel vcan0      # E1~E6 (vcan 필요: sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0)
+python3 -m pytest test/ -q                        # 102개 (ESTOP·원격 추종 조향 포함, 2026-11-05)
+python3 sil_tests/e_estop.py --channel vcan0      # E1~E7 (E7 = 원격 우선 조향 인계, 2026-11-05) (vcan 필요: sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0)
 ```
 
 ⚠️ 남은 문제: 제어 노드(어댑터 disarm, `lift_cmd` auto off)가 auto 000 명령을 쓰면 ACTIVE 에서 그대로 나가 브레이크가 풀린다 — silent INIT 은 "첫 명령 전"만 막는다.

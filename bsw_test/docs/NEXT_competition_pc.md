@@ -20,7 +20,32 @@
 **개발 PC 결과(참고만, 판정에 안 씀)**: python 3.10.12 · python-can 4.6.1 · cantools 44.0.0 venv 에서 단위 38 PASS, `run_sil_check.sh` 전체 PASS
 (E1~E6, sil_02_profile, sil_02_session A/B/C). 가짜 차량에서 0→10 km/h 최고 9.9 km/h(오버슈트 없음), 마지막 3 s 평균 오차 0.8 km/h, U턴 174~191°.
 
+## 0-1. 2026-11-05 추가 (개발 PC — 앱 비상정지 재정의·도구 정비, 보고 `reports/2026-11-05_bsw_update_report/`)
+
+| 항목 | 내용 | 파일 |
+|---|---|---|
+| 00 재정의 | 앱 = 원격 인수(En 동안 0x210 무시), 경로 A(우리)/B(앱)/C(원격 유닛) 로 기준 적용 분리. 업체 질문 Q1~Q5 | `00_SAF_estop/docs/goal.md` 0절 |
+| can_guard | ESTOP 중 앱 En 동안 조향 고정값 = 0x200 실제값(`--estop-remote-steer follow` 기본), 실행 중 다른 0x210 → 이벤트 `foreign_0x210`, `--help` `%` 오류 | `safety/can_guard/` |
+| SIL | E2 신호를 실제 can_guard 파이썬에 보냄(`--rt` FAIL 원인), **E7 추가**(원격 우선 조향 인계) | `sil_tests/e_estop.py` |
+| bringup | `sudo -n setsid -f chrt …` — sudo 를 setsid 밖에서(11-04 비밀번호 재요구), 기동 뒤 SCHED_FIFO·CPU 를 커널에서 확인해 출력 | `tools/track_day/bringup.sh` |
+| 브리지 | spin_once 0.2 s 마다, 커널 ID 필터 `ids`(launch 기본 0x200/0x201/0x210), 5 s 마다 밀림 경고 | `a1_can_bridge` (**colcon build 필요**) |
+| 분석 | `fit_maps.py` 기본 헤더 stamp(`--time bag` = 예전), `extract.py` 열 `t`=헤더·`t_bag`. 00 `analysis.py` 새로 | — |
+
+**개발 PC 결과(참고):** can_guard 단위 98 PASS, profile_lib 38 PASS, in-process(virtual 버스) E7 로직 확인(follow +5.0° 유지 / hold −49.8° 고정),
+bench_bridge 프레임당 30 → 1.8 µs. vcan·sudo 없어 E1~E7 프로세스 시험·bringup RT·bag 지연은 **못 돌림 → 아래 1절에서 대회 PC 로**.
+
 ## 1. 대회 PC 에서 할 일 (현장 출발 전)
+
+- [ ] (11-05) `git pull` → `cd ros2_ws && colcon build --packages-select a1_can_bridge` (브리지 수정 반영)
+- [ ] (11-05) `! bash bsw_test/00_SAF_estop/scripts/run_sil_check.sh --rt auto --track` → **E1~E7 전부 PASS**(E2 는 11-04 FAIL 하던 것, E7 새것)
+- [ ] (11-05) `! bash tools/track_day/bringup.sh --sil` → 출력에 `✅ can_guard RT: pid … SCHED_FIFO CPU 8` 확인 → `stop.sh`
+- [ ] (11-05) 같은 SIL 세션에서 2 분 녹화 뒤 `python3 tools/drive_log/hdr.py <bag> /control/status/control_info,/control/status/wheel_info` → **수신 − 헤더 최대 < 1 s**
+- [ ] (11-05) **주행 날 패키지** `! bash tools/bsw/bsw_up.sh --sil --name TEST` → `bash tools/bsw/bsw_status.sh` 모두 ✅ + **상태판 창이 뜨고 수신 칸이 초록**(11-06; 안 뜨면 `sudo apt install python3-tk`) →
+      `ros2 topic pub -r 20 /control/target a1_can_msgs/msg/ControllerOutput "{accel_mps2: -3.0}"` 로 자동 arm 확인 → 멈추고 `bsw_down.sh --force`(SIL 은 차속 0)
+      → 세션 폴더에 `*_kvaser*/candump*.zst`·`can_logs.sha256`·`SESSION.md` 확인 (`tools/bsw/README.md`)
+- [ ] (11-05) A-3 재측정(A1 DBC 코드): `cd safety/can_guard && python3 sil_tests/measure_a3_latency.py --channel vcan0 --duration 5` (기준선) →
+      `… --cpu 8 --rt-priority 90 --duration 5`(A-3, sudo 비밀번호 직접 입력) → 결과를 `safety/can_guard/README.md` "실측" 표에
+- [ ] (11-05) 새 코드 8 h soak(밤, tmux): `python3 sil_tests/soak_8h.py --channel vcan0 --hours 8 --cpu 8 --rt-priority 90` → 09-21 결과(최대 44.6 µs, 스푸리어스 0)와 비교
 
 - [x] `cd ~/git/A1-BSW && git fetch && git checkout claude/ecstatic-keller-uhtbhe && git pull` — 2026-11-04 `de5f161`
 - [x] `bash bsw_test/00_SAF_estop/scripts/setup_env.sh --build-ws` → 준비됨 — 2026-11-04 `--check` 로 ✅(이미 설치·빌드됨)

@@ -1,0 +1,4 @@
+wall_s,mono_s,event,detail
+1793884678.006638,11458.114871,start,"virtual:r786934 init=silent estop_can=remote"
+1793884678.406765,11458.514998,state,"INIT->ACTIVE cmd_age=0.0003189689996361267 speed_kph=15.0"
+1793884681.427151,11461.535384,stop,"cycles=172 tx_fail=0"

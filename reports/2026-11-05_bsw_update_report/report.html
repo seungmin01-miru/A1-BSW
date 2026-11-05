@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A1 BSW 개선 보고</title>
+<style>
+:root { --ink:#000; --gray:#555; --rule:#000; --paper:#fff; }
+@page { size: A4; margin: 17mm 16mm 17mm 16mm; }
+html { background: var(--paper); }
+body { font-family: "Noto Serif CJK KR", "Noto Serif KR", "Times New Roman", serif; color: var(--ink);
+       background: var(--paper); font-size: 9.2pt; line-height: 1.55; margin: 0 auto; max-width: 178mm;
+       text-align: justify; word-break: keep-all; overflow-wrap: anywhere; }
+h1 { font-size: 16pt; text-align: center; margin: 0 0 4pt; line-height: 1.3; font-weight: 700; }
+.subtitle { text-align: center; font-size: 10pt; margin: 0 0 3pt; }
+.byline { text-align: center; font-style: italic; font-size: 9pt; color: #222; margin-bottom: 10pt; }
+.abstract { font-size: 8.8pt; margin: 0 6mm 10pt; line-height: 1.5; }
+.abstract b { font-style: italic; }
+h2 { font-size: 10.5pt; font-weight: 700; margin: 14pt 0 5pt; text-transform: none; letter-spacing: .02em;
+     break-after: avoid; }
+h3 { font-size: 9.6pt; font-weight: 700; font-style: italic; margin: 9pt 0 3pt; break-after: avoid; }
+p { margin: 0 0 5pt; text-indent: 0; }
+code, .mono { font-family: "DejaVu Sans Mono", "Noto Sans Mono CJK KR", monospace; font-size: 7.9pt; }
+ul, ol { margin: 2pt 0 6pt 0; padding-left: 15pt; }
+li { margin: 1pt 0; }
+.tbl { margin: 10pt 0 10pt; }
+.tbl.keep { break-inside: avoid; }
+.tbl .tno, .tbl .ttl { break-after: avoid; }
+tr { break-inside: avoid; }
+.tbl .tno { text-align: center; font-size: 8.2pt; letter-spacing: .06em; }
+.tbl .ttl { text-align: center; font-size: 8.4pt; font-variant: small-caps; margin-bottom: 3pt; }
+table { width: 100%; border-collapse: collapse; font-size: 7.8pt; line-height: 1.38; }
+thead th { border-top: 1.1px solid var(--rule); border-bottom: 0.7px solid var(--rule); font-weight: 600;
+           padding: 3pt 4pt; text-align: left; vertical-align: bottom; }
+tbody td { padding: 2.2pt 4pt; vertical-align: top; text-align: left; }
+tbody tr:last-child td { border-bottom: 1.1px solid var(--rule); }
+td.c, th.c { text-align: center; } td.r, th.r { text-align: right; }
+tr.grp td { font-style: italic; font-weight: 600; padding-top: 4pt; border-top: 0.4px solid #999; }
+.tnote { font-size: 7.2pt; color: #222; margin-top: 3pt; line-height: 1.4; text-align: left; }
+figure { margin: 10pt 0 10pt; break-inside: avoid; }
+figure img { width: 100%; display: block; }
+figure.half img { width: 58%; margin: 0 auto; }
+figcaption { font-size: 7.9pt; line-height: 1.42; margin-top: 4pt; text-align: justify; }
+figcaption b { font-weight: 400; }
+.st-ok { font-weight: 700; } .st-g { } .st-w { font-style: italic; } .st-n { color: var(--gray); }
+.box { border: 0.7px solid #000; padding: 5pt 8pt; margin: 8pt 0; font-size: 8.6pt; break-inside: avoid; }
+.box .bt { font-weight: 700; margin-bottom: 2pt; }
+.pb { break-before: page; }
+figure.sheet img { width: auto; max-width: 100%; max-height: 226mm; margin: 0 auto; }
+figure.fig80 img { width: 86%; margin: 0 auto; }
+.small { font-size: 8pt; }
+sup { font-size: 6.5pt; }
+pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height: 1.35; border-top: .7px solid #000;
+      border-bottom: .7px solid #000; padding: 4pt 2pt; white-space: pre-wrap; margin: 4pt 0 8pt; }
+@media screen { body { padding: 16px; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#fff; } }
+:root[data-theme="dark"] { --paper:#fff; }
+</style>
+
+</head>
+<body>
+
+<h1>A1 BSW 개선 보고<br>— 앱 비상정지, 자동 arm·disarm, 주행 날 통합 실행, Kvaser 채널 공유</h1>
+<p class="subtitle">11-05 하위 제어 보고서의 후속 · 모델 팀·운용 담당을 위한 기술 보고서</p>
+<p class="byline">A1-BSW 팀 · 2026-11-05 · 기준 커밋 <span class="mono">1f4d36b</span> + 11-05 미커밋 변경 · 개발 PC 결과는 참고값</p>
+
+<p class="abstract"><b>요약 —</b> 11-04 자율 주행에서 드러난 세 가지 문제를 이미 있는 자료로 다뤘다. 첫째는 앱 비상정지의 실체, 둘째는 BSW 를 하나씩 띄우면서 생긴 혼선, 셋째는 도구 결함이다. (1) 앱 "비상정지"는 별도 정지 신호가 아니다. 앱이 제어권을 가져가는 <b>원격 인수</b>(0x156 En = 1)다. 그동안 차량은 0x210 을 무시했고, 15 km/h 에서 4.85 s·10.2 m 만에 섰다(0.87 m/s² ★). 앱을 놓는 순간 차량은 다시 우리 0x210 을 따르는데, 이때 핸들이 −53° 튀었다. 이것은 고쳤다. (2) 주행 날 BSW 를 <code>tools/bsw/bsw_up.sh</code> 하나로 띄운다. 띄운 뒤에는 모델이 <code>/control/target</code> 을 0.3 s 넘게 내면 어댑터가 <b>한 번만</b> 자동 arm 되어 바로 움직인다. CAN 로그는 자동으로 녹화·압축된다. (3) 시나리오를 재현하다가 두 가지 위험을 찾아 고쳤다. 하나는 <b>disarm 을 부르면 ESTOP·STOPPED 의 브레이크까지 사라지던 것</b>이고, 다른 하나는 고장 래치 뒤 disarm 이 HOLDING 을 풀던 것이다. 다만 주행 중 disarm 은 여전히 정지가 아니다. (4) Kvaser 채널은 핸들 2개(미러·can_guard)가 같이 쓴다. can_guard 가 RT 로 송신하던 11-04 자율 3세션(960 s)에서 0x200·0x201·0x156 수신율은 100.0 %, 최대 공백은 21.7 ms 였다. 수신이 막히지 않았다. 11-03 의 송신 실패는 핸들 구성 문제였고 이미 고쳤다.</p>
+
+<div class="box"><div class="bt">운용자가 꼭 알아야 할 것</div>
+<ol>
+<li><b>앱은 정지 버튼이 아니라 "원격 인수"다.</b> 누르면 차량은 앱만 따른다. 앱 담당은 <b>조향·가속을 건드리지 말고, 차가 완전히 선 뒤에만 앱을 놓는다.</b> 물리 E-stop 은 계속 병행한다.</li>
+<li><b>모델이 명령을 내기 시작하면 차가 바로 움직인다</b>(자동 arm). 모델은 서 있을 때도 정지 목표(예: −3 m/s²)를 계속 내야 한다. 150 ms 끊기면 브레이크가 걸리고 다시 가려면 재기동해야 한다.</li>
+<li><b>주행 중 disarm 은 정지가 아니다</b>(0x210 송신이 끊기고 우리 브레이크도 없다). 주행 중 정지는 <code>estop.py</code> 나 앱으로 한다. 끝낼 때는 <code>bsw_down.sh</code> 를 쓴다.</li>
+<li><b>원격 유닛(0x210 직접 송신)은 자율 세션 동안 꺼 둔다.</b> <code>bsw_monitor</code> 가 "송신자 둘"을 표시한다.</li>
+</ol></div>
+
+<h2>1. 바뀐 것 한눈에</h2>
+<div class="tbl">
+<div class="tno">TABLE I</div><div class="ttl">11-04 문제와 11-05 대응</div>
+<table>
+<thead><tr><th>갈래</th><th>11-04 (전)</th><th>11-05 (후)</th><th>확인</th></tr></thead>
+<tbody>
+<tr><td>앱 비상정지</td><td>"정지 버튼"으로 가정, 00 기준을 그대로 적용. 해제 순간 핸들 −53° 튐</td><td>원격 인수로 재정의(2장). 00 기준을 경로 A/B/C 로 나눠 적용. 앱 En 동안 조향 고정값이 실제 핸들각을 따라감</td><td>단위 시험, 재현(Fig. 3a)</td></tr>
+<tr><td>BSW 띄우기</td><td>미러·can_guard·브리지·어댑터·arm 2회·candump 를 손으로. RT 실패 → <code>--no-rt</code></td><td><code>bsw_up</code>/<code>bsw_down</code>/<code>bsw_status</code>/<code>bsw_monitor</code>(4장). 자동 arm, CAN 로그 자동 녹화·압축</td><td>ROS 실행(자동 arm), 가짜 세션(down). 전체는 대회 PC</td></tr>
+<tr><td>disarm</td><td>“disarm = auto 0 송신”으로 알고 있었음(stop.sh 주석)</td><td>실제로는 송신을 멈춤(침묵). ESTOP·STOPPED 가 disarm 에 풀리던 결함 수정(3장)</td><td>재현 8 시나리오, ROS 실행</td></tr>
+<tr><td>Kvaser 수신</td><td>“송신 채널을 열면 수신이 막힌다”는 우려</td><td>핸들 구성과 근거를 정리(5장). 상태판은 Kvaser 를 열지 않음</td><td>11-04 원본 수신율 100.0 %</td></tr>
+<tr><td>도구</td><td>bringup RT 실패, SIL E2 FAIL, bag 52 s 밀림, 분석이 bag 시각 사용</td><td>sudo 위치, 신호 대상, 브리지 필터·spin, 헤더 stamp(6장)</td><td>부분 — 대회 PC 확인 대기</td></tr>
+</tbody></table>
+</div>
+
+<h2>2. 앱 비상정지 — 원격 인수</h2>
+<h3>2.1 앱이 실제로 보내는 프레임</h3>
+<p>11-04 Kvaser 원본 16세션을 모두 다시 읽었다. 앱의 0x156 은 <b>두 가지 값뿐</b>이었다. AEB_En 은 한 번도 1 이 아니었다. 앱을 "누르면" EPS_En 과 ACC_En 이 함께 1 이 된다. 그 순간 0x157 은 조향 0°·가속 0.00 을 보내고 있었다.</p>
+<div class="tbl keep">
+<div class="tno">TABLE II</div><div class="ttl">앱 프레임 해석 (11-04 원본, dbc_lite.remote_messages 배치)</div>
+<table>
+<thead><tr><th>프레임 (hex)</th><th>필드</th><th>값</th><th>관측</th></tr></thead>
+<tbody>
+<tr><td><code>156# 00 96 00 … cnt</code></td><td>EPS_En 0, EPS_Speed 0x96 = 150, ACC_En 0, AEB_En 0</td><td>대기</td><td>16세션 전부, 10 ms</td></tr>
+<tr><td><code>156# 01 96 01 … cnt</code></td><td>EPS_En 1, ACC_En 1</td><td><b>앱이 쥠</b></td><td>bsw4 4,999 프레임(50.0 s), bsw5 801(8.0 s), QUICK-STEER s1·s2</td></tr>
+<tr><td><code>157# 00 00 00 FF 03 …</code></td><td>EPS_Cmd 0.0°, ACC_Cmd raw 0x03FF → 0.00 m/s²</td><td>중립</td><td>En 이 켜진 순간에도 이 값</td></tr>
+<tr><td><code>157# 00 00 00 D3 02 …</code></td><td>ACC_Cmd raw 0x02D3 → −3.00</td><td>최대 감속</td><td>bsw4 에서만 1.59 s (조작자 입력)</td></tr>
+<tr><td><code>157# 00 00 00 C1 04 …</code></td><td>ACC_Cmd raw 0x04C1 → +1.94</td><td>가속</td><td>bsw4 정지 뒤 앱으로 다시 주행</td></tr>
+</tbody></table>
+<div class="tnote">ACC_Cmd = raw × 0.01 − 10.23 (bit 24, 16 bit), EPS_Cmd = int16 × 0.1° (bit 0). 출처: <code>measurements/2026-11-04_drive_log/raw_can/</code>, 분석 <code>bsw_test/00_SAF_estop/scripts/analysis.py</code>.</div>
+</div>
+
+<h3>2.2 17:00:43 사건 시간표 (bsw4, 주행 중)</h3>
+<figure>
+<img src="figs/fig1_app_estop.png" alt="11-04 앱 비상정지 시간 이력" style="width:72%;margin:0 auto">
+<figcaption>Fig. 1. 11-04 17:00:43 앱 비상정지(bsw4). 위에서부터 후륜 속도(÷ 0.958), 앱 ACC_Cmd·En, 우리 0x210 브레이크와 0x200 브레이크 위치(×10), 핸들각(우리 명령·차량 실제·앱). 우리 브레이크가 30 → 82 → 100 % 로 올라가도 차량 브레이크 위치는 4.2 그대로다. 차량 핸들은 0.5 s 안에 앱 값(0°)으로 간다. 속도 기울기는 ACC_Cmd 가 −3.0 일 때와 0 일 때 같다.</figcaption>
+</figure>
+<div class="tbl">
+<div class="tno">TABLE III</div><div class="ttl">bsw4 사건 시간표 (t = 첫 En 프레임, Kvaser 수신 시각)</div>
+<table>
+<thead><tr><th class="r">t [s]</th><th>앱</th><th>can_guard (우리 0x210)</th><th>차량 (0x200·0x201)</th></tr></thead>
+<tbody>
+<tr><td class="r">−0.10</td><td>En 0</td><td>ACTIVE, 핸들 −56.8°, 가속 82 %</td><td>15.2 km/h, 핸들 −58.5°</td></tr>
+<tr><td class="r">0.000</td><td><b>En 1</b>, ACC_Cmd 0.00, EPS_Cmd 0°</td><td>—</td><td>15.1 km/h</td></tr>
+<tr><td class="r">+0.006</td><td></td><td>감지 5.9 ms → <b>ESTOP</b>, 첫 송신 브레이크 30.8 %·가속 0·auto 111, 핸들 −49.8° 고정</td><td></td></tr>
+<tr><td class="r">+0.20 / +0.50</td><td></td><td>브레이크 38 → 50 %</td><td>핸들 −35.7 → <b>+7.6°</b>(앱 0° 로), 브레이크 위치 4.2 그대로</td></tr>
+<tr><td class="r">+0.93</td><td>ACC_Cmd −2.49 → −3.00(+1.03)</td><td>브레이크 68 %</td><td>12.9 km/h (0–0.93 s 감속 ★ 0.61 m/s²)</td></tr>
+<tr><td class="r">+1.3</td><td></td><td>브레이크 82 % 도달(40 %/s 램프 끝)</td><td></td></tr>
+<tr><td class="r">+2.52</td><td>ACC_Cmd −0.48 → 0.00(+2.63)</td><td></td><td>7.3 km/h (0.93–2.5 s ★ 1.0 m/s²)</td></tr>
+<tr><td class="r">+4.0</td><td></td><td></td><td>1.8 km/h, 브레이크 위치 4.2 → 0.3 (2.5–4.0 s ★ 1.0 m/s²)</td></tr>
+<tr><td class="r">+4.85</td><td></td><td>브레이크 100 %(제어기 정지 명령이 바닥값)</td><td><b>정지</b> — 10.2 m, 평균 0.87 m/s² ★, 휠락 없음</td></tr>
+<tr><td class="r">+20 / +40</td><td>ACC_Cmd +1.86, EPS_Cmd 조작</td><td>ESTOP 유지(브레이크 100 %)</td><td><b>앱으로 다시 주행</b>: 4.4 km/h, 핸들 148°</td></tr>
+<tr><td class="r">+49.99</td><td><b>En 0</b>(해제)</td><td>ESTOP 유지</td><td>1.5 km/h 로 움직이는 중</td></tr>
+<tr><td class="r">+51.0</td><td></td><td></td><td>핸들 <b>−51.1°</b>(우리 고정값 −49.8° 로 1 s 만에 −53°), 브레이크 위치 7.6 → 정지 유지</td></tr>
+</tbody></table>
+<div class="tnote">출처: <code>bsw_test/00_SAF_estop/results/ref_20261104_app_estop/</code>(CSV·그림), can_guard 이벤트 <code>canguard_events.csv</code>. 속도는 0x201 ÷ 0.958 이다.</div>
+</div>
+
+<h3>2.3 여기서 확인한 규칙</h3>
+<ul>
+<li><b>R1 — 앱이 쥐면 0x210 은 무시된다.</b> 우리가 82 % 를 보내도 브레이크 위치는 움직이지 않았다. 핸들은 앱 값으로 갔다. 앱이 가속(+1.9)을 보내자 ESTOP 중인데도 차가 움직였다. <b>앱이 쥔 동안 can_guard 는 차를 세울 수 없다.</b></li>
+<li><b>R2 — 앱으로 세울 때 감속은 약하다.</b> En 만 켰을 때(ACC_Cmd 0) 0.61 m/s², −3.0 일 때 1.0, 다시 0 일 때 1.0 m/s² ★ 였다. −3.0 이 감속을 정한다고 볼 근거는 없다(1회 관측). 우리 브레이크 100 % 실측 약 3.0 m/s² 와 비교하면 약 1/3 이다.</li>
+<li><b>R3 — 앱을 놓으면 차량은 즉시 0x210 을 따른다.</b> 해제 1 s 안에 우리 고정 핸들각으로 갔다. 래치(ESTOP)가 있어서 정지는 유지됐다. 의도한 동작이다(17:01:33–17:02:19 재출발 시도도 막았다).</li>
+<li><b>R4 — 감지는 빠르다.</b> 첫 En 프레임에서 ESTOP 까지 5.9 ms(주행), 18.6 ms(정지)였다. 판정 조건(En = 1 또는 ACC_Cmd ≤ −1, 2프레임)은 그대로 둔다.</li>
+</ul>
+
+<h3>2.4 고친 것 — 앱 해제 순간 조향 튐</h3>
+<p>예전 ESTOP 은 진입 순간의 명령 핸들각(−49.8°)을 계속 보냈다. 그 50 s 동안 앱은 핸들을 0° 근처로 돌려 놓았다. 그래서 앱을 놓자 차량이 −49.8° 로 돌아갔다. 지금은 <code>--estop-remote-steer follow</code>(기본)로 바뀌었다. <b>ESTOP 중 앱 En = 1 인 동안</b>에는 고정값을 0x200 실제 핸들각으로 매 주기 갱신하고, En 이 꺼지면 마지막 실제값에 고정한다. Fig. 3(a)는 실제 can_guard 코드를 가상 버스로 돌린 결과다. follow 는 앱 구간과 해제 뒤에 모두 차량 값(+5°)을 유지한다. hold(예전)는 −49.8° 에 머물러 해제 순간 54.8° 튄다. 둘 다 브레이크 30 → 82 %, 가속 0, auto 111 은 같다.</p>
+
+<h3>2.5 원격 유닛이 같이 켜진 경우 (bsw5)</h3>
+<p>17:09:58 부터 124 s 동안 0x210 이 초당 약 97 프레임이었다. 우리 50 /s 와 원격 유닛 47 /s 가 섞인 것이다. 원격 쪽은 브레이크 0·가속 최대 48 %·핸들 −150° 를 보냈고, 차는 서 있었다. can_guard 는 <i>시작 전</i>에만 다른 송신자를 검사해 거부한다(종료 3). 실행 중에는 stderr 경고만 남겼다. 지금은 이벤트 로그에 <code>foreign_0x210</code> 이 1 s 마다 남는다. <code>bsw_monitor</code> 와 00 <code>analysis.py</code> 는 "송신자 둘"을 표시한다. 동작(정지 등)은 바꾸지 않았다. 차량이 두 송신자 중 무엇을 따르는지 모르기 때문이다(업체 질문 Q5).</p>
+
+<h3>2.6 00 SAF-ESTOP 기준 — 경로별 적용</h3>
+<div class="tbl keep">
+<div class="tno">TABLE IV</div><div class="ttl">비상 정지 경로와 판정 대상 (숫자는 기존 초기 가정치 그대로 — 적용 분리는 사용자 확인 필요)</div>
+<table>
+<thead><tr><th>경로</th><th>누가 차를 세우나</th><th>판정</th><th>기록</th></tr></thead>
+<tbody>
+<tr><td>A. 우리 정지 — <code>estop.py</code>·SIGUSR1·명령 끊김</td><td>can_guard (ESTOP 30 → 82 %, 보호 30 → 60 %)</td><td>감지 ≤ 100 ms, 제동 시작 ≤ 200 ms, 작동률 100 %, auto 000 없음</td><td>정지 시간·거리·휠락</td></tr>
+<tr><td>B. 앱 인수 — 0x156 En = 1</td><td>앱 조작자 + 차량 원격 모드</td><td>can_guard 감지 ≤ 100 ms, 래치, 해제 인계, auto 000 없음</td><td>감속 시작(차속 −0.5 km/h), 정지 시간·거리, 해제 때 조향 변화(제안 ≤ 1 핸들 °)</td></tr>
+<tr><td>C. 원격 유닛 0x210</td><td>— (운용 금지)</td><td>시작 거부, <code>foreign_0x210</code> 0 줄</td><td>있으면 그 회차 무효</td></tr>
+</tbody></table>
+</div>
+
+<h3>2.7 앱 운용 절차와 업체 질문</h3>
+<ol>
+<li>앱 담당은 자율 중에 앱을 대기 상태(En 0)로 둔다. 원격 유닛은 끈다.</li>
+<li>위험하면 앱을 켠다(En 1). 그 순간 차량은 앱만 따르고, can_guard 는 ESTOP 으로 래치한다.</li>
+<li><b>조향·가속을 건드리지 않는다.</b> 가속을 주면 ESTOP 중이어도 차가 간다(R1). 가능하면 ACC_Cmd 를 최소로 둔다.</li>
+<li><b>차가 완전히 선 뒤에만</b> 앱을 끈다. 끄는 순간 차량은 can_guard 를 따른다(브레이크 82–100 %, 조향 = 앱이 놓은 자리).</li>
+<li>다시 출발하려면 <code>bsw_down</code> → <code>bsw_up</code> 한다(ESTOP 은 재시작으로만 풀린다).</li>
+</ol>
+<p class="small">업체·대회측에 확인할 것: Q1 별도 정지 버튼(AEB_En?)이 있는가 · Q2 원격 모드에서 ACC_Cmd −3 은 몇 m/s² 이고 브레이크 액추에이터를 쓰는가(0x200 위치가 안 변함) · Q3 En = 1 동안 0x210 을 축별로 완전히 무시하는가 · Q4 En 해제 뒤 0x210 을 따르기까지의 조건·지연 · Q5 원격 유닛과 앱이 함께 켜지면 무엇을 따르는가. 자세한 내용은 <code>bsw_test/00_SAF_estop/docs/goal.md</code> 0절.</p>
+
+<h2 class="pb">3. 자동 arm 과 disarm</h2>
+<p>이 장은 모델 명령이 차를 움직이기 시작하는 조건과, 멈추거나 끊겼을 때 어떤 일이 일어나는지를 다룬다. 어댑터(<code>a1_control_adapter</code>)와 can_guard 두 단계를 같이 봐야 한다. Fig. 3 의 모든 값은 실제 can_guard 코드를 python-can <code>virtual</code> 버스로 돌려 기록했다(<code>scenarios.py</code>, 개발 PC, 시간 값은 참고). 어댑터 동작은 ROS2 Humble 에서 실제 노드로 확인했다.</p>
+<figure>
+<img src="figs/fig2_arm_states.png" alt="어댑터 arm 상태와 can_guard 상태">
+<figcaption>Fig. 2. 어댑터 상태(위)와 can_guard 상태(아래). 어댑터는 can_guard 공유메모리에 명령과 축별 auto 비트를 쓰고, can_guard 는 그것을 0x210 으로 바꾼다. 실선 화살표는 자동 arm, arm 서비스, 고장 래치, disarm 이다. ESTOP 은 어느 상태에서든 들어간다.</figcaption>
+</figure>
+
+<h3>3.1 자동 arm — 언제 움직이기 시작하나</h3>
+<p><code>bsw_up</code> 은 어댑터를 <code>auto_arm:=true</code> 로 띄운다. 어댑터는 20 ms 마다 아래 조건을 <b>모두</b> 확인하고, 만족하면 조향·종방향을 같이 arm 한다.</p>
+<div class="tbl keep">
+<div class="tno">TABLE V</div><div class="ttl">자동 arm 조건 (cmd_adapter.py, 2026-11-05)</div>
+<table>
+<thead><tr><th>#</th><th>조건</th><th>값 · 출처</th><th>안 맞으면</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>자동 arm 이 켜져 있고 아직 한 번도 쓰지 않음</td><td><code>auto_arm</code>, <code>auto_arm_spent</code></td><td>arm 서비스로만</td></tr>
+<tr><td>2</td><td>지금 arm 상태가 아님, 고장 래치·재시작 대기가 아님</td><td><code>fault</code>, <code>wait_restart</code></td><td>—</td></tr>
+<tr><td>3</td><td>can_guard 공유메모리가 열림</td><td>1 s 마다 다시 확인(재시작 시 inode 비교)</td><td>상태에 "자동 arm 대기: can_guard 공유메모리 없음"</td></tr>
+<tr><td>4</td><td><b>제어기 입력이 0.3 s 동안 끊김 없이 신선</b></td><td>신선 = 마지막 <i>유효</i> <code>/control/target</code> 이 150 ms 이내. 한 번이라도 150 ms 넘으면 0.3 s 를 다시 센다. <code>auto_arm_fresh_s</code></td><td>대기</td></tr>
+<tr><td>5</td><td>입력이 유효</td><td>NaN·inf 아님, |a| ≤ 15 m/s², |δ| ≤ 45° — 하나라도 어기면 마지막 값도 버림</td><td>거부 수 +1, 대기</td></tr>
+<tr><td>6</td><td>0x200 조향 위치를 0.5 s 안에 받음</td><td>상태 브리지 <code>/control/status/control_info</code></td><td>"0x200 조향 위치 없음"</td></tr>
+</tbody></table>
+<div class="tnote">arm 순간: 조향 속도 제한(120 °/s)의 출발점을 0x200 실제 핸들각으로 잡는다. 목표로 바로 튀지 않는다. 그다음 주기부터 auto 111 과 변환된 명령이 공유메모리에 쓰이고, can_guard 는 ACTIVE 로 그대로 0x210 에 싣는다. 시험(ROS 실행): 입력 시작 0.30 / 0.32 s 뒤 자동 arm.</div>
+</div>
+<p><b>한 번만.</b> 자동 arm 은 노드 하나당 한 번이다. 다음 중 하나가 일어나면 다시 자동으로 올라가지 않는다. ① 자동 arm 성공, ② 운영자의 disarm 이나 <code>arm_*</code>(false), ③ 고장 래치. 이렇게 한 이유는 "운영자가 내린 것을 모델이 다시 올리는" 일을 막기 위해서다. <code>bsw_up</code> 은 시작할 때 <code>/control/target</code> 발행자가 이미 있으면 경고하고 확인을 받는다. 뜨자마자 움직일 수 있기 때문이다.</p>
+<p><b>모델 팀 약속.</b> ① 출발 전에도, 서 있을 때도 정지 목표(예 <code>accel_mps2 = −3</code>)를 10–100 Hz 로 <i>계속</i> 낸다. 정지 목표로 arm 되면 브레이크만 걸린다. ② 150 ms 넘게 끊지 않는다. ③ 값이 범위 밖이면 그 즉시 래치된다.</p>
+
+<h3>3.2 고장 래치 — 모델이 멈추거나 끊기면</h3>
+<p>arm 중에 입력이 150 ms 넘게 끊기거나 유효하지 않은 값이 오면 어댑터는 <b>래치</b>된다. 공유메모리 기록과 하트비트를 멈추고, 입력이 돌아와도 다시 쓰지 않는다. can_guard 는 명령 나이가 50 ms 를 넘으면 HOLDING 으로 간다(가속 즉시 0, 핸들 고정, 브레이크 30 % → 20 %/s → 60 %). HOLDING 이 2 s 지나거나 차속이 3 km/h 이하가 되면 STOPPED 로 가서 브레이크를 유지한다. STOPPED 는 <b>can_guard 재시작으로만</b> 빠져나간다. Fig. 3(b)에서 입력이 끊긴 뒤 HOLDING 까지 64 ms, STOPPED 까지 2.08 s 였다. 모델 출력이 끊긴 순간부터 브레이크 명령까지는 150 + 약 50–64 ms ≈ <b>0.2 s ★</b> 이고, 여기에 차량 브레이크 무반응 약 0.11 s 가 더해진다.</p>
+<figure>
+<img src="figs/fig3_scenarios.png" alt="시나리오별 0x210 출력">
+<figcaption>Fig. 3. 실제 can_guard 코드(가상 버스)가 낸 0x210. 가짜 차량은 15 km/h 로 달린다. (a) 앱 En 1.0–2.5 s 동안 차량 핸들 +5°: follow(새 기본)와 hold(예전). (b) 1.0 s 에 제어기 입력 끊김(어댑터 래치와 같음). (c) 1.0 s 에 주행 중 disarm — 송신이 끊긴다. (d) <code>bsw_down</code>: 1.0 s <code>estop.py</code>, 3.0 s can_guard 종료. 출처: <code>data/scenarios.csv</code>, <code>data/events_*.csv</code>.</figcaption>
+</figure>
+
+<h3>3.3 disarm — 실제로 무엇을 하나</h3>
+<p>disarm 하면 어댑터가 공유메모리에 <b>auto 000·명령 0</b> 을 쓴다. can_guard 는 기본 <code>--auto-off-mode silent</code> 다. 그래서 auto 000 을 버스로 내보내지 않고 <b>0x210 송신 자체를 멈춘다</b>. auto 000 이 나가면 페일세이프 브레이크가 풀리기 때문이다(11-03). 따라서 disarm 은 "차를 차량 쪽에 돌려준다"는 뜻이지 정지가 아니다. 0x210 이 끊긴 뒤 차량 동작은 아직 확정되지 않았다(10-07 타임아웃 없음 vs 11-03 0.4 s 뒤 브레이크 8.2, TODO-2). <code>stop.sh</code> 의 예전 주석 "disarm = 차량에 auto 0" 은 틀린 설명이라 고쳤다.</p>
+<div class="tbl">
+<div class="tno">TABLE VI</div><div class="ttl">disarm 을 부른 시점별 결과 (재현, 수정 전 → 후)</div>
+<table>
+<thead><tr><th>disarm 시점</th><th>수정 전</th><th>수정 후 (2026-11-05)</th><th>운용 규칙</th></tr></thead>
+<tbody>
+<tr><td>정상 주행 중 (ARMED, can_guard ACTIVE)</td><td colspan="2">1.0 s 에 0x210 송신 끊김. 브레이크 없음 (Fig. 3c) — <b>설계대로, 바꾸지 않음</b></td><td><b>주행 중 disarm 금지</b> → <code>estop.py</code>·앱</td></tr>
+<tr><td>래치 뒤, can_guard HOLDING 중</td><td>auto 000 명령이 "명령 재개"로 보여 HOLDING → ACTIVE → 침묵(1.5 s 에 송신 끊김, 브레이크 40 % 사라짐)</td><td>어댑터: 래치 상태에서 disarm 하면 <b>can_guard 재시작까지 쓰지 않음</b>(<code>wait_restart</code>) → HOLDING → STOPPED 유지. 그 사이 arm 요청은 거부</td><td>차가 선 뒤 <code>bsw_down</code> → <code>bsw_up</code></td></tr>
+<tr><td>STOPPED 중</td><td>3.5 s 에 침묵(브레이크 60 % 사라짐)</td><td>can_guard: 마지막 auto 비트·브레이크로 계속 송신(5.0 s 끝까지 60 %, auto 111)</td><td>—</td></tr>
+<tr><td>ESTOP 중 (앱·estop.py)</td><td>2.0 s 에 침묵(브레이크 70 % 사라짐) — <b>ESTOP 래치가 disarm 에 풀림</b></td><td>can_guard: ESTOP 유지(82 %, auto 111)</td><td>—</td></tr>
+</tbody></table>
+<div class="tnote">재현: <code>scenarios.py</code> 의 <code>disarm</code>·<code>hold_disarm</code>·<code>stop_disarm</code>·<code>estop_disarm</code>(수정 전 값은 같은 스크립트를 수정 전 코드로 돌린 결과). 수정: <code>command_policy.command_for_state(last_auto_cmd=…)</code> — ESTOP·STOPPED 에서 마지막 auto 명령을 쓴다. <code>cmd_adapter.py</code> <code>wait_restart</code>. 래치 → disarm → 입력 재개 상황은 ROS2 실행으로 확인했다(HOLDING → STOPPED, 재-arm 거부). can_guard 단위 시험 102 PASS. <b>제어 동작을 바꾼 수정이므로 대회 PC SIL·저속 실차 확인이 필요하다.</b></div>
+</div>
+
+<h3>3.4 상황별 요약</h3>
+<div class="tbl">
+<div class="tno">TABLE VII</div><div class="ttl">운용 상황 → 어댑터 → can_guard → 차량</div>
+<table>
+<thead><tr><th>상황</th><th>어댑터</th><th>can_guard</th><th>차량</th></tr></thead>
+<tbody>
+<tr><td><code>bsw_up</code> 직후, 모델 무발행</td><td>DISARM(auto 000 기록)</td><td>INIT/ACTIVE, 침묵</td><td>사람·원격·페일세이프</td></tr>
+<tr><td>모델이 정지 목표 발행 0.3 s</td><td>자동 arm</td><td>ACTIVE, auto 111·브레이크</td><td>자율, 정지 유지</td></tr>
+<tr><td>모델이 출발 목표</td><td>ARMED</td><td>ACTIVE</td><td>출발</td></tr>
+<tr><td>모델 노드 죽음·150 ms 끊김·NaN</td><td>래치</td><td>+50 ms HOLDING → 2 s/정지 STOPPED</td><td>가속 0·조향 고정·브레이크 30 → 60 %</td></tr>
+<tr><td>앱 En</td><td>(무관)</td><td>ESTOP 래치, 조향은 실제값 추종</td><td><b>앱을 따름</b></td></tr>
+<tr><td>앱 해제(정지 뒤)</td><td>(무관)</td><td>ESTOP 유지</td><td>can_guard 를 따름: 브레이크 유지</td></tr>
+<tr><td><code>estop.py</code></td><td>(무관)</td><td>ESTOP 30 → 82 %</td><td>정지</td></tr>
+<tr><td>주행 중 disarm</td><td>DISARM</td><td><b>침묵</b></td><td>0x210 끊김 — 미확정</td></tr>
+<tr><td><code>bsw_down</code></td><td>(disarm 안 함)</td><td>ESTOP → 2 s → 종료</td><td>브레이크 82 % 뒤 0x210 끊김 — 바퀴 굄</td></tr>
+</tbody></table>
+</div>
+
+<h3>3.5 예시로 보는 정지 — 언제, 어떻게 서나</h3>
+<p>"정지"에는 세 종류가 있다. ① 모델이 스스로 세우는 <b>정상 정지</b>, ② BSW 가 이상을 감지해 거는 <b>보호 정지</b>(HOLDING → STOPPED), ③ 사람이 거는 <b>비상 정지</b>(estop.py·앱). 아래 예시에서 시각은 사건 시점을 0 으로 잡았다. 정지 시간·거리는 실측이 아니라 11-04 감속표로 계산한 <b>추정</b>(★)이다. 계산 가정: 브레이크 % → 감속은 25 % 0.6, 45 % 0.87, 55 % 1.91, 100 % 3.0 m/s² 이고, 60–95 % 는 미측정이라 55–100 % 사이를 선형으로 이었다. 가속 0 일 때 타행은 0.5 m/s², 차량 브레이크 무반응은 0.11 s 로 두었다. 실제 값은 00 S1·S2(5·10 km/h)에서 잰다.</p>
+
+<div class="tbl">
+<div class="tno">TABLE VIII</div><div class="ttl">상황별 정지 — 누가 감지하고, 언제·얼마나 브레이크가 걸리나</div>
+<table>
+<thead><tr><th>#</th><th>예시 상황</th><th>감지 · 첫 브레이크 명령</th><th>브레이크</th><th>서 있는 동안</th><th>다시 가려면</th></tr></thead>
+<tbody>
+<tr class="grp"><td colspan="6">① 정상 정지 — 모델이 세운다</td></tr>
+<tr><td>1</td><td>목적지 도착: 모델이 <code>accel −3</code> 을 계속 냄</td><td>모델 명령 그대로(어댑터 → 0x210 20 ms)</td><td>현재 표로 −3 m/s² → 90 %</td><td>ARMED·ACTIVE, 모델이 계속 정지 목표를 냄</td><td>모델이 출발 목표를 내면 바로 출발</td></tr>
+<tr class="grp"><td colspan="6">② 보호 정지 — BSW 가 이상을 보고 건다 (어댑터 래치 → can_guard HOLDING → STOPPED)</td></tr>
+<tr><td>2</td><td>모델 노드가 죽음·멈춤(20 km/h 주행 중)</td><td>입력 150 ms 끊김 → 어댑터 래치 → +50–64 ms can_guard HOLDING. 끊긴 뒤 <b>약 0.2 s</b></td><td>가속 즉시 0, 핸들 고정, 30 % → 20 %/s → 60 %(1.5 s 뒤)</td><td>차속 ≤ 3 km/h 또는 2 s 뒤 STOPPED, 60 %·auto 유지</td><td><code>bsw_down</code> → <code>bsw_up</code>(STOPPED 는 재시작으로만)</td></tr>
+<tr><td>3</td><td>모델이 NaN·범위 밖 값(|a| &gt; 15, |δ| &gt; 45°)을 냄</td><td>그 메시지에서 바로 래치 → +50 ms HOLDING</td><td>2 와 같음</td><td>2 와 같음</td><td>2 와 같음</td></tr>
+<tr><td>4</td><td>localization 이 끊겨 모델이 명령을 못 냄(11-04 odom 공백 340 ms 같은 경우)</td><td>모델 출력이 150 ms 넘게 끊기면 2 와 같음. 짧게 끊기고 돌아오면 아무 일 없음</td><td>2 와 같음</td><td>2 와 같음</td><td>2 와 같음</td></tr>
+<tr><td>5</td><td>어댑터 노드가 죽음</td><td>공유메모리 기록·하트비트 끊김 → +50 ms HOLDING</td><td>2 와 같음</td><td>2 와 같음</td><td>2 와 같음</td></tr>
+<tr class="grp"><td colspan="6">③ 비상 정지 — 사람이 건다 (can_guard ESTOP, 래치)</td></tr>
+<tr><td>6</td><td>사람이 위험을 보고 <code>python3 safety/can_guard/estop.py</code></td><td>다음 주기(≤ 20 ms) ESTOP</td><td>가속 즉시 0, 핸들 고정, <b>30 % → 40 %/s → 82 %</b>(1.3 s 뒤)</td><td>ESTOP 유지(차속 0 이어도). 모델·disarm 이 풀지 못함</td><td><code>bsw_down</code> → <code>bsw_up</code></td></tr>
+<tr><td>7</td><td>앱 담당이 앱을 켬</td><td>can_guard 감지 6–19 ms → ESTOP. <b>그러나 차량은 앱을 따른다</b></td><td>앱(원격 모드)이 정함 — 11-04 15 km/h → <b>4.85 s·10.2 m</b>(실측)</td><td>앱이 쥔 동안 앱 조작대로(가속하면 움직임). 정지 뒤 앱을 끄면 can_guard ESTOP 브레이크</td><td><code>bsw_down</code> → <code>bsw_up</code></td></tr>
+<tr><td>8</td><td>물리 E-stop</td><td>차량 자체</td><td>차량 자체</td><td>—</td><td>차량 절차</td></tr>
+<tr class="grp"><td colspan="6">정지가 아닌 것 — 헷갈리기 쉬움</td></tr>
+<tr><td>9</td><td>운영자가 <b>주행 중 disarm</b></td><td>can_guard 가 0x210 송신을 멈춤</td><td><b>우리 브레이크 없음</b> — 차량은 0x210 끊김 동작(미확정, TODO-2)</td><td>—</td><td>쓰지 말 것 → 6 을 쓴다</td></tr>
+<tr><td>10</td><td>can_guard 가 죽음·PC 전원 꺼짐</td><td>0x210 끊김</td><td>차량 자체(미확정: 10-07 없음 / 11-03 0.4 s 뒤 8.2)</td><td>—</td><td>물리 E-stop 담당이 대응</td></tr>
+<tr><td>11</td><td>원격 유닛이 켜짐(0x210 송신자 둘)</td><td>이벤트 <code>foreign_0x210</code>·상태판 경고만</td><td>바뀌지 않음 — 차량이 무엇을 따를지 모름</td><td>—</td><td>원격 유닛을 끈다. 위험하면 6</td></tr>
+<tr><td>12</td><td><code>bsw_up</code> 직후 모델이 아직 안 냄</td><td>자동 arm 전 — can_guard 침묵</td><td>우리 명령 없음(차량 페일세이프·사람)</td><td>—</td><td>모델이 0.3 s 내면 arm</td></tr>
+</tbody></table>
+</div>
+
+<div class="tbl keep">
+<div class="tno">TABLE IX</div><div class="ttl">정지 시간·거리 추정 ★ (시작 속도별, 사건 시점부터)</div>
+<table>
+<thead><tr><th>예시</th><th class="r">10 km/h</th><th class="r">20 km/h</th><th class="r">30 km/h</th></tr></thead>
+<tbody>
+<tr><td>2 모델이 끊김(0.21 s 뒤 30 → 60 %)</td><td class="r">2.3 s · 4.3 m</td><td class="r">3.7 s · 12.7 m</td><td class="r">5.1 s · 24.8 m</td></tr>
+<tr><td>3 NaN(0.06 s 뒤 30 → 60 %)</td><td class="r">2.2 s · 3.9 m</td><td class="r">3.5 s · 11.8 m</td><td class="r">4.9 s · 23.6 m</td></tr>
+<tr><td>6 estop.py(0.02 s 뒤 30 → 82 %)</td><td class="r">1.7 s · 2.9 m</td><td class="r">2.7 s · 9.0 m</td><td class="r">3.8 s · 18.1 m</td></tr>
+<tr><td>7 앱 (11-04 실측 1회)</td><td colspan="3" class="c">15 km/h → 4.85 s · 10.2 m</td></tr>
+</tbody></table>
+<div class="tnote">참고로 브레이크 100 % 를 바로 걸면 20 km/h 에서 약 2.0 s·5.8 m ★ 다(무반응 0.11 s, 3.0 m/s²). 보호·비상 정지가 이보다 긴 이유는 휠락을 막으려고 브레이크를 <i>서서히</i> 올리기 때문이다(시작 30 %, 램프·상한은 잠정값, CLAUDE.md 1.4). 이 값들은 00 실차 결과를 보고 조정한다.</div>
+</div>
+
+<p><b>예시 2 를 시간 순으로 — 20 km/h 로 달리는데 모델 노드가 죽으면</b></p>
+<ol>
+<li><b>0 ms</b> — 모델의 마지막 <code>/control/target</code>. 어댑터는 그 값(예: 가속 80 %)을 계속 쓴다.</li>
+<li><b>150 ms</b> — 어댑터: "제어기 입력 끊김" → <b>고장 래치</b>. 공유메모리 기록과 하트비트를 멈춘다.</li>
+<li><b>약 200–215 ms</b> — can_guard: 명령 나이 &gt; 50 ms → <b>HOLDING</b>. 0x210 은 가속 0 %, 핸들은 지금 값에 고정, 브레이크 30 %, auto 111.</li>
+<li><b>약 0.3 s</b> — 차량 브레이크가 움직이기 시작한다(무반응 약 0.11 s).</li>
+<li><b>0.2 → 1.7 s</b> — 브레이크 30 → 60 %(20 %/s). 감속은 약 0.6 → 2 m/s² ★.</li>
+<li><b>차속 ≤ 3 km/h(약 3 s ★)</b> — can_guard <b>STOPPED</b>. 브레이크 60 %·auto 111 을 계속 보낸다. 모델이 다시 살아나도 출발하지 않는다.</li>
+<li><b>그 뒤</b> — 원인을 확인하고 <code>bsw_down</code>(ESTOP 82 % → 종료) → <code>bsw_up</code>. 래치 중에 disarm 해도 브레이크는 풀리지 않는다(3.3절 수정).</li>
+</ol>
+
+<p><b>예시 6 — 사람이 estop.py 를 누르면.</b> 다음 can_guard 주기(≤ 20 ms)에 ESTOP 으로 간다. 가속 0, 핸들 고정, 브레이크 30 % 에서 1.3 s 동안 82 % 까지 올린다. 모델이 계속 출발 명령을 내도, 어댑터를 disarm 해도, 차가 서도 ESTOP 은 그대로다. 다시 가려면 재기동해야 한다. 앱(예시 7)과 다른 점은 이 경로에서는 <b>can_guard 가 실제로 차를 세운다</b>는 것이다. 그래서 00 의 경로 A 기준(감지 ≤ 100 ms, 제동 시작 ≤ 200 ms)을 적용한다.</p>
+
+<h2>4. 주행 날 통합 실행 — <code>tools/bsw/</code></h2>
+<p>11-04 자율 주행 때는 미러·can_guard(sudo·RT)·브리지·어댑터·arm 서비스 2개·candump 를 하나씩 띄웠다. 그러다 RT 실패(<code>--no-rt</code>), 원격 유닛을 켠 채 시작, 녹화 누락이 생겼다. 이제 명령 넷으로 정리했다. 내부에서는 현장 시험용 <code>bringup.sh</code> 를 그대로 부른다. 시험과 경주가 같은 경로를 쓰게 하려는 것이다.</p>
+<div class="tbl">
+<div class="tno">TABLE X</div><div class="ttl">tools/bsw 명령</div>
+<table>
+<thead><tr><th>명령</th><th>하는 일</th></tr></thead>
+<tbody>
+<tr><td><code>bsw_up.sh --name LAP1</code></td><td>사전 점검(can_guard 중복, 모델 이미 발행 중?, 원격 유닛 안내) → Kvaser 미러(원본 <code>kvaser_ch0.log</code>) → can_guard(CPU 8·FIFO 90, 앱 필수, 한계 150°/100 %/<code>BSW_ACC_LIMIT</code> 100 %) → 커널에서 RT 확인 → 브리지(0x200/0x201/0x210) + 어댑터(<code>auto_arm:=true</code>) → <code>candump_kv0.log</code>(ROS bag 없음) → <code>SESSION.md</code>(시각·커밋·한계)</td></tr>
+<tr><td><code>bsw_monitor.py</code></td><td>실시간 상태판(5 Hz). 아래 4.1</td></tr>
+<tr><td><code>bsw_status.sh</code></td><td>한 번 점검: 프로세스·RT 정책·CPU·어댑터 arm·로그 크기 증가·이벤트</td></tr>
+<tr><td><code>bsw_down.sh</code></td><td>차속 > 1 km/h 면 거부 → <code>estop.py</code>(브레이크 30 → 82 %, auto 유지) 2 s → <code>stop.sh --no-disarm</code> → CAN 로그 zstd 압축·<code>can_logs.sha256</code> → 00 분석 요약(비상 정지·송신자 둘)</td></tr>
+</tbody></table>
+<div class="tnote">세션 폴더 <code>~/a1_race_capture/&lt;날짜_시각&gt;_BSW-&lt;이름&gt;/</code>, 최신은 <code>bsw_latest</code>. 기본값 <code>tools/bsw/bsw.env</code>. 옵션 <code>--sil</code>, <code>--manual-arm</code>, <code>--no-app</code>, <code>--no-rt</code>. 확인: 가짜 세션으로 <code>bsw_down</code>(12.3 km/h 거부, 정지 시 끝까지). <b><code>bsw_up</code> 전체는 대회 PC <code>--sil</code> 로 먼저 확인해야 한다.</b></div>
+</div>
+
+<h3>4.1 상태판 (<code>bsw_monitor.py</code>)</h3>
+<p><code>bsw_status.sh</code> 는 "잘 떴나"를 한 번 확인하는 점검표다. 주행 중에 계속 볼 수치를 모은 화면은 <code>bsw_monitor.py</code> 다. 표준 라이브러리만 쓰고, 미러가 만든 <code>kv0</code> 를 커널 raw 소켓으로 <b>읽기만</b> 한다. Kvaser 채널을 열지 않으므로 5장의 핸들 문제와 무관하다. 아래는 11-04 bsw4 원본을 <code>--replay</code> 로 돌린 화면이다(t ≈ +1 s, 앱이 쥔 순간).</p>
+<pre>── BSW 상태판  입력 다시 보기 kvaser_ch0.log.zst ×20
+can_guard   ESTOP    …  |  ⚠️ 비상 정지 1회 — 마지막: remote remote_en detect_lag_ms=5.8
+차량 속도     12.7 km/h   (좌 12.4 우 11.9, ÷0.958)
+차량 상태   핸들    -3.8°  브레이크 위치  4.2  auto 111
+우리 0x210  핸들   -49.8°  브레이크  69 %  가속   0 %  auto 111  50 Hz
+앱          En 1  ⚠️ 앱이 쥠: 차량은 0x210 무시  ACC_Cmd -2.49 m/s²  EPS_Cmd +0.0°
+수신        0x200  48/s ✅  0x201  48/s ✅  0x210  50/s ✅  0x156 100/s ✅  0x157 100/s ✅</pre>
+<p class="small">bsw5 를 재생하면 "우리 0x210 … 97 Hz ❌ 송신자 둘(원격 유닛?)" 이 뜬다. 우리 0x210 이 없으면 "송신 없음(INIT silent 또는 disarm — 차량은 0x210 을 못 받는 중)"이 표시된다.</p>
+
+<h2 class="pb">5. Kvaser 채널 공유 — 송신을 열면 수신이 막히나</h2>
+<p><b>결론: 지금 구성(핸들 2개)에서는 막히지 않는다.</b> 11-04 실차 원본이 근거다. "막힌다"는 인상은 11-03 사고에서 왔다. 그때 원인은 듣는 쪽 핸들 구성이었고, 이미 고쳤다. 다만 조합을 바꾸면 다시 깨질 수 있으므로 지켜야 할 규칙이 있다.</p>
+<figure>
+<img src="figs/fig4_kvaser.png" alt="Kvaser 채널 0 핸들 구성">
+<figcaption>Fig. 4. Kvaser Leaf v3 CANlib 채널 0 을 쓰는 핸들. Leaf v3 는 이 PC 커널에서 SocketCAN 이 아니라 CANlib 채널로만 보인다(<code>tools/kvaser/README.md</code>). 하드웨어 하나를 핸들 두 개가 연다. 드라이버는 받은 프레임을 핸들마다 따로 넘기고, 한 핸들이 보낸 프레임은 다른 핸들에 "로컬 에코"로 넘긴다. ROS 브리지·candump·상태판은 미러가 만든 <code>kv0</code>(vcan)만 읽는다.</figcaption>
+</figure>
+
+<h3>5.1 누가 무엇을 여나</h3>
+<div class="tbl keep">
+<div class="tno">TABLE XI</div><div class="ttl">채널 0 핸들과 설정</div>
+<table>
+<thead><tr><th>핸들</th><th>모드</th><th>python-can 설정</th><th>받는 것</th><th>보내는 것</th></tr></thead>
+<tbody>
+<tr><td>① <code>kvaser_mirror.py</code></td><td>normal(ACK 함). silent 아님</td><td><code>single_handle=True</code>, <code>receive_own_messages=True</code></td><td>버스 전부 + ②의 송신(에코) → 원본 로그·<code>kv0</code></td><td>없음</td></tr>
+<tr><td>② <code>can_guard</code></td><td>normal</td><td>python-can 기본, <code>receive_own_messages=False</code>, CANlib 4바이트 TXACK 패치(<code>kvaser_compat</code>)</td><td>0x200·0x201·0x156·0x157(나머지는 버림), 다른 0x210</td><td>0x210 20 ms</td></tr>
+<tr><td>(③ <code>lift_cmd</code>)</td><td>normal</td><td><code>single_handle=True</code></td><td>—</td><td>공유메모리로 명령(버스 직접 아님)</td></tr>
+</tbody></table>
+<div class="tnote"><code>bsw_up</code> 은 ①②만 연다. ③은 표 측정 시험에서만 쓴다. ①②③ 세 핸들 조합은 실물로 확인하지 않았다(<code>docs/a1_todo.md</code>). <code>bringup.sh</code> 는 lift_cmd 가 떠 있으면 시작을 거부한다.</div>
+</div>
+
+<h3>5.2 11-03 실패 — 무엇이 막혔나</h3>
+<p>can_guard 가 송신을 시작하자마자 <code>canWriteSync</code> 가 타임아웃 났다. 수신은 0, 에러프레임은 초당 약 350 이었고 Kvaser 단자를 바꿔도 같았다. 송신을 멈추면 즉시 정상으로 돌아왔다. 1프레임씩 분리 시험한 결과는 다음과 같다(<code>measurements/2026-11-03_signal_audit/analysis/stage2_static.md</code>, <code>qa_summary.md</code> Q5).</p>
+<div class="tbl keep">
+<div class="tno">TABLE XII</div><div class="ttl">11-03 분리 시험</div>
+<table>
+<thead><tr><th>구성</th><th class="c">송신</th></tr></thead>
+<tbody>
+<tr><td>핸들 1개 단독 송신</td><td class="c">성공</td></tr>
+<tr><td>미러(python-can 기본 = 읽기·쓰기 핸들 2개 + 로컬 에코) 옆에서 송신</td><td class="c"><b>실패</b></td></tr>
+<tr><td>미러·송신 모두 <code>single_handle=True</code></td><td class="c">성공</td></tr>
+<tr><td>미러 로컬 에코 끔</td><td class="c">성공</td></tr>
+</tbody></table>
+<div class="tnote">즉 "송신 채널을 열면 수신이 막힌다"가 아니었다. <b>듣는 쪽이 핸들 2개 + 에코로 열려 있으면 같은 채널의 송신이 깨지고, 그 여파로 버스가 에러프레임으로 덮여 수신까지 끊긴 것</b>이다. 드라이버 내부에서 왜 그런지는 증명하지 못했다. 가설은 10-07 TXACK 패치로 에코가 실제로 켜지면서 2핸들 구성과 엮였다는 것이다(추정). silent(listen-only) 모드 자체가 원인이라는 증거는 없다. 그래도 송신 중에는 미러를 normal 로 연다(<code>bringup.sh</code> 가 그렇게 한다).</div>
+</div>
+
+<h3>5.3 11-04 실증 — 송신 중 수신율</h3>
+<figure>
+<img src="figs/fig5_kvaser_rx.png" alt="11-04 자율 세션 수신율">
+<figcaption>Fig. 5. 11-04 자율 세션에서 우리 0x210 이 나가던 동안(첫 0x210 ~ 마지막 0x210)의 수신. can_guard 는 CPU 8·SCHED_FIFO 90 으로 Kvaser 채널 0 에 송신 중이었다. 출처: <code>tools/drive_log/kvaser_rx_check.py</code> → <code>data/kvaser_rx.tsv</code>.</figcaption>
+</figure>
+<div class="tbl keep">
+<div class="tno">TABLE XIII</div><div class="ttl">can_guard 송신 중 수신 (기대 수 = 구간 ÷ 정상 주기)</div>
+<table>
+<thead><tr><th>세션</th><th class="r">구간 [s]</th><th>0x200 · 0x201 수신 / 최대 공백</th><th>0x156(앱) 수신 / 최대 공백</th><th>우리 0x210 (에코)</th></tr></thead>
+<tbody>
+<tr><td>bsw3 (60 m·300 m 주행)</td><td class="r">282</td><td>100.0 % · 100.0 % / 21.5 ms</td><td>100.0 % / 11.3 ms</td><td>98.0 % — 시작 때 5.6 s 공백 1회(주행 전)</td></tr>
+<tr><td>bsw4 (랩 1, 앱 정지)</td><td class="r">118</td><td>100.0 % · 100.0 % / 21.5 ms</td><td>100.0 % / 10.5 ms</td><td>100.0 % / 20.6 ms</td></tr>
+<tr><td>bsw5 (랩 2, 2.0 km)</td><td class="r">560</td><td>100.0 % · 100.0 % / 21.7 ms</td><td>100.0 % / 10.8 ms</td><td>120.7 % — 원격 유닛 0x210 이 섞임(2.5절)</td></tr>
+</tbody></table>
+<div class="tnote">1 s 넘게 받지 못한 구간 0. 5세션 모두 can_guard 송신 실패 <code>tx_fail = 0</code>(88,509 주기 ★). bsw·bsw2 는 can_guard 가 ACTIVE 였지만 어댑터가 disarm 이라 0x210 을 보내지 않아(침묵) 표에서 뺐다. 빠른 시험 ADAPTER-LON s1(비격리)도 100.0 % 였다.</div>
+</div>
+
+<h3>5.4 RT(격리 코어·SCHED_FIFO)와 수신의 관계</h3>
+<ul>
+<li>RT 설정은 <b>can_guard 프로세스 하나</b>의 스케줄링만 바꾼다(CPU 8 고정, FIFO 90, mlockall). Kvaser 채널을 독점하는 설정이 아니다. CANlib 채널은 기본으로 여러 핸들이 같이 열 수 있다.</li>
+<li>USB 수신과 드라이버는 커널이 처리한다. 미러는 일반 코어에서 일반 우선순위로 돈다. 미러가 잠시 늦어도 프레임은 드라이버 큐에 남고, 원본 로그 시각은 장치가 붙인 수신 시각이다.</li>
+<li>can_guard 는 매 주기 최대 64 프레임을 비블로킹으로 꺼내고, 필요한 ID 만 쓴다(0x200·0x201·0x156·0x157·다른 0x210). 11-04 에 ESTOP 때 차속 14.2 km/h 를 정확히 읽었다.</li>
+<li>bag 의 CAN 토픽이 52 s 밀린 것(6장)은 Kvaser 수신 문제가 아니다. ROS 브리지가 kv0 를 다 처리하지 못한 것이다. 같은 시간 Kvaser 원본은 100 % 였다.</li>
+</ul>
+
+<h3>5.5 지켜야 할 규칙</h3>
+<ol>
+<li>Kvaser 채널 0 을 여는 프로그램은 <b>미러와 can_guard 둘만</b> 둔다. 다른 도구(상태판, candump, ROS)는 <code>kv0</code> 를 읽는다.</li>
+<li>미러는 <code>single_handle=True</code>, 송신이 있는 동안 normal 모드로 연다(silent 금지). <code>bringup.sh</code>·<code>bsw_up</code> 이 그렇게 연다.</li>
+<li>python-can 으로 Kvaser 를 직접 여는 새 코드를 만들면 <code>kvaser_compat.apply()</code> 와 <code>single_handle=True</code> 를 쓰고, 실물에서 미러와 함께 송신을 확인한다.</li>
+<li>현장 확인: <code>bsw_monitor</code> 수신 줄이 모두 ✅ 인지, 미러 로그 "에러프레임 0/s", can_guard 상태 줄 "송신오류 누적 0건".</li>
+</ol>
+
+<h2>6. 도구 정비</h2>
+<div class="tbl">
+<div class="tno">TABLE XIV</div><div class="ttl">도구 수정</div>
+<table>
+<thead><tr><th>문제 (11-04)</th><th>원인</th><th>수정</th><th>확인</th></tr></thead>
+<tbody>
+<tr><td>bringup <code>--rt</code> 에서 can_guard 안 뜸</td><td><code>setsid sudo chrt …</code>: 터미널 없는 새 세션이라 sudo 가 방금 받은 인증을 못 씀</td><td><code>sudo -n setsid -f chrt -f 90 sudo -u $USER …</code>(sudo 를 setsid 밖에서). 기동 뒤 <code>chrt -p</code>·<code>taskset -cp</code> 로 확인</td><td>문법 · 대회 PC 대기</td></tr>
+<tr><td>SIL E2(SIGUSR1) <code>--rt</code> FAIL</td><td>신호를 바깥 sudo 에 보냄. sudo 는 같은 프로세스 그룹에서 온 신호를 중계하지 않음</td><td><code>/proc</code> 자식 트리에서 실제 can_guard 파이썬을 찾아 보냄. E7(원격 우선 조향) 추가</td><td>중첩 래퍼 시험 · 대회 PC 대기</td></tr>
+<tr><td>bag CAN 토픽 최대 52 s 밀림</td><td>브리지가 프레임마다 <code>spin_once</code>, 모든 ID(약 580 /s)를 한 코어에서 브리지·디코더·어댑터가 처리</td><td>spin 0.2 s 마다(30 → 1.8 µs/프레임, 개발 PC), 커널 ID 필터 기본 0x200/0x201/0x210(약 145 /s), 5 s 마다 밀림 경고</td><td>벤치 · 대회 PC bag &lt; 1 s 대기</td></tr>
+<tr><td>분석이 bag 시각 사용</td><td><code>fit_maps.py</code> 가 bag 기록 시각을 씀</td><td>헤더 stamp 기본(<code>--time bag</code> = 예전), <code>extract.py</code> 열 <code>t</code>/<code>t_bag</code></td><td>완료</td></tr>
+<tr><td>기타</td><td>—</td><td><code>can_guard --help</code> % 오류, 실행 중 다른 0x210 이벤트, 00 <code>analysis.py</code>, <code>kvaser_rx_check.py</code></td><td>완료</td></tr>
+</tbody></table>
+</div>
+
+<h2>7. 확인 상태와 남은 일</h2>
+<div class="tbl">
+<div class="tno">TABLE XV</div><div class="ttl">확인 상태 (개발 PC = 참고값, 판정은 대회 PC·실차)</div>
+<table>
+<thead><tr><th>항목</th><th>개발 PC</th><th>남은 확인 (대회 PC → 실차)</th></tr></thead>
+<tbody>
+<tr><td>can_guard 단위 시험</td><td>102 PASS</td><td><code>run_sil_check.sh --rt auto</code> E1–E7 전부 PASS</td></tr>
+<tr><td>앱 해제 인계(follow), disarm 래치 수정</td><td>재현 시나리오·ROS 실행</td><td>SIL E7 → 저속(≤ 10 km/h) 실차 00 S0–S2</td></tr>
+<tr><td>자동 arm</td><td>ROS 실행: 0.30 s arm, 151 ms 래치, 재-arm 없음</td><td><code>bsw_up --sil</code> + 정지 목표 발행 → 실차 정지 상태에서 arm 확인</td></tr>
+<tr><td><code>bsw_up</code>·<code>bsw_down</code>·상태판</td><td>down·monitor(재생)</td><td><code>bsw_up --sil</code> 전체, 실차 띄우기·끄기 1회</td></tr>
+<tr><td>Kvaser 수신</td><td>11-04 원본 100 %</td><td>새 코드로 실차에서 상태판 수신 줄·에러프레임 0 확인</td></tr>
+<tr><td>bringup RT·브리지 지연</td><td>문법·벤치</td><td>RT ✅ 표시, bag 수신 − 헤더 &lt; 1 s, A-3 재측정, 8 h soak</td></tr>
+<tr><td>업체 질문 Q1–Q5, TODO-2</td><td>—</td><td>답에 따라 경로 B 기준 확정</td></tr>
+</tbody></table>
+</div>
+<p class="small">사용자 확인 필요: ① 00 기준 숫자는 그대로 두고 경로 A/B 로 나눠 적용한 것. ② 앱 해제 인계 기준 제안(조향 변화 ≤ 1 핸들 °). ③ 제어 동작을 바꾼 세 가지 수정(ESTOP 조향 follow, ESTOP·STOPPED disarm 무시, 래치 뒤 어댑터 쓰기 중단).</p>
+
+<h2>부록 A. 다시 만들기</h2>
+<pre># 저장소 루트에서
+python3 bsw_test/00_SAF_estop/scripts/analysis.py measurements/2026-11-04_drive_log/raw_can/auto_bsw4/kvaser_ch0.log.zst \
+  --events measurements/2026-11-04_drive_log/tables/canguard_events.csv --session bsw4 \
+  --out bsw_test/00_SAF_estop/results/ref_20261104_app_estop --plot --name 20261104_auto_bsw4     # 2장 표·Fig. 1
+python3 tools/drive_log/kvaser_rx_check.py measurements/2026-11-04_drive_log/raw_can/auto_bsw*/kvaser_ch0.log.zst \
+  &gt; reports/2026-11-05_bsw_update_report/data/kvaser_rx.tsv                                     # 5장
+cd reports/2026-11-05_bsw_update_report
+python3 scenarios.py ../.. .        # 3장 시나리오(python-can 필요) → data/scenarios.csv
+python3 make_figs.py ../.. .        # Fig. 1–5
+google-chrome --headless --no-pdf-header-footer --print-to-pdf=report.pdf report.html
+python3 tools/bsw/bsw_monitor.py --replay measurements/2026-11-04_drive_log/raw_can/auto_bsw4/kvaser_ch0.log.zst   # 4.1 화면</pre>
+
+</body>
+</html>

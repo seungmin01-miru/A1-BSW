@@ -12,6 +12,7 @@ git add bsw_test/00_SAF_estop/results/sil_* && git commit -m "00 SIL 대회 PC �
 | 스크립트 | 내용 |
 |---|---|
 | `setup_env.sh [--check] [--build-ws]` | 환경 점검·설치. 오프라인이면 `/var/local/a1-wheels`(배포 번들) 또는 `A1_WHEELS=<경로>` |
-| `run_sil_check.sh [--rt N\|auto] [--trials N] [--track]` | 단위 시험 → E1~E6 → P-1/P-2 → (선택) rehearse_track. 결과 `results/sil_<시각>_<호스트>/summary.md` |
+| `run_sil_check.sh [--rt N\|auto] [--trials N] [--track]` | 단위 시험 → E1~E7 → P-1/P-2 → (선택) rehearse_track. 결과 `results/sil_<시각>_<호스트>/summary.md` |
+| `analysis.py <CAN 로그> [--events csv] [--out 폴더 --plot --name 이름]` | 00 실차 분석(2026-11-05) — 사건별 감지·제동·정지·조향 인계·두 송신자·auto 000. 11-04 참고 결과 `results/ref_20261104_app_estop/` |
 
 배포 흐름(`tools/deploy/90_validate.sh`)에도 E1~E6 이 들어가 있다(격리 코어 자동).

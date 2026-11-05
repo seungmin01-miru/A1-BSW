@@ -1,7 +1,7 @@
 # 실차 인수일 답변·관측 기록 — <날짜>
 
 > 현장에서 이 파일을 그대로 채운다(`cp tools/race_day/answers_template.md "$D/answers.md"`).
-> 칸 옆 `[체크리스트 §..]`은 `2026-09-14_can_verification_checklist.md`의 해당 항목,
+> 칸 옆 `[체크리스트 §..]`은 `docs/2026-09-14_can_verification_checklist.md`의 해당 항목,
 > `[계획 §..]`은 `docs/2026-10-06_a1_dbc_update_and_lift_plan.md`의 해당 항목.
 > 답을 못 받았으면 비워 두지 말고 "질문함-모른다고 함 / 못 물어봄" 중 하나로 적는다.
 

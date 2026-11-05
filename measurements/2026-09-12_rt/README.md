@@ -1,6 +1,6 @@
 # 2026-09-12 RT 커널 실측 원본 로그 (증거 스냅샷)
 
-`can_stack_development.md` §5.A 의 수치가 나온 원본. 커널 `6.8.1-1059-realtime`, 측정 도구 `tools/rt/a1_rt.sh`.
+`docs/can_stack_development.md` §5.A 의 수치가 나온 원본. 커널 `6.8.1-1059-realtime`, 측정 도구 `tools/rt/a1_rt.sh`.
 cyclictest 로그의 `# Max Latencies` 줄이 스레드(CPU)별 최악 지연(µs), `# Histogram Overflows` 가 400 µs 초과 횟수.
 
 | 파일 | 조건 | §5.A 수치 |

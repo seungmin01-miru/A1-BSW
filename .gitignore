@@ -19,3 +19,9 @@ tools/deploy/survey_*.txt
 # bsw_test 원본 로그 (용량 큼 — 위치는 각 raw/README.md 에 기록)
 bsw_test/*/raw/*
 !bsw_test/*/raw/README.md
+
+# 참고 자료 압축 해제본 (zip 은 추적)
+docs/reference/kf1600_gps_can/kf1600_CAN_GPSINS_CSV_unzipped/
+
+# 편집기 색인(수백 MB)
+.vscode/

@@ -21,7 +21,7 @@
 
 | 상태 | 항목 | 값 | 출처 |
 |---|---|---|---|
-| [x] | 하드웨어·소프트웨어 명세 | i7-12700 (8P+4E, 20T), RTX A5000, PEAK PCAN-PCIe FD, Ubuntu 22.04.5, 6.8.0-138-generic / 6.8.1-1059-realtime(Ubuntu Pro), NVIDIA 470.256.02 DKMS, PL1 35 W / PL2 78 W | `can_stack_development.md` §5.A |
+| [x] | 하드웨어·소프트웨어 명세 | i7-12700 (8P+4E, 20T), RTX A5000, PEAK PCAN-PCIe FD, Ubuntu 22.04.5, 6.8.0-138-generic / 6.8.1-1059-realtime(Ubuntu Pro), NVIDIA 470.256.02 DKMS, PL1 35 W / PL2 78 W | `docs/can_stack_development.md` §5.A |
 | [x] | 기준선: 튜닝 없는 RT 60 s | 65 / 23 / 20 µs | `2026-09-12_rt` |
 | [x] | 기본 RT 튜닝 30 min | 최악 467 µs, >50 ×102 | `2026-09-12_rt` |
 | [x] | 기본 RT 튜닝 8 h | 최악 828, >200 ×1,424, >400 ×231(전부 코어 6), 에피소드 65 | `2026-09-14_rt` |

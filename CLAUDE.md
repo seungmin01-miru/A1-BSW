@@ -1,6 +1,7 @@
 # A1-BSW — Claude 작업 지침 (실차 주행 테스트)
 
 작성 2026-11-04. 기준 계획서: [`bsw_test/docs/test_plan.md`](bsw_test/docs/test_plan.md). 진행 현황: [`bsw_test/docs/test_summary.md`](bsw_test/docs/test_summary.md).
+**주행 날 BSW 띄우기는 `tools/bsw/bsw_up.sh` 하나로**(2026-11-05) — can_guard·브리지·어댑터(자동 arm)·CAN 로그 녹화·상태판 창(읽기 전용, 대회 본 주행은 `--no-ui`)을 한 번에, 끄기는 `bsw_down.sh`. 개별 도구를 손으로 하나씩 띄우지 않는다.
 **지금 할 일(대회 PC 세션은 먼저 읽기): [`bsw_test/docs/NEXT_competition_pc.md`](bsw_test/docs/NEXT_competition_pc.md)** — 2026-11-04 v2(50 m·자율 U턴·속도 제어기) 넘김.
 이 파일은 **규칙과 확정된 사실**만 둔다. 숫자 근거는 아래 문서에 있고, 바뀌면 이 파일도 같이 고친다.
 
@@ -23,7 +24,7 @@
 
 ### 1.1 Claude 가 하지 않는 것
 - `raw/` 안의 파일 수정·삭제·이름 변경 (원본 로그는 읽기 전용)
-- 사용자 승인 없이 **차량·CAN 에 닿는 명령** 실행: `bringup.sh`, `stop.sh`, `record.sh`, `can_guard.py`, `lift_cmd.py`,
+- 사용자 승인 없이 **차량·CAN 에 닿는 명령** 실행: `bsw_up.sh`, `bsw_down.sh`, `bringup.sh`, `stop.sh`, `record.sh`, `can_guard.py`, `lift_cmd.py`,
   `kvaser_mirror.py`, `cansend`, `ip link set can*` 등 — `.claude/settings.json` 의 `ask` 규칙으로 매번 확인 창이 뜬다
 - `archive/dbc_2026-09/`(EAIT) DBC 사용, 0x156/0x157 을 원격 경로로 가정
 - 합격 기준 숫자를 임의로 바꾸기 (기준은 각 테스트의 `docs/goal.md` 에서만 가져온다)
@@ -38,8 +39,15 @@
 - **원격은 0x210 을 직접 보낸다** → 원격을 켠 채 자율(can_guard) 불가, 자율 중 원격으로 개입 불가.
 - **auto 000 을 보내면 페일세이프 브레이크가 풀린다** → 종료는 항상 **brake 100 유지한 채 `stop.sh`** (auto off 하지 않음).
 - 비상 정지는 **can_guard `ESTOP` 상태**로 구현(2026-11-04, `safety/can_guard/README.md` "비상 정지"). 원천: **핸드폰 앱 = 원격 0x156/0x157**,
-  `estop.py`, SIGUSR1. 브레이크는 휠락 방지로 **서서히**(30 % → 82 %). 앱 버튼의 실제 프레임은 현장 확인 전(잠정). 00 SIL·실차 통과 전까지는 물리 E-stop 병행.
-- can_guard INIT 은 기본 **silent**(첫 명령 전 0x210 안 보냄). 단 제어 노드가 auto 000 명령을 쓰면 그대로 나간다 → 어댑터 disarm·`lift_cmd auto off` 주의.
+  `estop.py`, SIGUSR1. 브레이크는 휠락 방지로 **서서히**(30 % → 82 %). 00 SIL·실차 통과 전까지는 물리 E-stop 병행.
+- **앱은 원격 인수다(11-04 로그, 2026-11-05 재정의 — `bsw_test/00_SAF_estop/docs/goal.md` 0절):** 앱 프레임은 En `01 96 01` 뿐(AEB_En·별도 정지 프레임 못 봄).
+  En = 1 동안 차량은 **0x210 을 무시**하고 앱을 따르며(조향 0°로, 정지 후 앱으로 다시 주행도 함), 15 km/h 에서 정지까지 4.85 s·10.2 m(0.87 m/s²).
+  앱을 놓으면 즉시 우리 0x210 을 따른다 → 앱 담당은 **차가 선 뒤에만 En 해제**, ESTOP 중 조향은 앱 En 동안 실제 핸들각을 따라감(`--estop-remote-steer follow`).
+  업체 확인 Q1~Q5 는 00 goal.md.
+- **원격 유닛(0x210 직접)은 자율 세션 동안 꺼 둔다** — 11-04 bsw5 에서 can_guard 실행 중에 켜져 124 s 동안 0x210 송신자가 둘이었다(시작 전 점검은 시작 때만 막음). 실행 중 감지는 이벤트 `foreign_0x210`.
+- can_guard INIT 은 기본 **silent**(첫 명령 전 0x210 안 보냄). auto 000 명령(어댑터 disarm)은 버스로 나가지 않고 **can_guard 가 송신을 멈춘다**(`--auto-off-mode silent` 기본).
+  → **주행 중 disarm 은 정지가 아니다**(우리 브레이크 없음, 0x210 끊김 동작은 TODO-2). 주행 중 정지는 `estop.py`·앱. ESTOP·STOPPED 는 disarm 에 풀리지 않고(2026-11-05 수정),
+  래치 뒤 disarm 한 어댑터는 can_guard 재시작 전까지 쓰지 않는다. 근거·시나리오: `reports/2026-11-05_bsw_update_report/` 3장.
 - 0x210 끊김 시 차량 동작: 문서끼리 충돌(“타임아웃 없음” vs “0.4 s 안 브레이크 8.2”) → **실무자 확인 대기(TODO-2)**. 확인 전엔 차량 자체 타임아웃에 기대지 않는다.
 - 자율은 **전진만**. 후진은 사람이 직접 한다. 왕복의 방향 전환은 **자율 U턴**(전진, 핸들 ±150 저속, 늘 같은 방향 — 2026-11-04 결정, 첫 U턴 전 조향 부호 확인).
 - **속도 상한 30 km/h 로 시작**, 결과를 보고 단계적으로 푼다. 각 테스트 `goal.md` 에 그날의 상한과 can_guard 클램프
@@ -56,7 +64,7 @@
 | 상태 0x200 | `steer_postion`(핸들각 °), `break_postion`(0~10, = 명령 % ÷ 10) | 브레이크는 **82 % 이상에서 8.2 포화** |
 | 바퀴 0x201 | `left/right_speed`(km/h), `rpm` | **후륜 엔코더만**, 전륜은 프리롤링(엔코더 없음). **부호 없음** |
 | 주기 | 0x200/0x201 21.0 ms(47.6 Hz), can_guard 20 ms | — |
-| DBC 밖 ID | 0x128, 0x202, 0x710~0x712 | 로그 확보됨, 정리 예정(TODO-1) |
+| DBC 밖 ID | 0x128, 0x710~0x712: **대회측이 심은 프레임, 자율주행과 무관 — 분석 대상 아님**(2026-11-05 사용자 확인). 0x202 만 미확인 | TODO-1 |
 | 휠베이스 L | **2.360 m** | 확정 |
 | 조향비 | 약 7.5 (핸들 150° ≈ 타이어 20°) | **잠정** — 변환표 작성 대상(TODO-4) |
 | 조향 불감대 | 핸들각 0 근처 ±1.5° | 10-07 리프트 |
@@ -85,6 +93,8 @@
 
 새 공통 코드는 `bsw_test/common/scripts/` 에 두고 각 `analysis.py` 는 그것을 import 한다. CAN 디코딩은 기존 `dbc_lite.py` 를 재사용한다(새로 만들지 않는다).
 
+**폴더 원칙(2026-11-05 정리):** 코드는 `safety/`·`ros2_ws/`·`sil/`·`bsw_test/`·`tools/`, 날짜별 데이터·데이터시트는 `measurements/YYYY-MM-DD_주제/`(분석 코드는 넣지 않고 `tools/` 에), 문서는 `docs/`(외부 자료 `docs/reference/`), 보고서는 `reports/YYYY-MM-DD_*/`. 구조도는 루트 `README.md`.
+
 ---
 
 ## 4. 데이터 규칙
@@ -93,7 +103,7 @@
 - 파일 이름: `날짜_테스트ID_회차.log` — 예) `20261104_LON-ACC-01_r1.log`
 - GNSS **RTX fix** 일 때는 같은 이름의 rosbag 을 함께 둔다: `20261104_LON-ACC-01_r1_bag/`
 - `raw/` 는 git 에 넣지 않는다(용량). `raw/README.md` 에 원본 보관 위치·크기·sha256 만 기록.
-  - 예외(2026-11-04 사용자 결정): **CAN 원본(Kvaser 로그)은 zstd 로 압축해 올린다**(예: `docs/2026-11-04_drive_log_data/raw_can/`, 하루 약 20 MB). bag·라이다는 올리지 않는다 — 저장소가 공개(public)라 대회·업체 공개 허락을 확인하기 전까지는 올리지 않는다.
+  - 예외(2026-11-04 사용자 결정): **CAN 원본(Kvaser 로그)은 zstd 로 압축해 올린다**(예: `measurements/2026-11-04_drive_log/raw_can/`, 하루 약 20 MB). bag·라이다는 올리지 않는다 — 저장소가 공개(public)라 대회·업체 공개 허락을 확인하기 전까지는 올리지 않는다.
 - `converted/` CSV 는 스크립트로 언제든 다시 만들 수 있어야 한다(손으로 고치지 않음).
 
 ## 5. 분석 규칙
@@ -122,7 +132,7 @@
 - 양식은 `bsw_test/docs/test_plan.md` 4절(`goal.md` / `results.md` / `test_summary.md`).
 - `results.md` 에 반드시: **소프트웨어 커밋 해시**, 그날 속도 상한·클램프, 원본 파일 이름, **시각화 자료 링크**
   - 그래프: 상대 경로 링크 `[목표 vs 실제 속도](../results/20261104_LON-ACC-01_r1_speed.png)`
-  - 공유용 페이지(Artifact 등)를 만들었으면 그 URL 도 “그래프” 절에 적는다
+  - **공유 페이지(Artifact)는 만들지 않는다**(2026-11-05 사용자 결정). 보고는 `reports/` 의 HTML·PDF·README 로만 한다
 - `test_summary.md` 에 “결과 링크” 열을 두고 각 테스트 `results.md` 와 대표 그래프로 연결한다.
 - 그래프 파일 이름은 원본 이름 + `_내용.png`.
 
@@ -130,7 +140,7 @@
 
 | # | 항목 | 담당 / 방법 |
 |---|---|---|
-| TODO-1 | DBC 밖 ID(0x128, 0x202, 0x710~0x712) 의미 | 보유 로그 옮겨서 분석 |
+| TODO-1 | ~~DBC 밖 ID 0x128, 0x710~0x712~~ [x] 2026-11-05 대회측 프레임·무관(사용자 확인). 남은 것: 0x202 의미 | 우선순위 낮음 |
 | TODO-2 | 0x210 끊김 시 차량 타임아웃·브레이크 동작 | 실무자 확인 |
 | TODO-3 | 가속·브레이크 % ↔ m/s² 변환표 | 03·04 (a) 단계 |
 | TODO-4 | 핸들각 ↔ 타이어각 변환표(조향비, 좌우 비대칭, 부호) | 정지 측정 + 05·07 |

@@ -71,7 +71,7 @@ fi
 
 # ── 1. 단위 시험 ─────────────────────────────────────────
 run unit_pytest $PY -m pytest test/ -q
-# ── 2. 비상 정지 시나리오 E1~E6 ───────────────────────────
+# ── 2. 비상 정지 시나리오 E1~E7 ───────────────────────────
 run sil_e_estop $PY sil_tests/e_estop.py --channel vcan0 --trials "$TRIALS" --guard-args "$GUARD_ARGS"
 # ── 3. 기존 회귀 P-1 / P-2 ───────────────────────────────
 run sil_p1 $PY sil_tests/p1_kill_control_node.py --channel vcan0
