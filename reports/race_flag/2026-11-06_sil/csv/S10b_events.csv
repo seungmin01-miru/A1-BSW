@@ -1,0 +1,16 @@
+t_s,event,detail
+0.006,start,virtual:r214fcfa5 init=silent estop_can=remote
+0.022,res_fb,res_end=0 res_error=0
+0.316,speed_limit_startup,observed=30.0 expected=None tx=off race=True action=pass
+0.316,state,INIT->ACTIVE cmd_age=0.015561242998956004 speed_kph=0.0
+0.336,input_clamped,none->hold_PRE_GO
+1.036,race_signal,go detect_lag_ms=20.0
+1.036,race_phase,PRE_GO->RACING go
+0.336,input_clamped,hold_PRE_GO->none
+5.536,res_alive_lost,alive_stall
+5.536,race_phase,RACING->SUSPENDED res_alive_lost
+5.536,estop_request,race_res reason=res_alive_lost
+5.537,state,ACTIVE->ESTOP cmd_age=0.015738645000965334 speed_kph=43.5
+5.537,estop_first_tx,brake=30.8 acc=0.0 auto=111
+5.536,input_clamped,none->hold_SUSPENDED
+10.017,stop,cycles=486 tx_fail=0

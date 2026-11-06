@@ -1,0 +1,13 @@
+t_s,event,detail
+-0.484,start,virtual:r80b414d8 init=silent estop_can=remote
+-0.470,res_fb,res_end=0 res_error=0
+-0.177,speed_limit_startup,observed=30.0 expected=None tx=off race=True action=pass
+-0.176,state,INIT->ACTIVE cmd_age=0.005735533999541076 speed_kph=0.0
+0.004,input_clamped,none->hold_PRE_GO
+1.024,race_signal,go detect_lag_ms=20.0
+1.024,race_phase,PRE_GO->RACING go
+0.004,input_clamped,hold_PRE_GO->none
+2.344,state,ACTIVE->HOLDING cmd_age=0.06574262700087274 speed_kph=9.1
+2.464,recover,gap=0.286s dev=0.046m
+2.464,state,HOLDING->ACTIVE cmd_age=0.005686737000360154 speed_kph=9.0
+4.904,stop,cycles=255 tx_fail=0

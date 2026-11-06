@@ -1,0 +1,14 @@
+t_s,event,detail
+-0.518,start,virtual:rcf93a1b5 init=silent estop_can=remote
+-0.504,res_fb,res_end=0 res_error=0
+-0.210,speed_limit_startup,observed=30.0 expected=None tx=off race=True action=pass
+-0.209,state,INIT->ACTIVE cmd_age=0.012253567998413928 speed_kph=0.0
+-0.009,race_signal,silence_armed go+slow_off quiet=0.508s
+0.011,input_clamped,none->hold_PRE_GO
+1.031,race_signal,go detect_lag_ms=20.0
+1.031,race_phase,PRE_GO->RACING go
+0.011,input_clamped,hold_PRE_GO->none
+2.331,state,ACTIVE->HOLDING cmd_age=0.052219836001313524 speed_kph=29.900000000000002
+2.391,commit,deviation=0.320m gap=0.212s
+4.391,state,HOLDING->STOPPED cmd_age=0.01241070199830574 speed_kph=20.5
+4.911,stop,cycles=257 tx_fail=0

@@ -1,0 +1,18 @@
+t_s,event,detail
+0.006,start,virtual:r39ac75cc init=silent estop_can=remote
+0.022,res_fb,res_end=0 res_error=0
+0.316,speed_limit_startup,observed=30.0 expected=None tx=off race=True action=pass
+0.316,state,INIT->ACTIVE cmd_age=0.01534201899994514 speed_kph=0.0
+0.356,input_clamped,none->hold_PRE_GO
+2.016,race_signal_unknown,raw=e000000000000000
+2.036,race_signal,go detect_lag_ms=20.0
+2.036,race_signal,stop detect_lag_ms=20.0
+2.036,race_signal,finish detect_lag_ms=20.0
+2.036,race_phase,PRE_GO->SUSPENDED stop
+2.036,race_finish_pending,SUSPENDED
+2.036,race_event_ignored,go SUSPENDED
+2.036,estop_request,race_res reason=stop
+2.036,state,ACTIVE->ESTOP cmd_age=0.01489445300103398 speed_kph=0.0
+2.036,estop_first_tx,brake=30.8 acc=0.0 auto=111
+2.036,input_clamped,hold_PRE_GO->hold_SUSPENDED
+8.016,stop,cycles=386 tx_fail=0

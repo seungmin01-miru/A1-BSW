@@ -1,0 +1,16 @@
+t_s,event,detail
+-0.557,start,virtual:r0a445a02 init=silent estop_can=remote
+-0.543,res_fb,res_end=0 res_error=0
+-0.249,speed_limit_startup,observed=30.0 expected=None tx=off race=True action=pass
+-0.249,state,INIT->ACTIVE cmd_age=0.012126349000027403 speed_kph=0.0
+-0.049,race_signal,silence_armed go+slow_off quiet=0.508s
+0.011,input_clamped,none->hold_PRE_GO
+1.031,race_signal,go detect_lag_ms=19.9
+1.031,race_phase,PRE_GO->RACING go
+0.011,input_clamped,hold_PRE_GO->none
+3.011,race_signal_unknown,raw=9000000000000000
+3.031,race_signal,slow_on detect_lag_ms=20.1
+3.031,slow_on,RACING
+3.031,override_on,phase=RACING
+3.031,input_clamped,none->slow_override
+20.011,stop,cycles=1014 tx_fail=0

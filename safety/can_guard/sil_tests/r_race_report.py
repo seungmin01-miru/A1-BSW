@@ -111,9 +111,10 @@ def fig_s05(plt, csv_dir, out):
     if not drawn:
         plt.close(fig)
         return None
-    for y, text, c in ((10.0, '10 규정', '#d03b3b'), (9.58, '★ 실제 10 에 해당하는 0x201 = 9.58', MUTED), (8.0, '목표 8.0', MUTED)):
+    for y, text, c, off, va in ((10.0, '10 규정', '#d03b3b', 0.08, 'bottom'), (9.58, '★ 실제 10 에 해당하는 0x201 = 9.58', MUTED, -0.08, 'top'),
+                                (8.0, '목표 8.0', MUTED, 0.08, 'bottom')):
         ax.axhline(y, color=c, lw=0.8, ls='--')
-        ax.text(11.1, y + 0.08, text, color=INK2, fontsize=7, ha='left', va='bottom')
+        ax.text(11.1, y + off, text, color=INK2, fontsize=7, ha='left', va=va)
     ax.set_xlim(11, 30)
     ax.set_ylim(5, 14)
     ax.set_ylabel('km/h')
@@ -337,6 +338,19 @@ python3 safety/can_guard/sil_tests/r_race.py --with-ros                         
 python3 safety/can_guard/sil_tests/r_race.py --only S05,S05m,S05d --rounds 1 --out /tmp/r
 python3 safety/can_guard/sil_tests/r_race.py --interface socketcan --channel vcan0 --with-ros   # 대회 PC, 프로세스 모드(vcan* 만 받음)
 ```
+
+## 이번에 고친 것
+
+- **제품 코드(버그):** `race_signal.py` — 확인 프레임 수를 못 채운 깃발이 흔적 없이 사라져 S3 기준 "이벤트 기록"을 못 맞췄다. 기록 `race_signal_ignored` 추가(1 초에 한 줄, 버린 수 포함). 시험 먼저 추가. `--race` off 는 이 모듈을 불러오지 않는다.
+- **시험 도구:** `ros2 run` 은 SIGTERM 을 자식에게 넘기지 않아 노드가 남고, 남은 어댑터가 다음 시나리오에 섞였다(`r_race.py`, `e2e_race_nodes.py` 모두 프로세스 그룹으로 수정). can_guard·어댑터 동작 문제가 아니다.
+- **시나리오·판정기 쪽 잘못(제품 문제 아님):** S16 은 0.1 s 보험 송신이 어긋남을 바로 고쳐 어긋남 경로가 돌지 않았다 → 차량이 0.6 s 동안 0x203 을 안 받는 조작을 넣었다. S6 어댑터 경로는 Slow On 전 RACING(유예 밖)에도 40 m/s² 를 내 래치가 났다(그 래치는 D7 대로 맞음) → 큰 가속을 Slow On 확인 뒤로 옮겼다.
+
+## 미결
+
+- 기본값(R_min 모름 + hold_after 0.10)에서 can_guard 가 볼 수 있는 끊김은 전부 영구 정지다(위 표). 0.2 s 끊김도 포함. `--track-min-radius-m` 값(모델 팀 질문 5-1)과 hold_after 를 정해야 R-07 이 의미가 있다. R_min 20 m 여도 30 km/h 는 횡가속 상한에 걸려 그대로다.
+- 끊긴 시간 = 명령 나이 + hold_after 는 "어댑터가 입력 끊김으로 기록을 멈췄다"는 가정이다. 어댑터 프로세스 자체가 50 ms 넘게 밀려도(입력은 정상) 같은 계산을 타서 약 0.15 s 끊김으로 잡히고, 확인 3주기까지 더하면 정지 확정이 될 수 있다(계산상. 이 시험에서 직접 재현하지는 않음). 대회 PC 어댑터 주기 지터를 재야 한다.
+- S5: 정상 구간 여유는 있으나 진입 끝 또는 지연 조건에서 0x201 9.20~9.30(실제 추정 ★ 9.60~9.71)까지 올라간다. 표는 잠정이고 오르막·슬립이 없다. 실차 서행 시험으로 확인.
+- 프로세스 모드(대회 PC 첫 실행), E1~E7·P1·P2.
 
 ## 못 돌린 것
 

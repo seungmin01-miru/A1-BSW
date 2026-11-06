@@ -1,0 +1,5 @@
+t_s,event,detail
+0.006,start,virtual:r0ce0b19f init=silent estop_can=remote
+0.022,res_fb,res_end=0 res_error=0
+0.316,speed_limit_startup,observed=9.3 expected=None tx=off race=True action=refuse
+0.317,stop,cycles=0 tx_fail=0
