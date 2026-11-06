@@ -155,6 +155,7 @@ class Rig:
             can_guard._stop_requested = True
             th.join(timeout=20)
             bg.join(timeout=2)
+            can_guard._stop_requested = False   # 모듈 전역 — 같은 프로세스의 다음 시험에 남기지 않는다
             self.bus.shutdown()
             if self._st is not None:
                 self._st.close()
