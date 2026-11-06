@@ -51,3 +51,8 @@ mlockall)가 `safety/can_guard/rt_setup.py`, `ros2_ws/.../rt_utils.py` 에 그�
 ## 한계
 vcan은 로컬 루프백이라 버스 전송지연·중재·에러프레임이 없다. 실시간성·버스 동작 최종 검증은 실물 CAN(PEAK `can0`/`can1`
 또는 Kvaser)에서 재측정.
+
+## 경기 신호 전달 SIL
+
+`fake_race_server.py <시나리오.yaml>` 가 0x124·0x125·0x126·0x127 을 재생한다(`race_scenarios/`, 머리말에 형식). `safety/can_guard/sil_tests/r_race.py` 가 브리지 → `race_state_publisher` → `/race/state` 경로를 자동 판정한다.
+vcan 없는 PC 는 virtual 버스(기본), 대회 PC 는 `--interface socketcan --channel vcan0`. 지연은 `--latency 300 --load`.

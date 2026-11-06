@@ -10,7 +10,7 @@ bsw_up.sh 가 기본으로 띄운다(nice 10, 격리 코어 밖). 대회 본 주
 
 **버스에 아무것도 보내지 않고, Kvaser 채널도 열지 않는다.** 미러가 만든 SocketCAN 사본(kv0)을 커널 raw 소켓으로 읽기만
 한다 — Kvaser 핸들을 하나 더 만들면 11-03 처럼 송신이 깨질 위험이 있어서다(보고서 2026-11-05 5장).
-커널 필터로 아래 5개 ID 만 받는다. 상태판이 멈추거나 느려도 vcan 은 이 소켓 몫만 버리고 미러·candump 는 영향받지 않는다.
+커널 필터로 아래 ID 만 받는다. 상태판이 멈추거나 느려도 vcan 은 이 소켓 몫만 버리고 미러·candump 는 영향받지 않는다.
 
 보여 주는 것(5 Hz 갱신):
   can_guard  상태(INIT/ACTIVE/HOLDING/STOPPED/ESTOP, 로그의 마지막 상태 줄)·비상 정지·다른 0x210 송신자 이벤트
@@ -18,6 +18,7 @@ bsw_up.sh 가 기본으로 띄운다(nice 10, 격리 코어 밖). 대회 본 주
   우리 명령  0x210 핸들·브레이크 %·가속 %·auto 비트, 송신율(Hz) — 75 Hz 넘으면 "송신자 둘"
   앱         0x156 En, 0x157 ACC_Cmd·EPS_Cmd — En=1 이면 "앱이 쥠: 차량은 0x210 무시"
   수신       ID 별 수신율·마지막 수신 뒤 시간 — 0.2 s 넘게 안 오면 ❌
+  경기 신호  0x124 깃발 5비트(2프레임 확인)·seen, 0x127 RES·alive, 0x202 차량 속도 제한. 표시만 — BSW 는 반응하지 않는다(반응은 모델)
 """
 import argparse
 import collections
@@ -29,10 +30,14 @@ import sys
 import threading
 import time
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'safety', 'can_guard'))
+from race_signal import RaceTracker  # noqa: E402   표준 라이브러리만 쓰는 순수 로직
+
 FMT = '=IB3x8s'
 SIZE = struct.calcsize(FMT)
 WHEEL_SCALE = 0.958
 IDS = {0x200: '0x200 차량 상태', 0x201: '0x201 바퀴', 0x210: '0x210 명령', 0x156: '0x156 앱 En', 0x157: '0x157 앱 명령'}
+RACE_IDS = (0x124, 0x127, 0x128, 0x202)     # 경기 신호 칸 전용. 평소 버스에 없을 수 있어 수신 칸(❌)에는 넣지 않는다
 STALE_S = 0.2
 TWO_SENDERS_HZ = 75
 
@@ -58,8 +63,13 @@ class State:
         self.times = collections.defaultdict(collections.deque)   # id → 최근 1 s 수신 시각
         self.clock = None                                # 다시 보기: 마지막 로그 시각
         self.done = False
+        self.race = RaceTracker()
 
     def feed(self, t, cid, data):
+        if cid in RACE_IDS or cid == 0x156:
+            with self.lock:
+                self.race.feed(cid, data, t)
+                self.race.take_records()
         if cid not in IDS:
             return
         with self.lock:
@@ -77,13 +87,15 @@ class State:
         with self.lock:
             now = self.now()
             last = dict(self.last)
+            self.race.update(now)
+            race = self.race.fields(now)
             rate = {}
             for i in IDS:
                 q = self.times[i]
                 while q and q[0] < now - 1.0:
                     q.popleft()
                 rate[i] = len(q)
-        v = {'now': now, 'speed': None, 'veh': None, 'cmd': None, 'app': None, 'rx': []}
+        v = {'now': now, 'speed': None, 'veh': None, 'cmd': None, 'app': None, 'rx': [], 'race': race}
         if 0x201 in last:
             b = last[0x201][1]
             r, lft = (u16(b, 0) & 0xFFF) * 0.1, (u16(b, 3) & 0xFFF) * 0.1   # DBC: right 0|12, left 24|12
@@ -148,8 +160,28 @@ def guard_state(st, ev):
     return st.split()[0] if st else '—'
 
 
+def race_lines(r):
+    """경기 신호 칸 글자(화면 공용). 표시만 한다."""
+    names = (('go', 'GO'), ('slow_on', 'SLOW_ON'), ('slow_off', 'SLOW_OFF'), ('finish', 'FINISH'), ('stop', 'STOP'))
+    if r['race_signal_age_s'] < 0:
+        flags = '0x124 수신 없음'
+    else:
+        flags = '  '.join(f'{lb} {"●" if r["sig_" + n] else ("○" if r["seen_" + n] else "·")}' for n, lb in names) \
+            + f'   마지막 {r["last_signal"]}, {r["race_signal_age_s"]:.2f} s 전 수신'
+    if r['res_age_s'] < 0:
+        res = 'RES 0x127 수신 없음'
+    else:
+        res = f'RES {"작동 중" if r["res_active"] else "없음"}  alive {"정상" if r["res_alive_ok"] else "끊김"}' \
+              f'  END {int(r["res_end"])} ERR {r["res_error"]}'
+    lim = r['vehicle_speed_limit_kph']
+    lim_txt = '0x202 수신 없음' if lim < 0 else f'0x202 차량 속도 제한 {lim:.1f} km/h'
+    return flags, f'{res}   ·   {lim_txt}'
+
+
 def warnings(v, ev):
     w = []
+    if v['race']['res_active']:
+        w.append(('red', '원격비상제동(RES) 작동 중 — 차량은 0x210 무시, 풀리면 즉시 우리 명령을 따름'))
     if v['app'] and v['app'][0]:
         w.append(('red', '앱이 쥠(En=1) — 차량은 0x210 무시. 차가 선 뒤에만 En 해제'))
     if v['cmd'] and v['cmd'][4] > TWO_SENDERS_HZ:
@@ -190,7 +222,7 @@ def open_socket(channel):
     sock = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
     mask = socket.CAN_SFF_MASK | socket.CAN_EFF_FLAG | socket.CAN_RTR_FLAG
     sock.setsockopt(socket.SOL_CAN_RAW, socket.CAN_RAW_FILTER,
-                    b''.join(struct.pack('=II', i, mask) for i in IDS))       # 5개 ID 만(커널에서 거름)
+                    b''.join(struct.pack('=II', i, mask) for i in (*IDS, *RACE_IDS)))   # 커널에서 거름
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1 << 20)
     sock.bind((channel,))
     return sock
@@ -243,6 +275,9 @@ def render_text(v, st, ev, d, src):
         w(f'앱          En {int(en)}  ' + (f'ACC_Cmd {acc:+.2f} m/s²  EPS_Cmd {eps:+.1f}°' if acc is not None else ''))
     w('')
     w('수신        ' + '  '.join(f'0x{i:03X} {r:3d}/s {"✅" if ok else "❌"}' for i, r, ok in v['rx']))
+    flags, res = race_lines(v['race'])
+    w(f'경기 신호   {flags}')
+    w(f'            {res}')
     return '\n'.join(out)
 
 
@@ -364,6 +399,11 @@ def run_gui(a, s, g, d, src):
         lb.grid(row=0, column=k, padx=(0, 4))
         rxl[i] = lb
 
+    c6 = card(body, '경기 신호 (표시만 · ● 켜짐 ○ 본 적 있음 · 없음)')
+    c6.grid(row=4, column=0, columnspan=2, sticky='nsew', pady=6)
+    race = tk.Label(c6, bg=C['card'], fg=C['ink'], font=F(11), justify='left', anchor='w')
+    race.pack(anchor='w', fill='x')
+
     t_end = time.monotonic() + a.once if a.once else None
 
     def tick():
@@ -397,7 +437,7 @@ def run_gui(a, s, g, d, src):
         for k, txt in vals.items():
             put(cells[k], k, text=txt)
         put(hz, 'hz', text=(f'0x210 송신 {c[4]} Hz (정상 50)' if c else '0x210 송신 없음 — INIT silent 또는 disarm')
-            + '   · 브레이크 실제 = 위치 × 10 (82 % 이상에서 포화)',
+            + '   · 브레이크 실제 = 위치 % (82 % 부근 포화, 세션별)',
             fg=C['bad'] if c and c[4] > TWO_SENDERS_HZ else C['muted'])
         if v['app']:
             en, acc, eps = v['app']
@@ -409,6 +449,8 @@ def run_gui(a, s, g, d, src):
         for i, r, ok in v['rx']:
             put(rxl[i], ('rx', i), text=f'0x{i:03X}\n{r}/s', bg=C['okbg'] if ok else C['badbg'],
                 fg=C['ok'] if ok else C['bad'])
+        put(race, 'race', text='\n'.join(race_lines(v['race'])),
+            fg=C['bad'] if v['race']['res_active'] else C['ink'])
         if (t_end and time.monotonic() >= t_end) or (a.replay and s.done):
             if a.shot:                                 # 시험용 창 캡처(xwd 형식, 실차에서는 안 씀)
                 root.update()

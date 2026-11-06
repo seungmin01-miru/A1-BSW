@@ -168,3 +168,9 @@ python3 sil_tests/e_estop.py --channel vcan0      # E1~E7 (E7 = 원격 우선 �
 ```
 
 ⚠️ 남은 문제: 제어 노드(어댑터 disarm, `lift_cmd` auto off)가 auto 000 명령을 쓰면 ACTIVE 에서 그대로 나가 브레이크가 풀린다 — silent INIT 은 "첫 명령 전"만 막는다.
+
+## 대회 신호 — 이벤트 로그만 (2026-11-06)
+
+`race_signal.py`(순수 로직, `race_state_publisher` 와 공유)로 0x124·0x125·0x126·0x127·0x128·0x202 를 해석해 **이벤트 로그에만** 남긴다:
+`race_signal`, `race_signal_ignored`, `race_signal_unknown`, `res`, `res_alive_lost`, `res_alive_restored`, `res_alive_jump`, `res_alive_never_changed`, `res_fb`, `speed_limit_info`, `pit_zone`, `repair`.
+상태 기계·명령에는 쓰지 않는다(반응은 모델, `docs/2026-11-06_engine_room_dev_plan.md` 1.1절). 앱 0x156/0x157 은 기존 `RemoteEstopDetector` 그대로. 확인: `test/test_race_log_guard.py`(신호 있음/없음 0x210 동일).

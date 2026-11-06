@@ -19,7 +19,7 @@ FRAME_ID_RES = 0x127
 FRAME_ID_RES_FB = 0x128
 FRAME_ID_SERVICE_INFO = 0x202
 
-# /race/state 가 보는 ID 전부. 0x157 은 해석에 쓰지 않는다(앱 En 은 0x156).
+# /race/state 해석에 쓰는 ID. 0x157 은 브리지 필터에는 있으나 해석에 쓰지 않는다(앱 En 은 0x156).
 RACE_FRAME_IDS = (FRAME_ID_RACE_SIGNAL, FRAME_ID_PIT_ZONE, FRAME_ID_REPAIR, FRAME_ID_RES, FRAME_ID_RES_FB,
                   FRAME_ID_SERVICE_INFO, FRAME_ID_REMOTE_01)
 # can_guard 이벤트 로그가 보는 ID. 앱은 can_guard 가 RemoteEstopDetector 로 이미 처리한다.

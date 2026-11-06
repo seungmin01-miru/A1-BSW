@@ -42,9 +42,10 @@ def generate_launch_description():
             description='can_raw_bridge SCHED_FIFO 우선순위, 0=미적용',
         ),
         DeclareLaunchArgument(
-            'ids', default_value='0x200,0x201,0x210',
-            description='raw 토픽으로 내보낼 CAN ID(커널 필터). 빈 값 = 전부. 11-04 전부(약 580 /s) 내보내다 52 s 밀림 → '
-                        '디코더가 쓰는 0x200/0x201/0x210 만(약 145 /s). 앱 0x156/0x157(각 100 Hz)·원본 전체는 candump/Kvaser 로그',
+            'ids', default_value='0x200,0x201,0x210,0x124,0x125,0x126,0x127,0x128,0x202,0x156,0x157',
+            description='raw 토픽으로 내보낼 CAN ID(커널 필터). 빈 값 = 전부. 11-04 전부(약 580 /s) 내보내다 '
+                        '52 s 밀림 → 디코더가 쓰는 3개 + 대회 신호·앱 8개만. 0x710~0x712 와 원본 전체는 '
+                        'candump/미러 로그',
         ),
         Node(
             package='a1_can_bridge', executable='can_raw_bridge', name='can_raw_bridge',

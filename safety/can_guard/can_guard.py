@@ -50,6 +50,7 @@ from rt_setup import apply as apply_rt
 from rt_setup import parse_cpulist
 from rx_decode import FRAME_ID_CONTROL_COMMAND, FRAME_ID_CONTROL_INFO, FRAME_ID_WHEEL_INFO
 from rx_decode import decode_control_info, decode_vehicle_speed_kph
+from race_signal import GUARD_LOG_FRAME_IDS, RaceTracker
 from rx_decode import FRAME_ID_REMOTE_01, FRAME_ID_REMOTE_02, RemoteEstopDetector
 from state_machine import DEFAULT_PERCEPTION_LOST_STOPPED_AFTER_S, DEFAULT_PERCEPTION_TIMEOUT_S
 from state_machine import DEFAULT_STOP_SPEED_KPH, DEFAULT_STOPPED_AFTER_S, DEFAULT_WATCHDOG_T_S
@@ -192,6 +193,7 @@ def run(a):
     hold_profile = BrakeProfile(a.hold_brake_pct, a.hold_brake_ramp_pct_s, a.hold_brake_max_pct)
     estop_profile = BrakeProfile(a.estop_brake_start_pct, a.estop_brake_ramp_pct_s, a.estop_brake_max_pct)
     remote = RemoteEstopDetector(a.estop_acc_mps2, a.estop_confirm_frames, a.estop_can_timeout)
+    race = RaceTracker()      # 대회 신호 — 이벤트 로그만. 상태·명령에 쓰지 않는다(반응은 모델, 지시서 1.1절)
     ev = EventLog(a.event_log)
     try:
         cmd_kwargs = {'name': a.cmd_shm} if a.cmd_shm else {}
@@ -337,6 +339,11 @@ def run(a):
                         # 이벤트 로그에는 안 남았다 → 00 분석(analysis.py)이 잡도록 1 초에 한 줄 남긴다(동작은 그대로)
                         ev('foreign_0x210', f'n={foreign_n} data={bytes(msg.data).hex()} state={state.value}', now)
                         foreign_warned_at = now
+                elif msg.arbitration_id in GUARD_LOG_FRAME_IDS:
+                    race.feed(msg.arbitration_id, msg.data, now)
+            race.update(now)
+            for name, detail in race.take_records():
+                ev(name, detail, now)
             vs_age_s = (now - last_vs_mono) if last_vs_mono is not None else None
 
             # --- 1b. 비상 정지 원천 모으기 ---

@@ -103,19 +103,23 @@ class CanRawBridge(Node):
                 next_report = now + 5.0
             if msg is None:
                 continue
-            if msg.timestamp:
-                self._lag_max = max(self._lag_max, time.time() - msg.timestamp)
-            out = CanFrame()
-            out.header.stamp = self._stamp_from(msg.timestamp)
-            out.header.frame_id = 'can'
-            out.id = msg.arbitration_id
-            out.dlc = msg.dlc if msg.dlc is not None else len(msg.data)
-            data8 = bytes(msg.data) + b'\x00' * 8
-            out.data = list(data8[:8])
-            out.is_extended = bool(msg.is_extended_id)
-            out.is_error = bool(msg.is_error_frame)
-            self._pub.publish(out)
-            self._n += 1
+            self.publish_frame(msg)
+
+    def publish_frame(self, msg):
+        """can.Message 하나를 CanFrame 으로 발행."""
+        if msg.timestamp:
+            self._lag_max = max(self._lag_max, time.time() - msg.timestamp)
+        out = CanFrame()
+        out.header.stamp = self._stamp_from(msg.timestamp)
+        out.header.frame_id = 'can'
+        out.id = msg.arbitration_id
+        out.dlc = msg.dlc if msg.dlc is not None else len(msg.data)
+        data8 = bytes(msg.data) + b'\x00' * 8
+        out.data = list(data8[:8])
+        out.is_extended = bool(msg.is_extended_id)
+        out.is_error = bool(msg.is_error_frame)
+        self._pub.publish(out)
+        self._n += 1
 
     @staticmethod
     def _stamp_from(can_ts):
