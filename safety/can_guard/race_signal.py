@@ -32,6 +32,7 @@ _FLAG_MASK = {FLAG_GO: 0x80, FLAG_STOP: 0x40, FLAG_FINISH: 0x20, FLAG_SLOW_ON: 0
 
 DEFAULT_CONFIRM_FRAMES = 2          # D12·A7
 DEFAULT_RES_ALIVE_TIMEOUT_S = 0.5   # 잠정, 계획서 10절
+DEFAULT_SILENCE_ARM_S = 0.5         # 잠정, 브리프 A12
 
 
 def _frame(data):
@@ -122,10 +123,16 @@ class RaceSignalDecoder:
       0 확인도 `confirm_frames` 연속으로 본다(옛 Go 위의 단발 0 + 복귀를 새 Go 로 오인하지 않게).
     - 제한 방향(stop, finish, slow_on)은 처음부터 1 이어도 확인 뒤 이벤트다.
     메인 루프 한 주기에 프레임 여러 개가 와도 이벤트를 잃지 않도록 `take_events()` 까지 쌓아 둔다.
+    - A12 조용함 무장: 0x124 가 깃발 있을 때만 송신되는 방식이면 0 프레임을 볼 수 없어 첫 Go 를 영영 못 받는다. 듣기 시작한 뒤(`note_silence`
+      첫 호출) 또는 마지막 프레임 뒤 `silence_arm_s` 동안 프레임이 없으면 해제 방향 깃발을 무장하고, 연속 프레임 수·level 을 지운다(조용한 구간을
+      사이에 둔 프레임은 "연속"이 아니다). 옛 Go 가 계속 나오는 경우는 조용한 구간이 없으므로 R-01 은 지켜진다.
     """
 
-    def __init__(self, confirm_frames=DEFAULT_CONFIRM_FRAMES):
+    def __init__(self, confirm_frames=DEFAULT_CONFIRM_FRAMES, silence_arm_s=DEFAULT_SILENCE_ARM_S):
         self.confirm_frames = max(1, confirm_frames)
+        self.silence_arm_s = silence_arm_s
+        self._listen_t = None
+        self._quiet_applied = False
         self._flags = {name: _FlagDebounce(name not in RELEASE_FLAGS) for name in RACE_FLAGS}
         self._events = []
         self._records = []
@@ -138,7 +145,10 @@ class RaceSignalDecoder:
         if not raw:
             self._records.append(('race_signal_unknown', 'empty_frame'))
             return
+        if self._listen_t is not None:
+            self.note_silence(t)     # 메인 루프가 밀렸어도 이 프레임 앞의 조용한 구간을 먼저 반영한다
         self.last_seen_t = t
+        self._quiet_applied = False
         if _is_undefined_pattern(raw):
             if raw != self._last_unknown:
                 self._records.append(('race_signal_unknown', f'raw={raw.hex()}'))
@@ -168,6 +178,26 @@ class RaceSignalDecoder:
             if f.off_run >= self.confirm_frames:
                 f.level = False
                 f.armed = True
+
+    def note_silence(self, now):
+        """A12. 매 주기 호출(프레임이 없어도). 조용한 구간이 `silence_arm_s` 를 넘으면 한 번 무장한다. ≤ 0 이면 끔."""
+        if self._listen_t is None:
+            self._listen_t = now
+        if self.silence_arm_s <= 0 or self._quiet_applied:
+            return
+        ref = self.last_seen_t if self.last_seen_t is not None else self._listen_t
+        if now - ref < self.silence_arm_s:
+            return
+        self._quiet_applied = True
+        newly = []
+        for name, f in self._flags.items():
+            if not f.armed:
+                newly.append(name)
+            f.armed = True
+            f.on_run = f.off_run = 0
+            f.level = False
+        if newly:
+            self._records.append(('race_signal', f'silence_armed {"+".join(newly)} quiet={now - ref:.3f}s'))
 
     def take_events(self):
         """쌓인 깃발 이벤트를 꺼낸다(중복 없음, 도착 순서). 우선순위는 race_state 가 적용한다."""

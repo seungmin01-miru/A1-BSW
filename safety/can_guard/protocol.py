@@ -442,10 +442,11 @@ class StatusChannel:
 
     @classmethod
     def open_or_none(cls, name=STATUS_SHM_NAME_DEFAULT):
-        """세그먼트가 없으면 None — can_guard 가 안 떠 있거나 StatusChannel 이 없는 구버전이다."""
+        """세그먼트가 없으면 None — can_guard 가 안 떠 있거나 StatusChannel 이 없는 구버전이다.
+        can_guard 가 세그먼트를 막 만드는 순간(크기 0)에 열면 mmap 이 ValueError 를 낸다 — 이것도 "아직 없음"이다."""
         try:
             return cls.open(name)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             return None
 
     def write(self, st: GuardStatus):

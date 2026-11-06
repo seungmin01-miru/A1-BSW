@@ -101,13 +101,15 @@ def _has_any_auto(cmd):
 
 def command_for_state(state, last_valid_cmd, held_steer_deg, steer_limiter, acc_limiter, brake_ramp, dt_s,
                       hold_profile=DEFAULT_HOLD_PROFILE, estop_profile=DEFAULT_ESTOP_PROFILE,
-                      stopped_mode='hold', init_mode='silent', auto_off_mode='silent', last_auto_cmd=None):
+                      stopped_mode='hold', init_mode='silent', auto_off_mode='silent', last_auto_cmd=None,
+                      recovery_coast=False):
     """state: 이번 주기에 확정된 상태(state_machine.next_state 의 결과).
     last_valid_cmd: 마지막으로 성공적으로 받은 제어 명령.
     held_steer_deg: 보호 상태 진입 시점에 얼린 조향각(호출자가 `held_steer_on_transition` 으로 캡처).
     steer_limiter/acc_limiter: `plausibility.RateLimiter` — 제어 노드 명령의 변화율 제한(기본 무제한).
     brake_ramp: `BrakeRamp` — can_guard 가 스스로 거는 브레이크.
     last_auto_cmd: auto 비트가 있던 마지막 명령(없으면 None).
+    recovery_coast: 경기 모드 복구 구간(HOLDING, 정지 확정 전, 계획서 8.2) — 조향 고정·가속 0·**브레이크 0(관성 주행)**. 기본 False 면 기존 동작.
     반환: 클램프 전 `Command`, 또는 **None = 이번 주기는 0x210 을 보내지 않는다**.
 
     2026-11-05 수정 — **ESTOP·STOPPED(hold) 는 disarm 으로 풀리지 않는다**: 예전에는 래치 상태에서 어댑터가 disarm
@@ -146,6 +148,13 @@ def command_for_state(state, last_valid_cmd, held_steer_deg, steer_limiter, acc_
         acc_limiter.reset(0.0)   # 가속은 변화율 제한 없이 즉시 0
         brake = brake_ramp.step(estop_profile, last_valid_cmd.brake_cmd_pct, dt_s)
         return replace(last_valid_cmd, steer_cmd_deg=steer, acc_cmd_pct=0.0, brake_cmd_pct=brake)
+
+    if recovery_coast and state == State.HOLDING:
+        # 정지 확정이 되면 BrakeRamp 가 0 에서 시작값으로 바로 올라간다(기존 hold 램프)
+        steer = steer_limiter.step(held_steer_deg, dt_s)
+        acc_limiter.reset(0.0)
+        brake_ramp.reset(0.0)
+        return replace(last_valid_cmd, steer_cmd_deg=steer, acc_cmd_pct=0.0, brake_cmd_pct=0.0)
 
     if state in (State.HOLDING, State.DEGRADED) or (state == State.STOPPED and stopped_mode == 'hold'):
         # 조향은 진입 순간 값에 고정, 가속은 0, 브레이크는 프로파일(시작값 → 서서히 상한). 이미 더 세면 그대로.

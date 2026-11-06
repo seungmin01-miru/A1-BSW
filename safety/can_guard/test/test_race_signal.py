@@ -387,3 +387,70 @@ def test_timeout_zero_disables_lost():
     m.feed(res_frame(0, 0), 0.0)
     m.update(100.0)
     assert not m.alive_lost
+
+
+# --- A12 조용함 무장 ------------------------------------------------------------------------------------------------
+def test_silence_arms_release_flags_from_listen_start():
+    dec = rs.RaceSignalDecoder()
+    dec.note_silence(0.0)
+    dec.note_silence(0.49)
+    feed_n(dec, f124('go'), 2, t0=0.492)   # 0.5 s 전 → 옛 Go 로 본다
+    assert dec.take_events() == ()
+    dec = rs.RaceSignalDecoder()
+    dec.note_silence(0.0)
+    dec.note_silence(0.5)
+    assert any('silence_armed' in r[1] for r in dec.take_records())
+    feed_n(dec, f124('go'), 2, t0=0.6)
+    assert dec.take_events() == ('go',)
+
+
+def test_old_go_held_without_silence_never_arms():
+    dec = rs.RaceSignalDecoder()
+    dec.note_silence(0.0)
+    t = 0.0
+    for _ in range(500):
+        dec.feed(f124('go'), t)
+        dec.note_silence(t)
+        t += DT
+    assert dec.take_events() == ()
+    assert dec.levels['go'] is True
+
+
+def test_silence_after_old_go_arms_and_clears_level_and_runs():
+    dec = rs.RaceSignalDecoder()
+    dec.note_silence(0.0)
+    feed_n(dec, f124('go'), 3, t0=0.0)
+    dec.take_records()
+    dec.note_silence(1.0)
+    assert dec.levels['go'] is False
+    dec.feed(f124('go'), 1.1)
+    assert dec.take_events() == ()      # 조용함을 사이에 둔 프레임은 연속이 아니다 — 1 프레임은 아직 Go 아님
+    dec.feed(f124('go'), 1.12)
+    assert dec.take_events() == ('go',)
+
+
+def test_single_frames_across_silence_are_not_consecutive():
+    dec = rs.RaceSignalDecoder()
+    dec.note_silence(0.0)
+    dec.feed(f124('go'), 0.6)
+    dec.feed(f124('go'), 1.5)           # 메인 루프가 note_silence 를 못 불렀어도 feed 가 반영
+    assert dec.take_events() == ()
+    assert dec.levels['go'] is False
+
+
+def test_silence_arm_off_when_zero():
+    dec = rs.RaceSignalDecoder(silence_arm_s=0)
+    dec.note_silence(0.0)
+    dec.note_silence(100.0)
+    feed_n(dec, f124('go'), 2, t0=101.0)
+    assert dec.take_events() == ()
+
+
+def test_restrict_flag_can_fire_again_after_silence():
+    dec = rs.RaceSignalDecoder()
+    dec.note_silence(0.0)
+    feed_n(dec, f124('slow_on'), 2, t0=0.0)
+    assert dec.take_events() == ('slow_on',)
+    dec.note_silence(1.0)
+    feed_n(dec, f124('slow_on'), 2, t0=1.1)
+    assert dec.take_events() == ('slow_on',)

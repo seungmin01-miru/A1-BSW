@@ -32,8 +32,13 @@ ESTOP 브레이크는 시작값 → 서서히 상한(`--estop-brake-*`), 가속 
 INIT 은 기본 `--init-mode silent`: 첫 유효 명령 전에는 0x210 을 보내지 않는다(auto 000 = 페일세이프 브레이크 해제, 11-03).
 제어 노드 명령이 auto 000(어댑터 disarm·lift_cmd auto off)이어도 기본 `--auto-off-mode silent` 로 보내지 않는다.
 `--event-log` 로 비상 정지 수신·상태 전이·첫 송신 시각(벽시계 + monotonic)을 CSV 로 남긴다 — 00 시험 지연 계산용.
+
+경기 모드 `--race`(2026-11-06, docs/2026-11-06_race_flag_dev_plan.md): 대회 깃발·RES·0x202/0x203 을 처리하는 race_runtime.py 를 켠다.
+    0x124·0x127 → 경기 상태(race_state) → SUSPENDED 면 ESTOP 원천 `race_res`(래치) → next_state → command_for_state → apply_race_envelope → clamp → 0x210
+끄면(기본) race_runtime 을 불러오지도 않는다 — 새 공유메모리·새 프레임 처리·새 이벤트 없이 예전과 같다.
 """
 import argparse
+import os
 import signal
 import sys
 import time
@@ -62,6 +67,7 @@ VS_DRAIN_MAX_PER_CYCLE = 64  # 한 주기에 non-blocking recv() 최대 시도 �
 #                              (11-03 버스: 0x200/0x201/0x128/0x202/0x710~712 + 원격 0x156/0x157 100 Hz ≈ 주기당 10여 개)
 EXIT_FOREIGN_SENDER = 3      # 시작 전 점검에서 다른 0x210 송신자 발견
 EXIT_NO_ESTOP_SOURCE = 4     # --estop-can-required 인데 시작 전 점검에서 원격 0x156/0x157 이 안 보임
+EXIT_RACE_CONFIG = 2         # --race 설정(race_flag.yaml·경기 파라미터)이 이상함. argparse 오류와 같은 코드
 
 
 class _SkipTx(Exception):
@@ -132,7 +138,52 @@ def parse_args(argv=None):
     ap.add_argument('--stats-interval-s', type=float, default=0.0,
                     help='이 간격(초)마다 자체측정 지연 스냅샷을 로그로 남김. 0=비활성(기본, 장시간 운전용)')
     ap.add_argument('--quiet', action='store_true')
-    return ap.parse_args(argv)
+    _add_race_args(ap)
+    a = ap.parse_args(argv)
+    _check_race_args(ap, a)
+    return a
+
+
+def _add_race_args(ap):
+    """경기 모드 옵션(계획서 10절). 기본값 표기 중 잠정은 잠정이고, 학습값은 race_flag.yaml 에 있다."""
+    g = ap.add_argument_group('경기 모드(--race)')
+    g.add_argument('--race', action='store_true', help='경기 상태 기계 켜기. 끄면 예전과 완전히 같게 동작')
+    g.add_argument('--race-confirm-frames', type=int, default=2, help='깃발·RES_START 확인 프레임 수(D12, A7)')
+    g.add_argument('--race-stop-action', choices=('estop',), default='estop', help='SIG_STOP 동작(잠정, 질의서 4)')
+    g.add_argument('--race-signal-timeout-s', type=float, default=0.0, help='0x124 끊김 → SUSPENDED. 0=기록만(잠정, 질의서 5)')
+    g.add_argument('--resume-mode', choices=('restart', 'go-reset'), default='restart',
+                   help='SUSPENDED 빠져나가기: restart=can_guard 재시작만(기본), go-reset=RES·STOP 해제 + 정지 + 새 Go(잠정, 질의서 6)')
+    g.add_argument('--res-alive-timeout-s', type=float, default=0.5, help='0x127 끊김·alive 정지 판정(잠정)')
+    g.add_argument('--pre-go-brake-pct', type=float, default=30.0, help='출발 대기 브레이크 %% (잠정)')
+    g.add_argument('--slow-target-kph', type=float, default=8.0, help='서행 목표(D8 1단계)')
+    g.add_argument('--slow-acc-cut-kph', type=float, default=8.8, help='서행 가속 차단(D8 1단계)')
+    g.add_argument('--slow-brake-kph', type=float, default=9.3, help='서행 브레이크(D8 1단계)')
+    g.add_argument('--finish-cap-kph', type=float, default=20.0, help='Finish 뒤 속도 상한(잠정, 질의서 7-3)')
+    g.add_argument('--parked-speed-kph', type=float, default=0.5, help='정차 판정 차속(잠정)')
+    g.add_argument('--parked-after-s', type=float, default=5.0, help='정차 판정 시간(잠정)')
+    g.add_argument('--parked-brake-pct', type=float, default=60.0, help='정차 유지 브레이크 %% (잠정)')
+    g.add_argument('--input-grace-s', type=float, default=1.0, help='Go·Slow Off 직후 입력 한계 유예(D7)')
+    g.add_argument('--recover-budget-m', type=float, default=0.30, help='이탈 예산(D3)')
+    g.add_argument('--recover-delay-s', type=float, default=0.25, help='조향 무반응 + 재보정 여유(잠정)')
+    g.add_argument('--recover-alat-max', type=float, default=3.0, help='횡가속 상한 m/s² (잠정)')
+    g.add_argument('--track-min-radius-m', type=float, default=None, help='최소 코너 반경. 미정이면 횡가속 상한으로 계산(잠정)')
+    g.add_argument('--resume-low-speed', action='store_true', help='정지 확정 뒤 저속 재개(8.3, 기본 꺼짐)')
+    g.add_argument('--adapter-hold-after-s', type=float, default=0.10,
+                   help='어댑터 hold_after_s 와 같은 값. 끊긴 시간 = 명령 나이 + 이 값(8.2)')
+    g.add_argument('--race-flag-yaml', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'race_flag.yaml'),
+                   help='가감속 프로파일(학습값). 기본 이 폴더 race_flag.yaml')
+    g.add_argument('--status-shm', default=None, help='StatusChannel 공유메모리 이름(기본 a1_can_guard_status)')
+
+
+def _check_race_args(ap, a):
+    """--race 와 함께 쓰면 auto 000·침묵 해제 경로가 열리는 조합은 시작부터 거부한다(계획서 13절)."""
+    if a.race:
+        if a.stopped_mode == 'manual':
+            ap.error('--race 에서 --stopped-mode manual 금지(auto 000 = 페일세이프 브레이크 해제)')
+        if a.auto_off_mode == 'send':
+            ap.error('--race 에서 --auto-off-mode send 금지(auto 000 = 페일세이프 브레이크 해제)')
+        if a.init_mode == 'legacy':
+            ap.error('--race 에서 --init-mode legacy 금지(auto 000 = 페일세이프 브레이크 해제)')
 
 
 _stop_requested = False
@@ -188,6 +239,7 @@ def run(a):
     tx_worst = 0.0
     tx_spikes = 0
     cmd_ch = hb_ch = es_ch = bus = None
+    race = None
     limits = Limits(a.steer_limit_deg, a.brake_limit_pct, a.acc_limit_pct)   # DBC 범위 밖이면 여기서 거부
     hold_profile = BrakeProfile(a.hold_brake_pct, a.hold_brake_ramp_pct_s, a.hold_brake_max_pct)
     estop_profile = BrakeProfile(a.estop_brake_start_pct, a.estop_brake_ramp_pct_s, a.estop_brake_max_pct)
@@ -199,6 +251,15 @@ def run(a):
         cmd_ch = CommandChannel.create(**cmd_kwargs)   # guard 가 먼저 뜬다 → 세그먼트도 guard 가 만든다(§7.2)
         hb_ch = HeartbeatChannel.create(**hb_kwargs)
         es_ch = EstopChannel.create(**({'name': a.estop_shm} if a.estop_shm else {}))
+        if a.race:
+            import yaml
+            from race_runtime import RaceRuntime   # 끄면 불러오지도 않는다
+            try:
+                race = RaceRuntime(a, ev, lambda msg: log(msg, file=sys.stderr))
+            except (ValueError, OSError, KeyError, TypeError, yaml.YAMLError) as e:
+                log(f'[can_guard] 🛑 경기 설정 오류 — 시작 거부: {e}', file=sys.stderr)
+                ev('race_config_error', str(e))
+                return EXIT_RACE_CONFIG
         bus_kw = {} if a.interface == 'socketcan' else {'bitrate': a.bitrate}
         if a.interface == 'kvaser':
             kvaser_compat.apply()   # python-can 4.6.1 ↔ CANlib 5.52 LOCAL_TXACK 버퍼 크기 호환
@@ -213,9 +274,13 @@ def run(a):
             seen = {}
             t_end = time.monotonic() + a.precheck_s
             while time.monotonic() < t_end and not _stop_requested:
+                if race is not None:
+                    race.idle(time.monotonic())   # 조용함 무장(A12)·상태 기록 — 어댑터가 점검 중에도 경기 모드임을 안다
                 m = bus.recv(timeout=0.05)
                 if m is not None and not m.is_error_frame:
                     seen[m.arbitration_id] = seen.get(m.arbitration_id, 0) + 1
+                    if race is not None and not m.is_extended_id:
+                        race.feed(m, time.monotonic())   # 점검 중에 온 깃발·RES·0x202 도 먹인다(옛 Go 를 놓치지 않게)
             summary = ', '.join(f'0x{k:03x}×{v}' for k, v in sorted(seen.items())) or '(수신 없음)'
             log(f'[can_guard] 시작 전 점검 {a.precheck_s:g}s: {summary}', file=sys.stderr)
             if seen.get(FRAME_ID_CONTROL_COMMAND):
@@ -253,6 +318,7 @@ def run(a):
         es_reset_seq = None        # 마지막으로 본 EstopChannel.reset_seq
         es_shm_on = sig_on = remote_on = False   # 원천별 이전 값(상승 에지 로그용)
         estop_tx_pending = False   # ESTOP 진입 뒤 첫 송신을 이벤트로 남기기
+        race_estop_on = False      # ESTOP 원천 race_res 의 이전 값(상승 에지 로그용)
 
         sd_notify.ready()
         log(f'[can_guard] INIT — {"첫 유효 명령 전까지 0x210 송신 안 함" if a.init_mode == "silent" else "auto 0·명령 0 송신"}'
@@ -314,6 +380,8 @@ def run(a):
                 msg = bus.recv(timeout=0)
                 if msg is None:
                     break
+                if race is not None and not msg.is_error_frame and not msg.is_extended_id and race.feed(msg, now):
+                    continue   # 대회 신호는 짧아도 처리한다(아래 8바이트 필터보다 먼저)
                 if msg.is_error_frame or len(msg.data) < 8:
                     continue
                 if msg.arbitration_id == FRAME_ID_WHEEL_INFO:
@@ -367,6 +435,16 @@ def run(a):
             estop_any = es_shm_now or sig_now or remote_now
             vehicle_speed_kph = last_vs_kph if (vs_age_s is not None and vs_age_s <= VS_MAX_AGE_S) else None
 
+            race_state_kw = {}
+            if race is not None:
+                race.begin_cycle(now, last_vs_kph, vs_age_s, cmd_age_s, state,
+                                 last_valid_cmd.steer_auto or last_valid_cmd.brake_auto or last_valid_cmd.acc_auto, estop_any)
+                if race.estop_asserted and not race_estop_on:
+                    ev('estop_request', race.estop_trigger_detail, now)
+                race_estop_on = race.estop_asserted
+                estop_any = estop_any or race.estop_asserted
+                race_state_kw = race.state_kwargs(now)
+
             # --- 2. 상태 전이 ---
             holding_duration_s = (now - holding_entered_at) if holding_entered_at is not None else 0.0
             degraded_duration_s = (now - degraded_entered_at) if degraded_entered_at is not None else 0.0
@@ -376,7 +454,7 @@ def run(a):
                                    degraded_duration_s=degraded_duration_s,
                                    perception_lost_stopped_after_s=a.perception_lost_stopped_after,
                                    vehicle_speed_kph=vehicle_speed_kph, stop_speed_kph=a.stop_speed_kph,
-                                   estop=estop_any, estop_reset=estop_reset)
+                                   estop=estop_any, estop_reset=estop_reset, **race_state_kw)
             if estop_reset:
                 ok = state == State.ESTOP and new_state != State.ESTOP
                 ev('estop_reset', 'accepted' if ok else
@@ -396,8 +474,12 @@ def run(a):
             held_steer_deg = held_steer_on_transition(state, new_state, held_steer_deg, last_valid_cmd)
             # ESTOP 중 앱 En=1 이면 차량은 앱을 따른다 → 고정값을 실제 핸들각으로(앱 해제 순간 조향 튐 방지, 11-04 bsw4)
             held_steer_deg = held_steer_follow_remote(
-                new_state, held_steer_deg, a.estop_can == 'remote' and remote.remote_enabled,
+                new_state, held_steer_deg,
+                (a.estop_can == 'remote' and remote.remote_enabled) or (race is not None and race.follow_steer),
                 last_info['steer_pos_deg'] if last_info else None, a.estop_remote_steer)
+            if race is not None:
+                held_steer_deg = race.held_steer(now, new_state, held_steer_deg,
+                                                 last_info['steer_pos_deg'] if last_info else None)
             if new_state == State.HOLDING and state != State.HOLDING:
                 holding_entered_at = now
             elif new_state != State.HOLDING:
@@ -412,7 +494,11 @@ def run(a):
             out = command_for_state(state, last_valid_cmd, held_steer_deg, steer_limiter, acc_limiter, brake_ramp,
                                     a.period, last_auto_cmd=last_auto_cmd, hold_profile=hold_profile, estop_profile=estop_profile,
                                     stopped_mode=a.stopped_mode, init_mode=a.init_mode,
-                                    auto_off_mode=a.auto_off_mode)
+                                    auto_off_mode=a.auto_off_mode,
+                                    **({'recovery_coast': race.coasting} if race is not None else {}))
+            if race is not None:
+                out = race.envelope(now, out, state, last_auto_cmd, last_info['steer_pos_deg'] if last_info else None,
+                                    a.period, steer_limiter, acc_limiter)
             if out is not None:
                 violations = []
                 out = clamp_range(out, limits=limits, violations_out=violations)
@@ -440,6 +526,9 @@ def run(a):
                     log(f'[can_guard] ⚠️ 송신 실패 누적 {tx_fail}: {e} (버스 문제·bus-off·E-stop 가능)',
                         file=sys.stderr)
 
+            if race is not None:
+                race.after_tx(now, out, state)
+
             if a.status_interval_s > 0 and now - status_at >= a.status_interval_s:
                 status_at = now
                 fb = (f'조향위치 {last_info["steer_pos_deg"]:+.1f}° 브레이크위치 {last_info["brake_pos_pct"]:.0f}% '
@@ -450,7 +539,7 @@ def run(a):
                         f'auto {int(out.steer_auto)}{int(out.brake_auto)}{int(out.acc_auto)}')
                 log(f'[can_guard] {state.value:8s} {sent} | 차량: {fb} | 차속 '
                     f'{vehicle_speed_kph if vehicle_speed_kph is not None else "?"} km/h | 송신오류 누적 {tx_fail}건'
-                    + (' (정상)' if tx_fail == 0 else ' ⚠️'),
+                    + (' (정상)' if tx_fail == 0 else ' ⚠️') + (race.status_text() if race is not None else ''),
                     file=sys.stderr)
 
             sd_notify.watchdog()
@@ -465,6 +554,8 @@ def run(a):
             hb_ch.close()
         if es_ch is not None:
             es_ch.close()
+        if race is not None:
+            race.close()
         ev('stop', f'cycles={cycle} tx_fail={tx_fail}')
         ev.close()
         avg_err = tx_err_sum / cycle * 1e6 if cycle else 0.0

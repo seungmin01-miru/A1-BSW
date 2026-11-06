@@ -263,3 +263,12 @@ def test_command_channel_still_works(shm_name):
         assert ch.read()[0].steer_cmd_deg == 1.0
     finally:
         ch.close()
+
+
+def test_open_or_none_during_create_window_is_none(monkeypatch):
+    """can_guard 가 세그먼트를 만드는 순간(크기 0) 열면 mmap 이 ValueError — 읽는 쪽이 죽지 않고 "아직 없음"으로 본다(11-06 부하 시험에서 재현)."""
+    def empty(*a, **kw):
+        raise ValueError('cannot mmap an empty file')
+
+    monkeypatch.setattr(StatusChannel, 'open', classmethod(lambda cls, name=None: empty()))
+    assert StatusChannel.open_or_none('whatever') is None
