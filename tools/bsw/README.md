@@ -56,6 +56,7 @@ bash tools/bsw/bsw_down.sh                 # 끄기 (차가 선 뒤) — 상태�
 | 명령 vs 실제 | 핸들 °, 브레이크 %(실제 = 위치 × 10), 가속 %, auto 비트 — 왼쪽 0x210, 오른쪽 0x200 | 0x210 송신율 75 Hz 초과 |
 | 앱 | En, ACC_Cmd, EPS_Cmd | En = 1 "앱이 쥠: 차량은 0x210 무시" |
 | 수신 | ID 별 1 s 프레임 수(0x200·0x201 48, 0x210 50, 0x156·0x157 100 이 정상) | 0.2 s 넘게 안 옴 |
+| 경기 상태 | can_guard `--race` 일 때만 보임(StatusChannel 읽기 전용): 경기 상태·깃발 비트·RES·BSW 속도 상한·0x202 값(30.0 = 원격 조종 제한, 자율 상한 아님)·모델 정상 시간 | 값이 0.1 s 넘게 오래됨, StatusChannel 사라짐(글자로 표시) |
 
 ```bash
 python3 tools/bsw/bsw_monitor.py                          # 직접 띄우기(kv0 + 최신 세션)

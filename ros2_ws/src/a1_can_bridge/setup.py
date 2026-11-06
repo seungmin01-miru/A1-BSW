@@ -30,6 +30,7 @@ setup(
         'console_scripts': [
             'can_raw_bridge = a1_can_bridge.can_raw_bridge:main',
             'a1_status_decoder = a1_can_bridge.a1_status_decoder:main',
+            'race_state_publisher = a1_can_bridge.race_state_publisher:main',
         ],
     },
 )

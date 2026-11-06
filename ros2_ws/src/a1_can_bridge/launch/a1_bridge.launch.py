@@ -6,9 +6,14 @@ Launch the real-vehicle (USER_ 0x200/0x201/0x210) bridge: can_raw_bridge + a1_st
 
 2026-10-06 실차 DBC(DBC/A1_dbc_2_fixed.dbc) 기준. 이 패키지의 유일한 launch.
 감시 등급 토픽 — 차량으로 명령을 보내는 건 can_guard 하나뿐(이 launch 는 아무것도 송신하지 않는다).
+race_state_publisher: can_guard StatusChannel → /race/state. can_guard 가 경기 모드가 아니면 아무것도 발행하지 않는다
+(race_state:=false 로 끌 수 있음).
 """
+import os
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -21,6 +26,7 @@ def generate_launch_description():
     cpu_affinity = LaunchConfiguration('cpu_affinity')
     rt_priority = LaunchConfiguration('rt_priority')
     ids = LaunchConfiguration('ids')
+    default_cg = os.path.join(os.environ.get('A1_BSW_ROOT', '~/git/A1-BSW'), 'safety', 'can_guard')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -57,4 +63,15 @@ def generate_launch_description():
         ),
         Node(package='a1_can_bridge', executable='a1_status_decoder',
              name='a1_status_decoder', output='screen'),
+        DeclareLaunchArgument('race_state', default_value='true',
+                              description='can_guard StatusChannel → /race/state 발행 노드'),
+        DeclareLaunchArgument('can_guard_dir', default_value=default_cg,
+                              description='protocol.py 위치(구조체 정의 공유)'),
+        DeclareLaunchArgument('status_shm', default_value='a1_can_guard_status'),
+        Node(package='a1_can_bridge', executable='race_state_publisher', name='a1_race_state_publisher',
+             parameters=[{
+                 'can_guard_dir': ParameterValue(LaunchConfiguration('can_guard_dir'), value_type=str),
+                 'status_shm': ParameterValue(LaunchConfiguration('status_shm'), value_type=str),
+             }],
+             output='screen', condition=IfCondition(LaunchConfiguration('race_state'))),
     ])

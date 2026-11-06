@@ -28,6 +28,12 @@
 자동 복귀 없음, `disarm` 으로만 해제. can_guard 가 재시작하면 공유메모리 inode 변화를 보고 1초 안에 다시 연결한다.
 인지 프로세스가 아직 없어 하트비트도 이 노드가 대신 보낸다(`perception_heartbeat`).
 
+경기 모드(`race_rules.py`, can_guard StatusChannel 이 있고 `race_enabled` 이고 stamp 0.1 s 안일 때만 — 아니면 위 규칙 그대로):
+입력이 `hold_after_s`(0.10 s, 모델 주기의 2배 이상이어야 함) 넘게 끊기면 기록·하트비트만 멈추고 래치하지 않는다 / ±15·±45 밖 입력은
+`input_grace`·`long_override`·PRE_GO·SLOW·PARKED·SUSPENDED 면 잘라 쓴다(NaN·inf 는 항상 래치) / PRE_GO 래치는 정상 입력
+`pre_go_relatch_s`(1 s) 뒤 자동 해제 / PRE_GO·PARKED·SUSPENDED 동안 조향 속도 제한을 실제 핸들각에 붙여 둔다.
+실제 노드 시험: `python3 ros2_ws/src/a1_control_adapter/test/e2e_race_nodes.py`(가짜 can_guard, CAN 안 씀).
+
 ## 표 (`config/track.yaml`) — 전부 잠정
 
 | 표 | 초기값 | 근거 / 확정 방법 |
