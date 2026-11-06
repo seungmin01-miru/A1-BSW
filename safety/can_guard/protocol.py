@@ -315,3 +315,176 @@ class EstopChannel:
         self._shm.close()
         if self._owner:
             self._shm.unlink()
+
+
+# --- 상태 채널 (2026-11-06, 경기 깃발 계획서 WP3) ---------------------------------------------------------------------
+# can_guard → 어댑터·race_state_publisher·상태판. 경기 상태를 판단하는 곳은 can_guard 하나뿐이고(D5) 다른 프로세스는 읽기만 한다.
+STATUS_SHM_NAME_DEFAULT = 'a1_can_guard_status'
+STATUS_MAX_AGE_S_DEFAULT = 0.1      # 이보다 오래되면 can_guard 가 죽은 것으로 보고 "없음"(계획서 WP3, 브리프 A10)
+STATUS_NONE = -1.0                  # "값 없음"(pit_lat/lon 만 NaN) — 데이터시트 05 시트와 같은 표기. speed_cap_kph 는 0 = 정지 유지
+
+# 안전 상태 코드 — state_machine.State 의 이름과 1:1. 공유메모리에 문자열을 얹지 않으려고 정수로 쓴다
+GUARD_STATE_CODE = {'INIT': 0, 'ACTIVE': 1, 'HOLDING': 2, 'DEGRADED': 3, 'STOPPED': 4, 'ESTOP': 5}
+GUARD_STATE_NAME = {v: k for k, v in GUARD_STATE_CODE.items()}
+# 경기 표시 코드 — 계획서 3.1, 데이터시트 05 시트 `phase`
+RACE_PHASE_CODE = {'PRE_GO': 0, 'RACING': 1, 'SLOW': 2, 'FINISHED': 3, 'PARKED': 4, 'SUSPENDED': 5}
+RACE_PHASE_NAME = {v: k for k, v in RACE_PHASE_CODE.items()}
+
+
+class _StatusPayload(ctypes.Structure):
+    """필드 순서·타입을 바꾸면 쓰는 쪽·읽는 쪽을 같이 재시작해야 한다. 실수는 전부 double — float32 로 줄이면 9.3 이 9.30000019 가 된다."""
+    _fields_ = [
+        ('seq', ctypes.c_uint64),
+        ('timestamp_ns', ctypes.c_int64),       # stamp. time.monotonic_ns() — 같은 PC 의 프로세스끼리는 시계가 같다
+        ('race_enabled', ctypes.c_uint8),
+        ('guard_state', ctypes.c_uint8),        # GUARD_STATE_CODE
+        ('race_phase', ctypes.c_uint8),         # RACE_PHASE_CODE
+        ('slow_active', ctypes.c_uint8),
+        ('long_override', ctypes.c_uint8),
+        ('sig_go', ctypes.c_uint8),
+        ('sig_slow_on', ctypes.c_uint8),
+        ('sig_slow_off', ctypes.c_uint8),
+        ('sig_finish', ctypes.c_uint8),
+        ('sig_stop', ctypes.c_uint8),
+        ('res_active', ctypes.c_uint8),
+        ('res_alive_ok', ctypes.c_uint8),
+        ('input_grace', ctypes.c_uint8),
+        ('_pad', ctypes.c_uint8 * 3),
+        ('speed_cap_kph', ctypes.c_double),
+        ('speed_target_kph', ctypes.c_double),
+        ('race_signal_age_s', ctypes.c_double),
+        ('vehicle_speed_limit_kph', ctypes.c_double),
+        ('speed_limit_target_kph', ctypes.c_double),
+        ('model_healthy_s', ctypes.c_double),
+        ('pit_lat_deg', ctypes.c_double),
+        ('pit_lon_deg', ctypes.c_double),
+    ]
+
+
+@dataclass
+class GuardStatus:
+    """StatusChannel 의 값 객체. 기본값 = 경기 모드 꺼짐 + 전부 "값 없음"."""
+    race_enabled: bool = False
+    guard_state: int = GUARD_STATE_CODE['INIT']
+    race_phase: int = RACE_PHASE_CODE['PRE_GO']
+    slow_active: bool = False
+    long_override: bool = False
+    sig_go: bool = False
+    sig_slow_on: bool = False
+    sig_slow_off: bool = False
+    sig_finish: bool = False
+    sig_stop: bool = False
+    res_active: bool = False
+    res_alive_ok: bool = False
+    input_grace: bool = False
+    speed_cap_kph: float = STATUS_NONE            # −1 = 상한 없음, 0 = 정지 유지
+    speed_target_kph: float = STATUS_NONE         # −1 = override 목표 없음
+    race_signal_age_s: float = STATUS_NONE        # −1 = 0x124 를 한 번도 못 받음
+    vehicle_speed_limit_kph: float = STATUS_NONE  # 0x202. −1 = 못 받음
+    speed_limit_target_kph: float = STATUS_NONE   # 0x203 목표. −1 = 없음(tx off 포함)
+    model_healthy_s: float = 0.0                  # 모델 입력 연속 정상 시간
+    pit_lat_deg: float = float('nan')             # NaN = 없음
+    pit_lon_deg: float = float('nan')             # NaN = 없음
+    seq: int = 0                                  # read() 가 채움(쓸 때는 무시)
+    stamp_ns: int = 0                             # read() 가 채움(쓸 때는 무시)
+    age_s: float = 0.0                            # read() 가 채움(쓸 때는 무시)
+
+    @property
+    def guard_state_name(self):
+        return GUARD_STATE_NAME.get(self.guard_state, f'?{self.guard_state}')
+
+    @property
+    def race_phase_name(self):
+        return RACE_PHASE_NAME.get(self.race_phase, f'?{self.race_phase}')
+
+
+_STATUS_BOOL_FIELDS = ('race_enabled', 'slow_active', 'long_override', 'sig_go', 'sig_slow_on', 'sig_slow_off',
+                       'sig_finish', 'sig_stop', 'res_active', 'res_alive_ok', 'input_grace')
+_STATUS_INT_FIELDS = ('guard_state', 'race_phase')
+_STATUS_FLOAT_FIELDS = ('speed_cap_kph', 'speed_target_kph', 'race_signal_age_s', 'vehicle_speed_limit_kph',
+                        'speed_limit_target_kph', 'model_healthy_s', 'pit_lat_deg', 'pit_lon_deg')
+
+
+class StatusChannel:
+    """can_guard → 다른 프로세스. 다른 채널과 같은 seqlock. can_guard 가 만들고(`create`) 매 주기 쓰며 읽는 쪽은 `open` 한다.
+
+      guard = StatusChannel.create();  guard.write(GuardStatus(race_enabled=True, ...))
+      rd = StatusChannel.open_or_none()   # 세그먼트가 없으면(can_guard 미실행·구버전) None
+      st = rd.read()                      # GuardStatus, 또는 None = 없음(한 번도 안 씀 / stamp 가 max_age_s 초과)
+
+    read() 가 None 이면 "경기 모드 아님"으로 보고 기존 규칙으로 동작한다(브리프 A10). can_guard 가 재시작하면 세그먼트를 새로
+    만들므로, 오래 사는 읽는 쪽은 None 이 이어질 때 다시 `open_or_none()` 해야 새 세그먼트를 본다(옛 핸들은 옛 내용 = 계속 None)."""
+
+    def __init__(self, shm, owner):
+        self._shm = shm
+        self._owner = owner
+        self._payload = _StatusPayload.from_buffer(self._shm.buf)
+
+    @classmethod
+    def create(cls, name=STATUS_SHM_NAME_DEFAULT):
+        size = ctypes.sizeof(_StatusPayload)
+        try:
+            shm = shared_memory.SharedMemory(name=name, create=True, size=size)
+        except FileExistsError:
+            stale = shared_memory.SharedMemory(name=name)
+            stale.close()
+            stale.unlink()
+            shm = shared_memory.SharedMemory(name=name, create=True, size=size)
+        ch = cls(shm, owner=True)
+        ch._payload.seq = 0
+        return ch
+
+    @classmethod
+    def open(cls, name=STATUS_SHM_NAME_DEFAULT):
+        shm = shared_memory.SharedMemory(name=name, create=False)
+        _unregister_from_tracker(shm)
+        return cls(shm, owner=False)
+
+    @classmethod
+    def open_or_none(cls, name=STATUS_SHM_NAME_DEFAULT):
+        """세그먼트가 없으면 None — can_guard 가 안 떠 있거나 StatusChannel 이 없는 구버전이다."""
+        try:
+            return cls.open(name)
+        except FileNotFoundError:
+            return None
+
+    def write(self, st: GuardStatus):
+        p = self._payload
+        seq = p.seq if p.seq % 2 == 0 else p.seq + 1
+        p.seq = seq + 1
+        p.timestamp_ns = time.monotonic_ns()
+        for f in _STATUS_BOOL_FIELDS:
+            setattr(p, f, int(bool(getattr(st, f))))
+        for f in _STATUS_INT_FIELDS:
+            setattr(p, f, int(getattr(st, f)))
+        for f in _STATUS_FLOAT_FIELDS:
+            setattr(p, f, float(getattr(st, f)))
+        p.seq = seq + 2
+
+    def read(self, max_age_s=STATUS_MAX_AGE_S_DEFAULT, max_retries=1000):
+        """GuardStatus 또는 None(없음). max_age_s=None 이면 나이를 보지 않는다(상태판의 "마지막 값" 표시용, 판단에 쓰지 말 것).
+        재시도를 다 쓰면 TornReadError — 다른 채널과 같다. 호출자는 "이번 주기 없음"으로 본다."""
+        p = self._payload
+        for _ in range(max_retries):
+            seq1 = p.seq
+            if seq1 == 0:
+                return None
+            if seq1 % 2 != 0:
+                continue
+            kw = {f: bool(getattr(p, f)) for f in _STATUS_BOOL_FIELDS}
+            kw.update({f: int(getattr(p, f)) for f in _STATUS_INT_FIELDS})
+            kw.update({f: float(getattr(p, f)) for f in _STATUS_FLOAT_FIELDS})
+            ts = p.timestamp_ns
+            if seq1 != p.seq:
+                continue
+            age_s = (time.monotonic_ns() - ts) / 1e9
+            if max_age_s is not None and age_s > max_age_s:
+                return None
+            return GuardStatus(seq=seq1, stamp_ns=ts, age_s=age_s, **kw)
+        raise TornReadError(f'StatusChannel: {max_retries}번 재시도해도 seqlock 이 안정되지 않음')
+
+    def close(self):
+        del self._payload
+        self._shm.close()
+        if self._owner:
+            self._shm.unlink()
