@@ -26,12 +26,8 @@ I/O(공유메모리·CAN)는 profile_gen.py 가 한다. 이 파일은 계산·�
       - {type: speed, to: 10, rate: 2, t: 12}          # 폐루프: 목표 차속을 rate km/h/s 로 to 까지 → t 초까지 유지
                                                        #   (가속·브레이크는 SpeedController 가 정함, 조향 구간은 그 목표를 이어받음)
       - {type: until_dist, m: 20, timeout: 30}         # 이 구간 시작부터 후륜 적분 거리 ≥ m 까지 지금 값 유지
-      - {type: until_heading, deg: 180, timeout: 60}   # 방위 변화(자전거 모델 추정) ≥ deg 까지
       - {type: until_stop, brake: 40, timeout: 10}     # 가속 0 + 브레이크 % → 차속 ≤ 0.3 km/h 1 s 까지
-      - {type: uturn, deg: 150, kph: 5}                # 매크로: 정지 → 핸들 deg → 출발(kph 폐루프 또는 acc % 개루프)
-                                                       #   → 방위 180° → 정지 → 핸들 0. 좌 = +deg, 우 = −deg
     course: {length_m: 50, decel_mps2: 1.5, delay_s: 0.3}   # (선택) 직선 코스 길이 — 이동거리 + 예측 정지거리 ≥ 길이면 끝내기
-    vehicle: {wheelbase_m: 2.36, steer_ratio: 7.5}          # 방위 추정용(조향비 잠정, TODO-4)
     speed_ctrl: {kp: 2.0, ...}                              # (선택) SpeedController 파라미터 — 기본값 SPEED_CTRL_DEFAULTS
     end: {brake: 100, ramp_s: 2.5}         # 끝나면(정상·중단 모두): 가속 즉시 0, 조향 유지, 브레이크 ramp_s 동안 올림
 
@@ -49,7 +45,6 @@ DEFAULT_LIMITS = {'steer_deg': 15.0, 'brake_pct': 100.0, 'acc_pct': 10.0, 'steer
                   'max_speed_kph': 10.0}
 EPS = 1e-6
 MAX_STEER_OFFSET_DEG = 15.0          # 핸들 ° — 01 오프셋이 이보다 크면 측정·부호부터 의심
-VEHICLE_DEFAULTS = {'wheelbase_m': 2.36, 'steer_ratio': 7.5}     # CLAUDE.md 2절 (조향비 잠정, TODO-4)
 COURSE_DEFAULTS = {'length_m': 0.0, 'decel_mps2': 1.5, 'delay_s': 0.3}   # 감속도 잠정 — 04(a) 후 갱신
 STOP_KPH = 0.3                       # until_stop / 세션 회차 사이 "정지" 판정
 # SpeedController 기본값 — 전부 잠정(03(a) 계단 결과로 hold_* 와 kp 를 맞춘다). acc/brake % 는 0x210 단위.
@@ -97,12 +92,10 @@ class Prim:
     ctrl_a: float = None   # 폐루프 목표 차속 km/h (None = 개루프). speed 구간은 ctrl_a → ctrl_b 를 ctrl_rate 로
     ctrl_b: float = None
     ctrl_rate: float = 0.0
-    m: float = 0.0          # until_dist 거리 / until_heading 거리 상한
-    deg: float = 0.0        # until_heading 방위
+    m: float = 0.0          # until_dist 거리
     hold_s: float = 1.0     # until_stop 정지 유지
-    lead_brake: float = 0.0  # until_heading: 다음 정지 브레이크 % — 서는 동안 더 돌 각도만큼 일찍 끝낸다(0 = 안 함)
 
-    RUNTIME = ('until_speed', 'until_dist', 'until_heading', 'until_stop')
+    RUNTIME = ('until_speed', 'until_dist', 'until_stop')
 
     @property
     def closed_loop(self):
@@ -146,7 +139,6 @@ class Profile:
     vars: dict = field(default_factory=dict)
     steer_offset: float = 0.0          # 핸들 ° — 실행 때 모든 조향 명령에 더함(validate 도 반영)
     course: dict = None                # {length_m, decel_mps2, delay_s} 또는 None
-    vehicle: dict = field(default_factory=lambda: dict(VEHICLE_DEFAULTS))
     speed_ctrl: dict = field(default_factory=lambda: dict(SPEED_CTRL_DEFAULTS))
 
     @property
@@ -256,10 +248,6 @@ def build(cfg, var_overrides=None, steer_offset=0.0, speed_ctrl=None):
         if not (5 <= c['length_m'] <= 300) or c['decel_mps2'] <= 0 or c['delay_s'] < 0:
             raise ProfileError('course: length_m 5~300, decel_mps2 > 0, delay_s ≥ 0')
         prof.course = c
-    for k, v in (cfg.get('vehicle') or {}).items():
-        if k not in VEHICLE_DEFAULTS:
-            raise ProfileError(f'vehicle.{k}: 모르는 항목 — {sorted(VEHICLE_DEFAULTS)}')
-        prof.vehicle[k] = _num(v, vars_, f'vehicle.{k}')
     sc = dict(SPEED_CTRL_DEFAULTS)
     sc.update(cfg.get('speed_ctrl') or {})
     sc.update(speed_ctrl or {})          # 현장에서 맞춘 파일(--ctrl)이 프로파일보다 우선
@@ -372,56 +360,15 @@ def build(cfg, var_overrides=None, steer_offset=0.0, speed_ctrl=None):
             if m <= 0:
                 raise ProfileError(f'segments[{i}]: m > 0')
             cur = add('until_dist', n('timeout'), m=m)
-        elif typ == 'until_heading':
-            deg = n('deg')
-            if not (0 < deg <= 360):
-                raise ProfileError(f'segments[{i}]: deg 0~360')
-            cur = add('until_heading', n('timeout'), deg=deg, m=n('max_m', 0))
         elif typ == 'until_stop':
             b = n('brake', 40)
             if not (30 <= b <= limits['brake_pct']):
                 raise ProfileError(f'segments[{i}]: until_stop brake 30~limits.brake_pct')
             set_open(acc=0.0, brake=b)
             cur = add('until_stop', n('timeout', 10), hold_s=n('hold_s', 1.0))
-        elif typ == 'uturn':
-            deg = n('deg')
-            if not (30 <= abs(deg) <= limits['steer_deg']):
-                raise ProfileError(f'segments[{i}]: uturn |deg| 30~limits.steer_deg({limits["steer_deg"]:g})')
-            # 오프셋을 더해도 상한 안: 끝까지(lock) 돌리는 게 목적이라 줄여서 맞춘다
-            room = limits['steer_deg'] - (prof.steer_offset if deg > 0 else -prof.steer_offset)
-            if abs(deg) > room:
-                deg = math.copysign(room, deg)
-            kph, acc = n('kph', 0), n('acc', 0)
-            if (kph > 0) == (acc > 0):
-                raise ProfileError(f'segments[{i}]: uturn 은 kph(폐루프) 와 acc(개루프 %) 중 하나만 > 0')
-            if kph > 0:
-                need_speed_le(kph, 'uturn.kph')
-            heading = n('heading', 180)
-            srate = n('steer_rate', 60)
-            sb = n('stop_brake', 40)
-            V = prof.vehicle
-            r_est = V['wheelbase_m'] / math.tan(math.radians(abs(deg) / V['steer_ratio']))
-            max_m = n('max_m', 1.6 * r_est * math.radians(heading))   # 조향비가 틀려도 여기서 멈춤
-            to = n('timeout', 60)
-            set_open(acc=0.0, brake=sb)
-            cur = add('until_stop', 10, label='U턴정지', hold_s=0.5)
-            cur = add('ramp', abs(deg - cur['steer']) / srate, label='U턴조향', axis='steer', a=cur['steer'], b=deg)
-            cur = add('const', 1.0, label='U턴대기')
-            if kph > 0:
-                cur['acc'] = cur['brake'] = 0.0
-                cur = add('until_heading', to, label='U턴', deg=heading, m=max_m, ctrl_a=kph, ctrl_b=kph, ctrl_rate=0,
-                          lead_brake=sb)
-            else:
-                cur['brake'] = 0.0
-                cur = add('const', 0.3, label='U턴브레이크풀기')
-                cur['acc'] = acc
-                cur = add('until_heading', to, label='U턴', deg=heading, m=max_m, lead_brake=sb)
-            set_open(acc=0.0, brake=sb)
-            cur = add('until_stop', 10, label='U턴정지', hold_s=0.5)
-            cur = add('ramp', abs(cur['steer']) / srate, label='U턴복귀', axis='steer', a=cur['steer'], b=0.0)
         else:
             raise ProfileError(f'segments[{i}]: 모르는 type {typ!r} — hold/set/step/ramp/trap/sine/until_speed/'
-                               f'speed/until_dist/until_heading/until_stop/uturn')
+                               f'speed/until_dist/until_stop')
     return prof
 
 
@@ -530,21 +477,6 @@ def stop_distance_m(v_kph, course, end_ramp_s):
     return v * (course['delay_s'] + end_ramp_s / 2.0) + v * v / (2.0 * course['decel_mps2'])
 
 
-def heading_lead_deg(v_kph, yaw_rate, brake_pct, speed_ctrl, delay_s=0.3):
-    """브레이크 brake_pct 로 서는 동안 더 돌 방위(°) ★ — 지연 동안 그대로 + 감속 동안 선형으로 줄어든다고 봄.
-    감속도는 speed_ctrl 의 brake_map(잠정)에서."""
-    if brake_pct <= 0 or v_kph <= 0:
-        return 0.0
-    dec = max(interp(brake_pct, speed_ctrl['brake_pct'], speed_ctrl['decel_mps2']), 0.3)
-    return abs(yaw_rate) * (delay_s + (v_kph / 3.6) / dec / 2.0)
-
-
-def yaw_rate_deg_s(v_kph, steer_handle_deg, vehicle):
-    """자전거 모델 방위 변화율(°/s, 좌 +). 타이어각 = 핸들각 / 조향비(잠정)."""
-    tire = math.radians(steer_handle_deg / vehicle['steer_ratio'])
-    return math.degrees((v_kph / 3.6) * math.tan(tire) / vehicle['wheelbase_m'])
-
-
 def validate(prof):
     """시간표 전체를 주기마다 훑어 상한 위반을 모은다. 빈 리스트 = 통과."""
     L = prof.limits
@@ -608,7 +540,6 @@ def summary(prof):
         desc = {'const': '유지', 'ramp': f'{p.axis} {p.a:g}→{p.b:g}', 'sine': f'{p.axis} {p.a:g}±{p.amp:g} {p.freq:g} Hz',
                 'until_speed': f'차속 ≥ {p.kph:g} km/h 까지(최대)',
                 'until_dist': f'거리 ≥ {p.m:g} m 까지(최대)',
-                'until_heading': f'방위 ≥ {p.deg:g}° 까지(최대, ≤ {p.m:.0f} m)',
                 'until_stop': f'정지 {p.hold_s:g} s 까지(최대)'}[p.kind]
         if p.closed_loop:
             desc += (f' [폐루프 {p.ctrl_a:g}→{p.ctrl_b:g} km/h]' if p.ctrl_b is not None and p.ctrl_b != p.ctrl_a

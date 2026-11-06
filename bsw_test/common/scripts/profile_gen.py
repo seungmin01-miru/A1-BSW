@@ -11,14 +11,14 @@ lift_cmd.py 와 같은 자리(가짜 제어 노드 + 가짜 인지 하트비트)
   python3 bsw_test/common/scripts/profile_gen.py run bsw_test/02_LON_profile/profiles/acc_step.yaml --var acc=15 \
       --run 20261105_LON-ACC-01_r4 --interface kvaser --channel 0
 
-  # 3) 한 세션 여러 회차 + 회차 사이 자율 U턴 (2026-11-04) — 50 m 코스 왕복, 재시작·사람 방향 전환 없음
+  # 3) 한 세션 여러 회차 (자율 U턴은 2026-11-06 폐기 — 방향 전환은 사람이 세션 밖에서)
   python3 bsw_test/common/scripts/profile_gen.py run $P/brake_step.yaml --var acc=15 --var v=10 \
-      --sweep brake=20,40,60 --reps 3 --turn $P/uturn.yaml --turn-var deg=150 --turn-var acc=6 \
+      --sweep brake=20,40,60 --reps 3 \
       --steer-offset 1.2 --run 20261104_LON-DEC-01 --interface kvaser --channel 0
-  #   회차 이름 20261104_LON-DEC-01_r1 … _r9 (+ 사이 U턴 _r1_turn …). 회차마다 Enter 로 시작(안전 "비었음" 확인)
+  #   회차 이름 20261104_LON-DEC-01_r1 … _r9. 회차마다 Enter 로 시작(안전 "비었음" 확인)
 
 세션 흐름 (회차가 여러 개일 때)
-  시험 r1 → 끝내기(브레이크 100) → 정지 1 s → U턴 대기 → Enter → U턴 → 정지 → r2 대기 → Enter → …
+  시험 r1 → 끝내기(브레이크 100) → 정지 1 s → r2 대기 → Enter → …
   회차 사이에도 계속 명령을 쓴다(브레이크 유지, auto 111) → can_guard 는 ACTIVE 그대로, stop.sh·재기동 없음.
   대기 중  Enter = 시작,  s = 이 회차 건너뛰기,  q = 생성기 종료
   세션 중단(남은 회차 안 함): 0x201 끊김, 차속 상한, can_guard 개입(ESTOP 등), 정지 안 함, Ctrl+C
@@ -29,12 +29,12 @@ lift_cmd.py 와 같은 자리(가짜 제어 노드 + 가짜 인지 하트비트)
   실행   segments 순서대로.  아무 줄(Enter) / Ctrl+C = 중단 → 끝내기
          자동 중단: 차속 > limits.max_speed_kph, 0x201 0.3 s 이상 안 들어옴, until_* 시간 초과,
                    코스(course.length_m): 이동거리 + 예측 정지거리 ≥ 코스 길이
-         폐루프 구간(speed, uturn kph): SpeedController 가 0x201 후륜 차속으로 가속/브레이크 % 를 정함(--ctrl 파라미터)
+         폐루프 구간(speed): SpeedController 가 0x201 후륜 차속으로 가속/브레이크 % 를 정함(--ctrl 파라미터)
          조향 오프셋(--steer-offset, 핸들 °): 모든 조향 명령에 더해서 씀 — 로그 steer_cmd_deg 는 더한 값
   끝내기 가속 즉시 0, 조향 유지, 브레이크 end.brake(기본 100) 까지 end.ramp_s 동안 → 유지
          q / Ctrl+C = 생성기 종료 → can_guard 가 50 ms 뒤 HOLDING(브레이크 그대로) → 2 s 뒤 STOPPED. 그다음 stop.sh.
 
-남기는 것(--out, 기본 ~/a1_race_capture/track_latest). 회차가 여러 개면 <run> = 회차 이름(_r1, _r1_turn …):
+남기는 것(--out, 기본 ~/a1_race_capture/track_latest). 회차가 여러 개면 <run> = 회차 이름(_r1, _r2 …):
   <run>_cmd.csv      매 주기 명령값 + 들은 차속·0x200·0x210 + 목표 차속·제어 모드·이동거리·방위 추정
                      (02 판정: 0x210 과 1주기 안 일치)
   <--run>_gen.log    이벤트(시작·중단 이유·끝) — 세션 하나에 한 파일
@@ -179,14 +179,14 @@ def load_ctrl(path):
 
 
 class Item:
-    """세션 안 한 회차(시험 또는 U턴)."""
+    """세션 안 한 회차."""
 
     def __init__(self, kind, name, path, cfg, prof):
         self.kind, self.name, self.path, self.cfg, self.prof = kind, name, path, cfg, prof
 
 
 def plan_items(a, ctrl):
-    """--reps·--sweep·--turn → [Item]. 시험 회차 사이마다 U턴(있으면). 전부 미리 build·validate."""
+    """--reps·--sweep → [Item]. 전부 미리 build·validate."""
     base_over = pl.parse_var_overrides(a.var)
     sweeps = []
     for sw in a.sweep:
@@ -204,17 +204,13 @@ def plan_items(a, ctrl):
             ov = dict(base_over)
             ov.update(dict(combo))
             overs.append(ov)
-    multi = len(overs) > 1 or a.turn or a.first_rep is not None
+    multi = len(overs) > 1 or a.first_rep is not None
     first = a.first_rep if a.first_rep is not None else 1
     cfg = load_yaml(a.profile)
-    turn_cfg = load_yaml(a.turn) if a.turn else None
     items = []
     for j, ov in enumerate(overs):
         name = f'{a.run}_r{first + j}' if multi else a.run
         items.append(Item('test', name, a.profile, cfg, pl.build(cfg, ov, a.steer_offset, ctrl)))
-        if turn_cfg is not None and j < len(overs) - 1:
-            tp = pl.build(turn_cfg, pl.parse_var_overrides(a.turn_var), a.steer_offset, ctrl)
-            items.append(Item('turn', f'{name}_turn', a.turn, turn_cfg, tp))
     return items
 
 
@@ -230,12 +226,8 @@ def cmd_run(a):
             bad.append(f'{it.name}: {e}')
     print(pl.summary(items[0].prof), file=sys.stderr)
     if len(items) > 1:
-        print(f'세션 {len(items)}회차: ' + ', '.join(f'{it.name}{"" if it.kind == "test" else "(U턴)"}'
-                                                     f'{" " + str(it.prof.vars) if it.kind == "test" and it.prof.vars else ""}'
+        print(f'세션 {len(items)}회차: ' + ', '.join(f'{it.name}{" " + str(it.prof.vars) if it.prof.vars else ""}'
                                                      for it in items), file=sys.stderr)
-        turns = [it for it in items if it.kind == 'turn']
-        if turns:
-            print('U턴 프로파일:\n' + pl.summary(turns[0].prof), file=sys.stderr)
     if bad:
         print('🛑 상한 위반 — 실행 안 함:\n  ' + '\n  '.join(bad[:30]), file=sys.stderr)
         return 2
@@ -244,12 +236,12 @@ def cmd_run(a):
         print('🛑 다른 명령 도구 실행 중(명령 쓰는 쪽이 둘이 됨):\n  ' + '\n  '.join(others), file=sys.stderr)
         return 2
     if not a.ctrl and any(p.closed_loop for it in items for p in it.prof.prims):
-        print('⚠️⚠️ 폐루프 구간(speed / uturn kph)이 있는데 --ctrl 없음 → 속도 제어기 기본값(잠정, SIL 가짜 차량 기준)으로 돈다. '
+        print('⚠️⚠️ 폐루프 구간(speed)이 있는데 --ctrl 없음 → 속도 제어기 기본값(잠정, SIL 가짜 차량 기준)으로 돈다. '
               '현장 값이면 --ctrl (field_env: $CTRL) 붙여서 다시', file=sys.stderr)
     speed_check = not (a.no_speed_check or a.sil)
     needs_v = any(it.prof.needs_speed for it in items)
     if (speed_check or needs_v) and not a.channel:
-        print('🛑 차속(0x201)이 필요 — --channel 지정 (차속 감시·폐루프·U턴·코스 제한)', file=sys.stderr)
+        print('🛑 차속(0x201)이 필요 — --channel 지정 (차속 감시·폐루프·코스 제한)', file=sys.stderr)
         return 2
 
     out = os.path.expanduser(a.out)
@@ -324,13 +316,13 @@ def cmd_run(a):
               'steer_cmd_deg', 'brake_cmd_pct', 'acc_cmd_pct', 'auto',
               'speed_kph', 'speed_age_s', 'steer_pos_deg', 'brake_pos_pct', 'tx210_steer_deg', 'tx210_brake_pct',
               'tx210_acc_pct', 'tx210_auto',
-              'steer_prof_deg', 'steer_offset_deg', 'v_ref_kph', 'ctrl_mode', 'dist_m', 'heading_deg', 'item']
+              'steer_prof_deg', 'steer_offset_deg', 'v_ref_kph', 'ctrl_mode', 'dist_m', 'item']
     log(f'시작 {a.run}: {a.profile} {len(items)}회차 → {out}  (차속 감시 {"on" if speed_check else "OFF(SIL)"}, '
         f'조향 오프셋 {a.steer_offset:+g}°, ctrl {a.ctrl or "기본값(잠정)"})')
 
     S = {   # 회차 상태
         'idx': 0, 'phase': 'pre', 'pi': 0, 'k_in': 0, 'k_run': 0, 'end_from': None, 'end_k0': 0, 'end_reason': None,
-        'fatal': False, 'dist_run': 0.0, 'dist_prim': 0.0, 'heading': 0.0, 'still_s': 0.0, 'ctrl': None,
+        'fatal': False, 'dist_run': 0.0, 'dist_prim': 0.0, 'still_s': 0.0, 'ctrl': None,
         'intervene': 0, 'stall_s': 0.0, 'csvf': None, 'w': None, 'end_ramp_done_t': None, 'started_any': False,
     }
     cur = dict(items[0].prof.start)
@@ -356,7 +348,7 @@ def cmd_run(a):
 
     def reset_run_state():
         S.update(pi=0, k_in=0, k_run=0, end_from=None, end_reason=None, dist_run=0.0, dist_prim=0.0,
-                 heading=0.0, still_s=0.0, ctrl=None, intervene=0, stall_s=0.0, end_ramp_done_t=None)
+                 still_s=0.0, ctrl=None, intervene=0, stall_s=0.0, end_ramp_done_t=None)
 
     def go_end(reason, value, fatal=False):
         prof = item().prof
@@ -444,17 +436,11 @@ def cmd_run(a):
                     S['phase'] = 'pre'
                     open_item_csv()
                 continue
-            # ── 이동거리·방위·정지 시간 ──
+            # ── 이동거리·정지 시간 ──
             if phase in ('run', 'end') and speed_ok:   # 끝내기(제동) 중 거리도 코스에 들어간다
                 ds = speed / 3.6 * period
                 S['dist_run'] += ds
                 S['dist_prim'] += ds
-                st_meas = (s200['steer_pos_deg'] if s200 and s200_age is not None and s200_age < 0.2
-                           else cur['steer'] + prof.steer_offset)
-                yr = pl.yaw_rate_deg_s(speed, st_meas - prof.steer_offset, prof.vehicle)
-                sgn = 1.0 if cur['steer'] >= 0 else -1.0
-                S['heading'] += sgn * yr * period
-                S['yaw_rate'] = yr
             S['still_s'] = S['still_s'] + period if (speed_ok and speed <= pl.STOP_KPH) else 0.0
             # 가속을 주는데 안 움직임(가속 % 가 불감대 아래) — 시간 초과까지 기다리지 않는다
             S['stall_s'] = S['stall_s'] + period if (phase == 'run' and cur['acc'] > 0 and speed_ok
@@ -521,21 +507,6 @@ def cmd_run(a):
                                 break
                             else:
                                 break
-                        elif p.kind == 'until_heading':
-                            lead = pl.heading_lead_deg(speed if speed_ok else 0.0, S.get('yaw_rate', 0.0), p.lead_brake,
-                                                       prof.speed_ctrl)
-                            if S['heading'] + lead >= p.deg:
-                                log(f'seg{p.seg} {p.label}: 방위 {S["heading"]:.0f}° + 정지 중 예측 {lead:.0f}° ≥ {p.deg:g} '
-                                    f'(거리 {S["dist_prim"]:.1f} m) — 정지')
-                            elif p.m > 0 and S['dist_prim'] > p.m:
-                                go_end(f'seg{p.seg} {p.label} 거리 초과 {S["dist_prim"]:.1f} > {p.m:.0f} m '
-                                       f'(방위 {S["heading"]:.0f}° — 조향비·조향 위치 확인)', cur)
-                                break
-                            elif timed_out:
-                                go_end(f'seg{p.seg} {p.label} 시간 초과 (방위 {S["heading"]:.0f}/{p.deg:g}°)', cur)
-                                break
-                            else:
-                                break
                         elif p.kind == 'until_stop':
                             if S['still_s'] >= p.hold_s:
                                 log(f'seg{p.seg} {p.label}: 정지 — 다음 구간')
@@ -550,7 +521,6 @@ def cmd_run(a):
                         S['pi'] += 1
                         S['k_in'] = 0
                         S['dist_prim'] = 0.0
-                        S['heading'] = 0.0
                     if S['phase'] == 'run':
                         if S['pi'] >= len(prof.prims):
                             last = prof.prims[-1]
@@ -611,7 +581,7 @@ def cmd_run(a):
                              s210['acc_pct'] if s210 else '',
                              f'{s210["steer_auto"]}{s210["brake_auto"]}{s210["acc_auto"]}' if s210 else '',
                              f'{cur["steer"]:.3f}', f'{off:g}', f'{v_ref:.2f}' if v_ref is not None else '', ctrl_mode,
-                             f'{S["dist_run"]:.2f}', f'{S["heading"]:.1f}', S['idx']])
+                             f'{S["dist_run"]:.2f}', S['idx']])
             if ph != 'pre' and now - last_status >= STATUS_EVERY_S and not a.sil:
                 last_status = now
                 tx = (f' | 0x210 조향 {s210["steer_deg"]:+.1f} 브 {s210["brake_pct"]} 가 {s210["acc_pct"]} '
@@ -621,7 +591,7 @@ def cmd_run(a):
                 ref = f' 목표 {v_ref:4.1f}' if v_ref is not None else ''
                 print(f'[gen] {it.name} {ph:<3} {S["k_run"] * period:6.2f}s {lab:<10} 명령 조향 {cur["steer"] + off:+6.1f}° '
                       f'브 {cur["brake"]:5.1f}% 가 {cur["acc"]:5.1f}% | 차속 {spd}{ref} 이동 {S["dist_run"]:5.1f} m'
-                      + (f' 방위 {S["heading"]:4.0f}°' if p.kind == 'until_heading' and ph == 'run' else '') + tx,
+                      + tx,
                       file=sys.stderr)
             tick += 1
             next_t += period
@@ -671,8 +641,6 @@ def main():
     r.add_argument('--sweep', action='append', default=[],
                    help='이름=값1,값2,… — 값마다 --reps 번(여러 개면 모든 조합). 예 --sweep brake=20,40,60')
     r.add_argument('--first-rep', type=int, default=None, help='첫 회차 번호(기본 1) — 세션을 나눠 이어갈 때')
-    r.add_argument('--turn', default='', help='시험 회차 사이에 넣을 U턴 프로파일(yaml), 예 profiles/uturn.yaml')
-    r.add_argument('--turn-var', action='append', default=[], help='U턴 프로파일 vars 덮어쓰기')
     r.add_argument('--steer-offset', type=float, default=0.0, help='조향 오프셋(핸들 °, 01 결과) — 모든 조향 명령에 더함')
     r.add_argument('--ctrl', default='', help='속도 제어기 파라미터 yaml(현장에서 맞춘 값). 없으면 기본값(잠정)')
     r.add_argument('--sil', action='store_true', help='SIL 전용: 바로 시작, 끝내기 후 자동 종료, 입력 안 받음')

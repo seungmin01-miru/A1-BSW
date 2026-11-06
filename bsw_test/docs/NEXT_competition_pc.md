@@ -1,5 +1,7 @@
 # 다음 할 일 — 대회 차량 PC 세션 (2026-11-04 작성, 개발 PC 에서 넘김)
 
+> **2026-11-06: 자율 U턴·v2 하루 순서 폐기.** 실차 절차는 [`docs/2026-11-06_engine_room_dev_plan.md`](../../docs/2026-11-06_engine_room_dev_plan.md) 4절. 아래 0절 표의 U턴 항목과 4절 U턴 한계는 11-04 기록으로만 남긴다. 코드(`uturn`, `until_heading`, `--turn`)는 제거됨.
+
 > 대회 PC 의 Claude 세션은 **이 파일을 먼저 읽고** 1절부터 차례로 진행한다. 끝난 항목은 지우지 말고 `[x]` + 날짜.
 > 기준: [`CLAUDE.md`](../../CLAUDE.md), 현장 순서 [`FIELD_MANUAL.md` 5-0절](../FIELD_MANUAL.md), 입력 [`FIELD_CHEATSHEET.txt` "★ v2"](../FIELD_CHEATSHEET.txt).
 
@@ -51,23 +53,21 @@ bench_bridge 프레임당 30 → 1.8 µs. vcan·sudo 없어 E1~E7 프로세스 �
 - [x] `bash bsw_test/00_SAF_estop/scripts/setup_env.sh --build-ws` → 준비됨 — 2026-11-04 `--check` 로 ✅(이미 설치·빌드됨)
 - [ ] `bash bsw_test/00_SAF_estop/scripts/run_sil_check.sh --rt auto --track` → **sudo 비밀번호 필요 — 사람이 `! bash …` 로 실행** → **전부 PASS**(특히 `sil_02_session` A/B/C). FAIL 이면 현장 안 감 — 로그(`results/sil_*/sil_02_session.log`, 각 시나리오 `profile_gen_stdout.txt`)를 보고 고친다
 - [ ] 결과 커밋·푸시: `git add bsw_test/00_SAF_estop/results/sil_* && git commit -m "SIL 대회 PC 결과(v2 세션)" && git push`
-- [ ] `source bsw_test/field_env.sh` → `chk uturn.yaml`, `chk align_straight.yaml --var acc=8`, `chk speed_step.yaml $CTRL` 모두 ✅ (경로가 `~/git/A1-BSW` 인지)
+- [ ] `source bsw_test/field_env.sh` → `chk align_straight.yaml --var acc=8`, `chk speed_step.yaml $CTRL` 모두 ✅ (경로가 `~/git/A1-BSW` 인지)
 
-## 2. 현장 (FIELD_CHEATSHEET "★ v2" ①~⑩ 순서)
+## 2. 현장 (FIELD_CHEATSHEET "★ 11-14" ①~⑥ 순서)
 
-- [ ] ① 00 통과 (기존 절차)
-- [ ] ② **조향 부호 확인**: `lift> steer 30` → 앞바퀴 왼쪽? 아니면 U턴·05·07 중단, `track.yaml steer_sign`·CLAUDE.md 2.1 수정 제안
-- [ ] ③ 01 보정 전 왕복 → **첫 U턴 끝 방위를 눈으로 확인**(10° 넘게 틀어지면 조향비 7.5 잠정이 틀림 → 기록, `vehicle.steer_ratio` 조정 후보)
-- [ ] ④⑤ 03(a)·04(a) — "코스 끝 예측"으로 일찍 끝나는 회차는 정상
-- [ ] ⑥ `speed_ctrl.yaml` 현장 값(승인) → **대회 PC `sil_session.py --only A` 재 PASS** → 커밋
-- [ ] ⑦~⑩ 폐루프 03(b)·04(b), 01 보정 후, 05 원, 07 나선
+- [ ] ① 00 통과, RTX fix, **조향 부호 확인**: `lift> steer 30` → 앞바퀴 왼쪽? 아니면 중단, `track.yaml steer_sign`·CLAUDE.md 2.1 수정 제안
+- [ ] ② 원 돌기(WP3 도구 필요) ③ 조향 최대각
+- [ ] ④ 직선 계단: 가속 75/85/100 %, 브레이크 50/80/100 %, 각 2회
+- [ ] ⑤ 현장 1차 표(WP3 도구 필요, 자동 반영 금지) ⑥ 서킷 15 → 20(모델): 직선 횡편차, 가속 전환 수
 
 ## 3. 현장 뒤 (분석 — Claude 자유 작업, CLAUDE.md 1.3)
 
 - [ ] 원본 옮기기 + sha256 (`raw/README.md`)
 - [ ] 각 테스트 `analysis.py` — 아직 없음. 우선순위: 01(오프셋·횡편차) → 03/04(a)(% ↔ m/s² 표, `fit_maps.py` 재사용) → 03/04(b)(지연·오버슈트·오차) → 05/07(반경, 06 에커먼)
-  - 세션 CSV(`<run>_cmd.csv`) 열: 기존 + `steer_prof_deg, steer_offset_deg, v_ref_kph, ctrl_mode, dist_m, heading_deg, item`
-  - 회차 구분 = 파일 이름(`_r<N>`, U턴 `_r<N>_turn`), `notes.txt` 시작/끝 줄
+  - 세션 CSV(`<run>_cmd.csv`) 열: 기존 + `steer_prof_deg, steer_offset_deg, v_ref_kph, ctrl_mode, dist_m, item`
+  - 회차 구분 = 파일 이름(`_r<N>`), `notes.txt` 시작/끝 줄
 - [ ] `track.yaml`(accel_map/brake_map/steer_sign), `a1_control_adapter` 인터페이스 갱신 — **승인 후**
 - [ ] `results.md`(커밋 해시·상한·클램프·원본 이름·그래프 링크), `test_summary.md` 갱신
 
@@ -76,8 +76,6 @@ bench_bridge 프레임당 30 → 1.8 µs. vcan·sudo 없어 E1~E7 프로세스 �
 | 항목 | 내용 |
 |---|---|
 | 예측 정지거리 | 감속 1.5 m/s²·지연 0.3 s 잠정(`course:`). 04(a) 결과로 갱신 |
-| U턴 방위 | GNSS 없이 자전거 모델(0x200 실제 핸들각 / 조향비 7.5 잠정). GNSS 토픽(TODO-5) 오면 yaw 로 바꿀 것 |
-| 01 왕복 | 두 방향이 약 13 m 떨어진 두 차선 — 노면 기울기 상쇄 가정 약함, 결과에 표시 |
 | 01 기준 | 0.125 m 는 남은 타이어 오프셋 ≈ 0.05° 요구 ★ — 불감대(±0.2°)면 약 0.46 m 이탈 가능. 01 analysis 에 0x200 실제 조향 위치 평균 출력 |
 | 50 m 코스 | 03(b) 20→30, 04(a) 20 km/h·20 %, 30 km/h 대부분은 안 들어감 ★ |
 | 속도 제어기 | SIL 가짜 차량은 실차가 아님. 03(b) 반응 지연 ≤ 0.3 s 는 실차 불감대·지연에 달림(가짜 차량 0.78 s) |

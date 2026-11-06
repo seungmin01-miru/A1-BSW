@@ -2,7 +2,7 @@
 
 작성 2026-11-04. 기준 계획서: [`bsw_test/docs/test_plan.md`](bsw_test/docs/test_plan.md). 진행 현황: [`bsw_test/docs/test_summary.md`](bsw_test/docs/test_summary.md).
 **주행 날 BSW 띄우기는 `tools/bsw/bsw_up.sh` 하나로**(2026-11-05) — can_guard·브리지·어댑터(자동 arm)·CAN 로그 녹화·상태판 창(읽기 전용, 대회 본 주행은 `--no-ui`)을 한 번에, 끄기는 `bsw_down.sh`. 개별 도구를 손으로 하나씩 띄우지 않는다.
-**지금 할 일(대회 PC 세션은 먼저 읽기): [`bsw_test/docs/NEXT_competition_pc.md`](bsw_test/docs/NEXT_competition_pc.md)** — 2026-11-04 v2(50 m·자율 U턴·속도 제어기) 넘김.
+**지금 할 일(대회 PC 세션은 먼저 읽기): [`bsw_test/docs/NEXT_competition_pc.md`](bsw_test/docs/NEXT_competition_pc.md)**. **실차 절차 기준 = [`docs/2026-11-06_engine_room_dev_plan.md`](docs/2026-11-06_engine_room_dev_plan.md) 4절**(2026-11-06, 11-04 자율 U턴 시험 폐기).
 이 파일은 **규칙과 확정된 사실**만 둔다. 숫자 근거는 아래 문서에 있고, 바뀌면 이 파일도 같이 고친다.
 
 | 근거 문서 | 내용 |
@@ -52,7 +52,7 @@ BSW = ① 모델 가감속 → 페달 % 변환 ② 모델 입력 끊김 → 정�
   → **주행 중 disarm 은 정지가 아니다**(우리 브레이크 없음, 0x210 끊김 동작은 TODO-2). 주행 중 정지는 `estop.py`·앱. ESTOP·STOPPED 는 disarm 에 풀리지 않고(2026-11-05 수정),
   래치 뒤 disarm 한 어댑터는 can_guard 재시작 전까지 쓰지 않는다. 근거·시나리오: `reports/2026-11-05_bsw_update_report/` 3장.
 - 0x210 끊김 시 차량 동작: 문서끼리 충돌(“타임아웃 없음” vs “0.4 s 안 브레이크 8.2”) → **실무자 확인 대기(TODO-2)**. 확인 전엔 차량 자체 타임아웃에 기대지 않는다.
-- 자율은 **전진만**. 후진은 사람이 직접 한다. 왕복의 방향 전환은 **자율 U턴**(전진, 핸들 ±150 저속, 늘 같은 방향 — 2026-11-04 결정, 첫 U턴 전 조향 부호 확인).
+- 자율은 **전진만**. 후진·방향 전환·시작선 복귀는 세션을 끝낸 뒤 사람이 직접 한다(자율 U턴은 2026-11-06 폐기, 코드 제거).
 - **속도 상한 30 km/h 로 시작**, 결과를 보고 단계적으로 푼다. 각 테스트 `goal.md` 에 그날의 상한과 can_guard 클램프
   (`--steer-limit-deg`, `--brake-limit-pct`, `--acc-limit-pct`)를 적는다.
 
@@ -127,8 +127,8 @@ BSW = ① 모델 가감속 → 페달 % 변환 ② 모델 입력 끊김 → 정�
 | ID | 확정 사항 |
 |---|---|
 | 00 SAF-ESTOP | can_guard 에 비상 정지 신호 구현 → SIL(vcan) 검증 → 저속(≤ 10 km/h) 실차. 감지 ≤ 100 ms, 제동 시작 ≤ 200 ms. 정지 후 auto 000 을 보내지 않는지 확인 |
-| 01 LAT-ALIGN | 오프셋은 타이어각으로 산출. **직선 50 m**(앱 신호 거리, 11-04), 기준 50 m 횡편차 ≤ 0.125 m(100 m·0.5 m 제곱 환산 — 이탈 ∝ L², 사용자 결정. 불감대 ±0.2° 타이어면 못 지킬 수 있음 → 실제 조향 위치 같이 기록). 왕복은 자율 U턴(두 차선 약 13 m 간격). 보정 전·후 비교 |
-| 02 LON-PROF | 계단·램프·사다리꼴. 1단계는 **가속/브레이크 % 프로파일**, 2단계는 목표속도 프로파일. 상한 내장 + 명령값 로그. 1단계 구현 `bsw_test/common/scripts/profile_gen.py`(CommandChannel 직접, yaml `02_LON_profile/profiles/`). 11-04: 한 세션 여러 회차(`--reps/--sweep`) + 회차 사이 자율 U턴(`--turn`) + 코스 길이 끝내기 + `--steer-offset` + 폐루프 속도 제어(`SpeedController`, 0x201 피드백, 파라미터 `02_LON_profile/ctrl/speed_ctrl.yaml` 잠정). SIL `02_LON_profile/scripts/sil_session.py` |
+| 01 LAT-ALIGN | 오프셋은 타이어각으로 산출. **직선 50 m**(앱 신호 거리, 11-04), 기준 50 m 횡편차 ≤ 0.125 m(100 m·0.5 m 제곱 환산 — 이탈 ∝ L², 사용자 결정. 불감대 ±0.2° 타이어면 못 지킬 수 있음 → 실제 조향 위치 같이 기록). 왕복은 편도마다 세션을 끝내고 사람이 차를 돌린다. 보정 전·후 비교 |
+| 02 LON-PROF | 계단·램프·사다리꼴. 1단계는 **가속/브레이크 % 프로파일**, 2단계는 목표속도 프로파일. 상한 내장 + 명령값 로그. 1단계 구현 `bsw_test/common/scripts/profile_gen.py`(CommandChannel 직접, yaml `02_LON_profile/profiles/`). 11-04: 한 세션 여러 회차(`--reps/--sweep`) + 코스 길이 끝내기 + `--steer-offset` + 폐루프 속도 제어(`SpeedController`, 0x201 피드백, 파라미터 `02_LON_profile/ctrl/speed_ctrl.yaml` 잠정). SIL `02_LON_profile/scripts/sil_session.py` |
 | 03 LON-ACC / 04 LON-DEC | **(a) 개루프 % 계단 → % ↔ m/s² 변환표(`fit_maps.py` → `track.yaml`) 먼저**, (b) 폐루프 속도 추종은 그다음. 지연·오버슈트 합격 기준은 (b)에 적용 |
 | 05 LAT-MAXSTEER | 좌(+150, 반시계)·우(−150, 시계) 각각, 저속, GNSS 궤적 + 요레이트. 07 나선이 있어도 유지(11-04) |
 | 06 LAT-ACK | 05 데이터로 1차 분석, 07(원) 이후 갱신. 오차 기준 타이어각 1~2° |

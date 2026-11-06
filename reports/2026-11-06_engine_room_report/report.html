@@ -70,7 +70,7 @@ pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height:
 <li><b>모델이 요청할 수 있는 최대 타이어각은 이제 ±11.5°</b>(이전 ±20°). 그 이상은 끝값 포화다. 경로 계획 최소 반경을 다시 봐야 한다(모델 팀).</li>
 <li><b>Go 전에 가속을 내면 차가 움직인다.</b> BSW 는 전달만 한다. Go 잠금·서행·Finish 정차·RES 뒤 정지 유지는 전부 모델 책임이다(데이터시트 v0.5, 06 시트).</li>
 <li><b>가속 히스테리시스의 실제 효과는 아직 모른다.</b> 고정 입력 시험은 통과했지만(전환 0 회/분), 11-04 목표 가속도는 약 1.8 s 주기로 이탈값(0.03) 근처까지 내려간다. 실차에서는 전환이 남을 수 있다(4.2절).</li>
-<li><b>11-14 U턴 시험 전에 결정이 필요하다.</b> 자율 U턴 도구와 현장 매뉴얼이 아직 조향비 7.5 전제다. 새 표 기준 지름은 13 m 가 아니라 약 23 m ★이고, 방위 추정은 실제 약 100° ★에서 180° 라고 판단한다(6장 E-6).</li>
+<li><b>11-04 자율 U턴 시험은 폐기했다(사용자 결정, 2026-11-06).</b> 코드(<code>uturn</code>, <code>until_heading</code>, <code>--turn</code>)를 지우고 현장 문서를 지시서 4절 절차로 바꿨다. 다만 그 절차의 원 돌기·표 갱신 도구(WP3)는 아직 없다(7장)</li>
 <li><b>vcan0 시험을 아직 못 돌렸다.</b> 이 PC 에 vcan0·can-utils 가 없고 sudo 가 필요해서 <span class="mono">rehearse_lift_guard</span>(31 항목)·E1~E7·P1·P2·브리지 프로세스 분리 지연 측정은 미실행이다(7장).</li>
 </ol></div>
 
@@ -192,7 +192,7 @@ SIL 입력은 처음부터 0.03 아래로 내려가지 않으므로 전환 0 은
 </tbody></table></div>
 <div class="tbl"><div class="tno">TABLE XI</div><div class="ttl">결정이 필요한 미결 (전체는 docs/engine_room_open_items.md)</div>
 <table><thead><tr><th style="width:7%">#</th><th>내용</th><th style="width:28%">결정·기한</th></tr></thead><tbody>
-<tr><td>E-6</td><td><b>자율 U턴·레인 간격이 조향비 7.5 전제.</b> <code>profile_lib.py</code> 방위 추정과 FIELD_MANUAL 13 m. 타이어 11.5° 면 지름 ≈ 23 m ★, 방위 추정은 실제 약 100° ★에서 180° 로 판단. 범위 밖이라 코드는 안 고치고 매뉴얼에 경고만 넣음</td><td>11-14 전: <code>steer_ratio</code>·레인 간격 수정 여부(사용자)</td></tr>
+<tr><td>E-6</td><td><s>자율 U턴이 조향비 7.5 전제</s> — 11-04 U턴 시험 전체 폐기로 종료. 참고로 새 표 기준 U턴 지름은 약 23 m ★ 였다</td><td>끝(2026-11-06)</td></tr>
 <tr><td>E-7</td><td>원 돌기 계획의 "타이어 ±5/10/15/20°" 는 옛 7.5 기준. 새 표로는 11.5° 에서 포화 → WP3 도구는 핸들각 기준으로 명령해야 함</td><td>WP3 때 반영</td></tr>
 <tr><td>—</td><td>영점 −9° vs 측정 회귀 −13.7°(4.1절)</td><td>11-14 직선 50 m 로 결정</td></tr>
 <tr><td>E-1</td><td><code>guard_state</code> 를 비워 둠. 모델 팀이 필요하면 별도 작업</td><td>모델 팀 의견(11-09)</td></tr>
@@ -202,7 +202,7 @@ SIL 입력은 처음부터 0.03 아래로 내려가지 않으므로 전환 0 은
 <div class="tbl keep"><div class="tno">TABLE XII</div><div class="ttl">다음 순서</div>
 <table><thead><tr><th style="width:17%">언제</th><th>할 일</th></tr></thead><tbody>
 <tr><td>sudo 필요(개발·대회 PC)</td><td><code>sudo bash sil/vcan/vcan_up.sh</code> + can-utils 설치 뒤 <code>rehearse_lift_guard</code> 31/31, E1~E7·P1·P2, <code>r_race.py --interface socketcan --channel vcan0 --latency 300 --load</code></td></tr>
-<tr><td>별도 지시 후</td><td>WP2(2차원 표), WP3(측정·갱신 도구), 그때 E-7 반영</td></tr>
+<tr><td>별도 지시 후, 11-14 전 필수</td><td>WP2(2차원 표), WP3(원 돌기·표 갱신 도구), 그때 E-7·E-8 반영. <code>speed_ctrl.yaml</code> 은 SIL 가짜 차량 값이라 실차 폐루프 불가 — 직선 계단은 개루프만</td></tr>
 <tr><td>11-14</td><td>① 점검·RTX ② 원 돌기 ③ 조향 최대각 ④ 직선 계단. 직선 횡편차가 +0.33 m 보다 나빠지면 <code>steer_map_v0</code> 로 복귀, 가속 전환 재측정</td></tr>
 <tr><td>11-23</td><td>대회 서버 신호 실물 확인 — 0x124~0x127 은 아직 실물 프레임을 본 적이 없다</td></tr>
 </tbody></table></div>

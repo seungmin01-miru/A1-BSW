@@ -52,86 +52,38 @@ A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)         
       gen 쓴 경우:  끝내기(브레이크 100 %) 뜬 뒤  q + Enter
   [T1] down                                        # stop.sh
        브레이크 위치 유지되는지 확인 — 풀리면 물리 E-stop + 기록
-  ※ 생성기는 --reps/--sweep 를 주면 한 세션 여러 회차(v2, 아래 ★). 안 주면 1 회차 = 1 세션
+  ※ 생성기는 --reps/--sweep 를 주면 한 세션 여러 회차. 안 주면 1 회차 = 1 세션
   ※ 비상 정지 뒤엔:  esr → down → 차 복귀 → up (_s 번호 +1)  — 세션도 거기서 끝(남은 회차는 --first-rep 로 이어감)
 
 =============================================================================================
-★ v2 하루 순서 (11-04 결정) — 50 m 직선 + 회차 사이 자율 U턴, 한 세션 여러 회차
+★ 11-14 순서 (2026-11-06 지시서 4절) — 자율 U턴·v2 왕복 폐기. 전체 날짜표는 docs/2026-11-06_engine_room_dev_plan.md 4절
 =============================================================================================
-  코스  직선 50 m × 2 차선(간격 약 13 m ★), 양 끝 U턴 구역(끝선에서 15 m 이상 비움)
-        U턴은 늘 좌(+150, 반시계) → 타원 코스.  앱 담당 = 직선 가운데, 타원 바깥쪽 10 m 이상 (신호 거리 안)
-        05·07 원은 타원과 겹치지 않는 별도 구역(지름 20 m 이상)
-  ※ 폐루프(kph·speed) 가 들어가면 반드시 $CTRL — 빠지면 생성기가 "기본값(잠정)" 경고
-  흐름  [T2] gen … --reps N $TURN …  →  회차마다 대기 화면 → (안전 "비었음") → Enter
-        r1 → 끝내기(브레이크 100) → 정지 → U턴 대기 → Enter → U턴 → 정지 → r2 대기 → Enter …
-        대기 중  Enter = 시작 / s = 이 회차 건너뛰기 / q = 생성기 종료 → down
-        실행 중  Enter = 이 회차만 끝(다음 회차 대기) / Ctrl+C = 세션 중단
-  자동  "코스 끝 예측" = 이동 + 예측 정지거리 ≥ 50 m → 그 회차 끝내기(정상)
-        "출발 안 함" = 가속 주는데 5 s 정지 → 그 회차 끝(acc 올려서 다음)
-        "can_guard 개입"·"차속 끊김"·"차속 상한" → 세션 중단 → q → down
-  up 가속 한계 = 그 세션 시험 % 와 U턴 % 중 큰 값 (폐루프 세션은 30)
+  ⚠️ WP3 도구(circle_test.py, fit_circle.py, fit_long_map.py)는 아직 없다 — ②·⑤ 는 구현 뒤에만.
+  방향 바꾸기·시작선 복귀 = 세션 끝내고 사람이 직접(자율은 전진만).
+  조향 표는 잠정: 타이어 ±11.5° = 핸들 ±150°, 직진 = 핸들 −9° (track.yaml). 되돌림: steer_map_v0_20261104.yaml
 
--- ① 00 SAF-ESTOP — 아래 "00" 절 그대로 (세션 모드 안 씀)
-
--- ② 01-1 정지 측정 + 조향 부호 확인 (U턴 전에 반드시)
+-- ① 점검: 00 SAF-ESTOP 절차, RTX fix 확인, 조향 부호
   [T1] up LAT-ALIGN-01_s1 10
   [T2] lc --steer-limit-deg 150 --acc-limit-pct 10 --steer-hold-s 60
   lift> auto steer on
-  lift> steer 30          # 앞바퀴가 **왼쪽**으로 도는지 눈으로 확인 → 아니면 오늘 U턴·05·07 중단(부호, track.yaml steer_sign)
-  lift> steer 0           # 앞바퀴 좌·우 각도 실측 + 상태줄 조향 위치 기록
-  lift> brake 100 → q → [T1] down
+  lift> steer 30          # 앞바퀴가 **왼쪽**인지 눈으로 → 아니면 중단(부호, track.yaml steer_sign)
 
--- ③ 01 보정 전 왕복 (10 km/h, 3 왕복 = 6 편도)
-  [T1] up LAT-ALIGN-01_s2 10
-  [T2] chk align_straight.yaml --var acc=<10 km/h %>
-  [T2] gen align_straight.yaml LAT-ALIGN-01 --var acc=<10 km/h %> --reps 6 $TURN --turn-var acc=<5 km/h %>
-       # r1 정방향, r2 역방향, … 회차 끝마다 이탈 줄자: m r<N> 이탈 <cm>
-  끝: q → down.   오프셋 계산(타이어 → 핸들 °) → ofs <핸들°>   (모든 터미널에서)
+-- ② 원 돌기 (WP3 circle_test.py 필요) 핸들 ±37/75/112/150°, 각 2바퀴, ≤ 8 km/h, 좌우 → 영점·실효 조향비
+     필요 공간 지름 ★(새 표): 37° 약 63 m / 75° 약 37 m / 112° 약 28 m / 150° 약 23 m
 
--- ④ 03(a) 가속 % — 불감대 → 계단
-  [T1] up LON-ACC-01_s1 10
-  [T2] gen acc_step.yaml LON-ACC-01 --sweep acc=3,4,5,6,7,8,9,10 --var t=5
-       # 회차마다 1 % 씩. 안 움직이면 5 s 뒤 자동 다음. 처음 움직인 % = 불감대 → 기록. q → down
-  [T1] up LON-ACC-01_s2 30
-  [T2] gen acc_step.yaml LON-ACC-01 --first-rep 11 --sweep acc=10,15,20,25,30 --reps 3 $TURN --turn-var acc=<5 km/h %>
-       # 50 m 라 센 % 는 "코스 끝 예측"으로 일찍 끝남(정상). 화면 최고 속도 → m r<N> 최고 <km/h>
+-- ③ 조향 최대각 (정지)  같은 lc 세션
+  lift> steer 150 → 상태줄 조향 위치 기록 → lift> steer -150 → 기록 → lift> steer 0 → brake 100 → q → [T1] down
 
--- ⑤ 04(a) 브레이크 % (시작 속도 10 → 20)
-  [T1] up LON-DEC-01_s1 <03에서 찾은 %>
-  [T2] gen brake_step.yaml LON-DEC-01 --var acc=<%> --var v=10 --var vmax=15 --sweep brake=20,40,60,82,100 --reps 3 \
-           $TURN --turn-var acc=<5 km/h %>
-  [T2] gen brake_step.yaml LON-DEC-01 --first-rep 16 --var acc=<%> --var v=20 --var vmax=25 --sweep brake=40,60,82,100 --reps 3 \
-           $TURN --turn-var acc=<5 km/h %>
-       # 20 % 는 20 km/h 에서 50 m 안에 못 섬 ★ → 뺌. 30 km/h 는 82·100 % 1회만 먼저 보고 결정
-  매 회차: 브레이크 시작 콘 ~ 정지 위치 줄자 → m r<N> 정지거리 <m>
+-- ④ 직선 계단 (0→20 km/h, 편도마다 세션 끝 → 사람이 시작선 복귀)
+  [T1] up LON-ACC-01_s1 100
+  [T2] gen acc_step.yaml LON-ACC-01 --sweep acc=75,85,100 --reps 2 --var vmax=20 --var t=15
+  [T2] gen brake_step.yaml LON-DEC-01 --var acc=85 --var v=20 --var vmax=25 --sweep brake=50,80,100 --reps 2
+       # 회차마다 대기 화면에서 안전 "비었음" → Enter. 코스 길이가 모자라면 --var course=<m>. 끝: q → down
 
--- ⑥ 속도 제어기 맞추기 (현장 PC, 차 세운 상태)
-  python3 ~/git/A1-BSW/tools/track_day/fit_maps.py long <세션>/bag            # accel_map / brake_map
-  ~/git/A1-BSW/bsw_test/02_LON_profile/ctrl/speed_ctrl.yaml 고치기(승인):  hold_kph/hold_pct, start_pct, accel_*, decel_*
-  python3 ~/git/A1-BSW/bsw_test/02_LON_profile/scripts/sil_session.py --only A    # 고친 값으로 SIL 다시 — PASS 아니면 폐루프 안 함
-  git -C ~/git/A1-BSW commit -am "speed_ctrl 현장 값" && 해시 기록
+-- ⑤ 현장 1차 표 (WP3 fit_long_map.py 필요. 자동 반영 금지 — 사람이 보고 track.yaml 고치고 커밋)
 
--- ⑦ 03(b) / 04(b) 폐루프 (U턴도 폐루프 5 km/h)
-  [T1] up LON-ACC-02_s1 30
-  [T2] gen speed_step.yaml LON-ACC-02 $CTRL --var v=10 --reps 3 $TURN --turn-var acc=0 --turn-var kph=5      # 0→10
-  [T2] gen speed_step.yaml LON-ACC-02 $CTRL --first-rep 4 --var v0=10 --var t0=4 --var v=20 --var vmax=25 --reps 3 \
-           $TURN --turn-var acc=0 --turn-var kph=5                                                         # 10→20
-  [T2] gen decel_ramp.yaml LON-DEC-02 $CTRL --var v=15 --sweep rate=3.6,7.2,10.8 --reps 3 $TURN --turn-var acc=0 --turn-var kph=5
-       # 1.0 / 2.0 / 3.0 m/s² 목표 감속
-
--- ⑧ 01 보정 후 왕복
-  ofs <핸들°>  확인 → gen align_straight.yaml LAT-ALIGN-01 $CTRL --first-rep 7 --var acc=<10 km/h %> --reps 6 $TURN --turn-var acc=0 --turn-var kph=5
-
--- ⑨ 05 최대 조향 원 (원 구역으로 이동, 회차 사이 U턴 없음)
-  [T1] up LAT-MAXSTEER-02_s1 15
-  [T2] chk steer_circle_speed.yaml $CTRL --var deg=150          # 오프셋 더해 150 넘으면 거부 → deg=<150−OFS>
-  [T2] gen steer_circle_speed.yaml LAT-MAXSTEER-02 $CTRL --var deg=<150−OFS> --reps 3            # 좌(반시계) 3회
-  [T2] gen steer_circle_speed.yaml LAT-MAXSTEER-02 $CTRL --first-rep 4 --var deg=<−150−OFS> --reps 3   # 우(시계) 3회
-
--- ⑩ 07 나선 (좌 → 우)
-  [T2] gen steer_spiral_speed.yaml LAT-PROF-02 $CTRL --var deg=<150−OFS> --reps 2               # 좌(반시계), 원이 점점 작아짐
-  [T2] gen steer_spiral_speed.yaml LAT-PROF-02 $CTRL --first-rep 3 --var deg=<−150−OFS> --reps 2  # 우(시계)
-  (시간 남으면) 원 ±30~120: steer_circle_speed --var deg=… / 사인: steer_sine (50 m 라 0.1 Hz 는 --var cycles=1)
+-- ⑥ 서킷 15 → 20 km/h (모델 + bsw_up): 직선 50 m 횡편차 ≤ 0.125 m 목표, +0.33 m 보다 나빠지면 steer_map_v0 복귀
+       가속 전환 수 기록(히스테리시스 효과는 여기서 처음 확인)
 
 =============================================================================================
 00 SAF-ESTOP — 비상 정지 (관문)              상한 10 km/h

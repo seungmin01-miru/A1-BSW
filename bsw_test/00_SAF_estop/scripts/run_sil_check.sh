@@ -79,7 +79,7 @@ run sil_p2 $PY sil_tests/p2_kill_perception.py --channel vcan0
 # ── 3b. 02 프로파일 생성기 (단위 + vcan 2회 재현성·0x210 일치) ──
 run unit_profile_lib $PY -m pytest "$REPO/bsw_test/common/scripts" -q
 run sil_02_profile $PY "$REPO/bsw_test/02_LON_profile/scripts/sil_profile.py" --channel vcan0 --out "$OUT/sil_02_profile"
-# ── 3c. 02 세션(한 세션 여러 회차 + 자율 U턴 + 속도 제어 + 50 m 코스, 가짜 차량 --physics) ──
+# ── 3c. 02 세션(한 세션 여러 회차 + 속도 제어 + 50 m 코스, 가짜 차량 --physics) ──
 run sil_02_session $PY "$REPO/bsw_test/02_LON_profile/scripts/sil_session.py" --channel vcan0 --out "$OUT/sil_02_session"
 # ── 4. (선택) 트랙 리허설 — 어댑터 disarm 침묵 포함 ─────────
 if [ $TRACK = 1 ]; then

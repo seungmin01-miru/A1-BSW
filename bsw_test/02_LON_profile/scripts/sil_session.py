@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""02 세션 SIL — vcan0 에 가짜 차량(--physics) + can_guard 를 띄우고 profile_gen 을 "한 세션 여러 회차 + 자율 U턴"으로 돌린다.
+"""02 세션 SIL — vcan0 에 가짜 차량(--physics) + can_guard 를 띄우고 profile_gen 을 "한 세션 여러 회차"으로 돌린다.
 
   python3 bsw_test/02_LON_profile/scripts/sil_session.py [--channel vcan0] [--only A|B]
 
 | 시나리오 | 내용 |
 |---|---|
-| A 폐루프 | speed_step.yaml (0→10 km/h, 8 s) × 2회, 사이 U턴 폐루프 5 km/h, 조향 오프셋 +1.0°, --ctrl speed_ctrl.yaml |
-| B 개루프 | align_straight.yaml (acc 10 %, 코스 50 m) × 2회, 사이 U턴 개루프 acc 10 %, 조향 오프셋 −1.0° |
+| A 폐루프 | speed_step.yaml (0→10 km/h, 8 s) × 2회, 조향 오프셋 +1.0°, --ctrl speed_ctrl.yaml |
+| B 개루프 | align_straight.yaml (acc 10 %, 코스 50 m) × 2회, 조향 오프셋 −1.0° |
 
 | 확인 | 기준 |
 |---|---|
-| 세션 완주 | rc 0, 시험 회차마다 "프로파일 완료"/"코스 끝 예측", U턴마다 "방위 ≥ 180", "세션 중단" 없음 |
+| 세션 완주 | rc 0, 시험 회차마다 "프로파일 완료"/"코스 끝 예측", "세션 중단" 없음 |
 | can_guard 계속 ACTIVE | 세션 동안 0x210 간격 ≤ 60 ms, auto 비트 111 유지(재시작·STOPPED 없음) |
 | 가속·브레이크 동시 0건 | 버스 0x210 |
 | 명령 로그 = 0x210 (1주기) | sil_profile.py 와 같은 판정 |
@@ -19,7 +19,6 @@
 | 코스 | B: 시험 회차 이동거리(후륜 적분, 제동 포함) ≤ 50 m |
 | 출발 안 함 감지 | C: 불감대 아래 acc 3 % → 5 s 안에 그 회차 끝내기, 세션은 다음 회차로 |
 | 속도 추종(로직 확인) | A: 계단 마지막 3 s 평균 |오차| ≤ 1 km/h, 최고 ≤ 목표 × 1.1 + 0.5 |
-| U턴 방위 | 가짜 차량 자세 로그로 방위 변화 180 ± 15° |
 
 **가짜 차량 물리는 실차가 아니다** — 로직(닫힘·멈춤·이어짐)만 본다. 실차 판정에 쓰지 않는다.
 """
@@ -48,15 +47,15 @@ P = os.path.join(REPO, 'bsw_test', '02_LON_profile', 'profiles')
 CTRL = os.path.join(REPO, 'bsw_test', '02_LON_profile', 'ctrl', 'speed_ctrl.yaml')
 
 SCENARIOS = {
-    'A': dict(desc='폐루프 계단 0→10 km/h ×2 + U턴 폐루프 5 km/h, 오프셋 +1.0°',
+    'A': dict(desc='폐루프 계단 0→10 km/h ×2, 오프셋 +1.0°',
               profile='speed_step.yaml', var=['v=10', 't=8'], reps=2, offset=1.0,
-              turn_var=['acc=0', 'kph=5'], ctrl=True, v_ref=10.0),
-    'B': dict(desc='개루프 직진 acc 10 % 코스 50 m ×2 + U턴 개루프 acc 10 %, 오프셋 −1.0°',
+              ctrl=True, v_ref=10.0),
+    'B': dict(desc='개루프 직진 acc 10 % 코스 50 m ×2, 오프셋 −1.0°',
               profile='align_straight.yaml', var=['acc=10'], reps=2, offset=-1.0,
-              turn_var=['acc=10'], ctrl=False, course=50.0),
-    'C': dict(desc='출발 안 함 감지: 직진 acc 3 %(가짜 차량 불감대 5 % 아래) ×2, U턴 없음',
-              profile='align_straight.yaml', var=['acc=3'], reps=2, offset=0.0, turn=False,
-              turn_var=[], ctrl=False, expect_stall=True),
+              ctrl=False, course=50.0),
+    'C': dict(desc='출발 안 함 감지: 직진 acc 3 %(가짜 차량 불감대 5 % 아래) ×2',
+              profile='align_straight.yaml', var=['acc=3'], reps=2, offset=0.0,
+              ctrl=False, expect_stall=True),
 }
 
 
@@ -95,10 +94,7 @@ def run_scenario(key, sc, a, out):
         argv = [sys.executable, GEN, 'run', os.path.join(P, sc['profile']), '--sil', '--run', f'sil{key}',
                 '--out', d, '--cmd-shm', cmd_shm, '--hb-shm', hb_shm, '--interface', 'socketcan',
                 '--channel', a.channel, '--reps', str(sc['reps']), '--steer-offset', str(sc['offset'])]
-        if sc.get('turn', True):
-            argv += ['--turn', os.path.join(P, 'uturn.yaml')]
         argv += sum((['--var', v] for v in sc['var']), [])
-        argv += sum((['--turn-var', v] for v in sc['turn_var']), [])
         if sc['ctrl']:
             argv += ['--ctrl', CTRL]
         r = subprocess.run(argv, capture_output=True, text=True, timeout=900)
@@ -127,7 +123,6 @@ def judge(key, sc, d, rc, frames):
     res = []
     glog = open(glob.glob(os.path.join(d, '*_gen.log'))[0], encoding='utf-8').read()
     names = [f'sil{key}_r{i + 1}' for i in range(sc['reps'])]
-    turns = [f'{n}_turn' for n in names[:-1]] if sc.get('turn', True) else []
     if sc.get('expect_stall'):
         n_stall = glog.count('출발 안 함')
         rows = [r for n in names for r in read_csv(os.path.join(d, f'{n}_cmd.csv'))]
@@ -136,12 +131,11 @@ def judge(key, sc, d, rc, frames):
         return [('출발 안 함 → 5 s 안에 회차 끝, 다음 회차 진행', ok,
                  f'rc {rc}, 감지 {n_stall}/{len(names)}, 실행 단계 최대 {max(t_run):.1f} s')]
     done = [n for n in names if f'{n} 끝내기 단계: 프로파일 완료' in glog or f'{n} 끝내기 단계: 코스 끝 예측' in glog]
-    turned = glog.count('U턴: 방위')
-    ok = rc == 0 and len(done) == len(names) and turned == len(turns) and '세션 중단' not in glog
-    res.append(('세션 완주', ok, f'rc {rc}, 시험 끝 {len(done)}/{len(names)}, U턴 {turned}/{len(turns)}'))
+    ok = rc == 0 and len(done) == len(names) and '세션 중단' not in glog
+    res.append(('세션 완주', ok, f'rc {rc}, 시험 끝 {len(done)}/{len(names)}'))
 
     rows_all = []
-    for n in names + turns:
+    for n in names:
         rows_all += read_csv(os.path.join(d, f'{n}_cmd.csv'))
     rows_all.sort(key=lambda r: float(r['mono_s']))
     t0, t1 = float(rows_all[0]['mono_s']), float(rows_all[-1]['mono_s'])
@@ -182,19 +176,6 @@ def judge(key, sc, d, rc, frames):
             ok &= mae <= 1.0 and vmax <= sc['v_ref'] * 1.1 + 0.5
             msg.append(f'{nm}: 오차 {mae:.2f} km/h, 최고 {vmax:.1f}')
         res.append(('속도 추종(가짜 차량, 로직 확인)', ok, '; '.join(msg)))
-    pose = read_csv(os.path.join(d, 'pose.csv'))
-    pt = [float(p['mono_s']) for p in pose]
-    msg, ok = [], bool(turns)
-    import bisect
-    for nm in turns:
-        rr = [r for r in read_csv(os.path.join(d, f'{nm}_cmd.csv')) if r['phase'] == 'run']
-        ta, tb = float(rr[0]['mono_s']), float(rr[-1]['mono_s'])
-        ya = float(pose[max(bisect.bisect_left(pt, ta) - 1, 0)]['yaw_deg'])
-        yb = float(pose[min(bisect.bisect_left(pt, tb), len(pose) - 1)]['yaw_deg'])
-        dy = abs(yb - ya)
-        ok &= abs(dy - 180) <= 15
-        msg.append(f'{nm}: {dy:.0f}°')
-    res.append(('U턴 방위 180 ± 15°(가짜 차량 자세)', ok, ', '.join(msg)))
     return res
 
 

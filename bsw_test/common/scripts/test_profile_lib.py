@@ -122,7 +122,7 @@ def test_shipped_profiles_pass(path):
     assert prof.limits['max_speed_kph'] <= 30
 
 
-# ── 2026-11-04: 폐루프·U턴·코스·오프셋 ──────────────────────────────
+# ── 2026-11-04: 폐루프·코스·오프셋 ──────────────────────────────
 
 def ctrl(**kw):
     p = dict(pl.SPEED_CTRL_DEFAULTS)
@@ -192,27 +192,6 @@ def test_steer_ramp_inherits_closed_loop_and_acc_breaks_it():
     assert pl.validate(p) == []
 
 
-def test_uturn_macro_open_and_closed():
-    lim = {'max_speed_kph': 10, 'steer_deg': 150, 'acc_pct': 10}
-    po = pl.build(base(limits=lim, segments=[{'type': 'uturn', 'deg': 150, 'acc': 6}]))
-    kinds = [x.kind for x in po.prims]
-    assert kinds[0] == 'until_stop' and 'until_heading' in kinds and kinds[-1] == 'ramp'
-    assert po.prims[-1].b == 0 and pl.validate(po) == []
-    assert not any(x.closed_loop for x in po.prims)
-    pc = pl.build(base(limits=lim, segments=[{'type': 'uturn', 'deg': -150, 'kph': 5}]))
-    h = [x for x in pc.prims if x.kind == 'until_heading'][0]
-    assert h.closed_loop and h.base['steer'] == -150 and h.m > 0
-    with pytest.raises(pl.ProfileError):   # kph 와 acc 둘 다
-        pl.build(base(limits=lim, segments=[{'type': 'uturn', 'deg': 150, 'acc': 6, 'kph': 5}]))
-
-
-def test_uturn_lock_fits_offset():
-    lim = {'max_speed_kph': 10, 'steer_deg': 150, 'acc_pct': 10}
-    p = pl.build(base(limits=lim, segments=[{'type': 'uturn', 'deg': 150, 'acc': 6}]), steer_offset=1.5)
-    assert max(x.base['steer'] for x in p.prims) == pytest.approx(148.5)
-    assert pl.validate(p) == []
-
-
 def test_steer_offset_in_validate():
     cfg = base(limits={'steer_deg': 20, 'max_speed_kph': 10}, segments=[{'type': 'ramp', 'axis': 'steer', 'to': 19, 'rate': 10}])
     assert pl.validate(pl.build(cfg)) == []
@@ -230,10 +209,3 @@ def test_course_and_stop_distance():
     assert d20 == pytest.approx(20 / 3.6 * 1.55 + (20 / 3.6) ** 2 / 3.0)
     with pytest.raises(pl.ProfileError):
         pl.build(base(course={'length_m': 2}))
-
-
-def test_yaw_rate_bicycle():
-    v = dict(pl.VEHICLE_DEFAULTS)
-    r = pl.yaw_rate_deg_s(5, 150, v)          # 타이어 20°, R = 2.36 / tan20 ≈ 6.48 m
-    assert r == pytest.approx(math.degrees((5 / 3.6) / (2.36 / math.tan(math.radians(20)))))
-    assert pl.yaw_rate_deg_s(5, -150, v) == pytest.approx(-r)
