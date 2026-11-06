@@ -5,7 +5,7 @@
   수신    feed(msg) — 0x124·0x125·0x126·0x127·0x128·0x202·0x203·0x710·0x711. `len < 8` 필터보다 먼저 탄다(짧으면 0 패딩)
   주기    begin_cycle() → 깃발·RES·경기 상태·복구 판정 → estop_asserted(ESTOP 원천 `race_res`), state_kwargs() → next_state()
           held_steer() → command_for_state(recovery_coast) → envelope() → clamp → 0x210
-          after_tx() → write_status()
+          after_tx() → 0x203 관리자(0x210 송신 뒤, 실패가 0x210 을 막지 않음), write_status()
 
 **예외를 삼키지 않는다:** 이 모듈 안의 계산에서 예외가 나면 이벤트 `race_internal_error` + traceback 을 남기고 SUSPENDED + ESTOP 으로
 보수적으로 전환한다(재시작으로만 빠져나간다, go-reset 도 받지 않음). 메인 루프와 안전 축은 계속 돈다.
@@ -22,20 +22,23 @@ import yaml
 from protocol import GUARD_STATE_CODE, STATUS_NONE, GuardStatus, StatusChannel, STATUS_SHM_NAME_DEFAULT
 from race_policy import RaceEnvelopeContext, apply_race_envelope
 from race_signal import (FRAME_ID_FB_ACC, FRAME_ID_FB_STEER, FRAME_ID_PIT_ZONE, FRAME_ID_RACE_SIGNAL, FRAME_ID_REPAIR,
-                         FRAME_ID_RES, FRAME_ID_RES_FB, RaceSignalDecoder, ResMonitor,
-                         decode_fb_acc, decode_fb_steer, decode_pit_zone, decode_repair, decode_res_fb)
+                         FRAME_ID_RES, FRAME_ID_RES_FB, FRAME_ID_SERVICE_INFO, RaceSignalDecoder, ResMonitor,
+                         decode_fb_acc, decode_fb_steer, decode_pit_zone, decode_repair, decode_res_fb,
+                         decode_speed_limit_info)
 from race_state import RaceInputs, RaceLimits, RaceParams, RacePhase, RaceState, next_race_state, race_phase_code
 from recovery import PHASE_COMMITTED, PHASE_RECOVER, RecoveryParams, RecoveryTracker
 from speed_ctrl import SlowController, SlowParams
+from speed_limit import ACTION_CORRECT, ACTION_REFUSE, EXIT_SPEED_LIMIT, SpeedLimitManager, SpeedLimitParams, startup_check
 from state_machine import State
+from tx_encode import FRAME_ID_SERVICE_COMMAND, encode_speed_limit_command
 
 RACE_VS_MAX_AGE_S = 0.1          # 계획서 4.1 — 경기 판단에 쓰는 차속의 나이 상한(안전 축 VS_MAX_AGE_S 와 별개)
 CLAMP_EVENT_HOLD_S = 0.5         # input_clamped 사유가 이만큼 이어져야 기록(브리프 세부 보완 g)
 _ACTIVE_LIKE = (State.ACTIVE, State.HOLDING, State.DEGRADED)
 _NO_MOTION_HOLD_ACTUAL = (RacePhase.PRE_GO, RacePhase.PARKED)   # 모델 조향이 차에 간 적 없는(또는 무시되는) 구간
 
-RX_IDS = (FRAME_ID_RACE_SIGNAL, FRAME_ID_PIT_ZONE, FRAME_ID_REPAIR, FRAME_ID_RES, FRAME_ID_RES_FB,
-          FRAME_ID_FB_STEER, FRAME_ID_FB_ACC)
+RX_IDS = (FRAME_ID_RACE_SIGNAL, FRAME_ID_PIT_ZONE, FRAME_ID_REPAIR, FRAME_ID_RES, FRAME_ID_RES_FB, FRAME_ID_SERVICE_INFO,
+          FRAME_ID_SERVICE_COMMAND, FRAME_ID_FB_STEER, FRAME_ID_FB_ACC)
 
 
 def load_race_flag(path):
@@ -51,7 +54,7 @@ def load_race_flag(path):
 
 
 def build_params(a):
-    """CLI + race_flag.yaml → (RaceParams, SlowParams, RecoveryParams). 값이 이상하면 ValueError."""
+    """CLI + race_flag.yaml → (RaceParams, SlowParams, RecoveryParams, SpeedLimitParams). 값이 이상하면 ValueError."""
     d, ramp = load_race_flag(a.race_flag_yaml)
     slow = SlowParams.from_yaml_dict(d, slow_target_kph=a.slow_target_kph, slow_acc_cut_kph=a.slow_acc_cut_kph,
                                      slow_brake_kph=a.slow_brake_kph, hold_brake_start_pct=a.hold_brake_pct,
@@ -64,7 +67,13 @@ def build_params(a):
                       suspended_brake_pct=a.estop_brake_start_pct, input_grace_s=a.input_grace_s, slow_off_ramp_pct_s=ramp)
     rec = RecoveryParams(budget_m=a.recover_budget_m, delay_s=a.recover_delay_s, alat_max_mps2=a.recover_alat_max,
                          min_radius_m=a.track_min_radius_m, resume_low_speed=a.resume_low_speed)
-    return race, slow, rec
+    sl = SpeedLimitParams(tx_enabled=a.speed_limit_tx, release_kph=a.speed_limit_release_kph,
+                          practice_kph=a.speed_limit_practice_kph, slow_brake_kph=a.slow_brake_kph,
+                          allow_missing=a.speed_limit_allow_missing, fast_period_s=a.speed_limit_fast_period,
+                          keep_period_s=a.speed_limit_keep_period, confirm_frames=a.speed_limit_confirm_frames,
+                          mismatch_s=a.speed_limit_mismatch_s, release_note_s=a.speed_limit_release_note_s,
+                          startup_timeout_s=a.speed_limit_startup_timeout)
+    return race, slow, rec, sl
 
 
 class RaceRuntime:
@@ -72,19 +81,22 @@ class RaceRuntime:
         self.a = a
         self.ev = ev
         self.log = log
-        self.params, slow, rec = build_params(a)
+        self.params, slow, rec, sl = build_params(a)
         self.hold_after_s = a.adapter_hold_after_s
         self.watchdog_t = a.watchdog_t
         self.decoder = RaceSignalDecoder(a.race_confirm_frames)
         self.res = ResMonitor(a.race_confirm_frames, a.res_alive_timeout_s)
         self.slow_ctrl = SlowController(slow)
         self.tracker = RecoveryTracker(rec)
+        self.sl = SpeedLimitManager(sl, race_mode=not a.speed_limit_practice)
+        self.sl_params = sl
         self.state = RaceState()
         self.limits = self._no_motion_limits(RacePhase.PRE_GO, self.params.pre_go_brake_pct)
         self.status_ch = StatusChannel.create(a.status_shm or STATUS_SHM_NAME_DEFAULT)
         self.fatal = False
         self.speed_kph = None
         self.last_acc_pct = 0.0
+        self.last_limit_kph = None     # 0x202 마지막 값 — 시작 점검이 읽는다
         self.pit = None
         self._prev_phase = RacePhase.PRE_GO
         self._go_reset_now = False
@@ -100,6 +112,7 @@ class RaceRuntime:
         self._clamp_shown = None
         self._clamp_cand = None
         self._clamp_cand_t = None
+        self._last_203_failed = False
 
     # --- 수신 --------------------------------------------------------------------------------------------------
     def feed(self, msg, now):
@@ -119,6 +132,11 @@ class RaceRuntime:
         elif aid == FRAME_ID_RES:
             if len(data) > 0:   # 빈 프레임을 RES=0 으로 치지 않는다
                 self.res.feed(data, now)
+        elif aid == FRAME_ID_SERVICE_INFO:
+            self.last_limit_kph = decode_speed_limit_info(data)
+            self.sl.on_0x202(now, self.last_limit_kph)
+        elif aid == FRAME_ID_SERVICE_COMMAND:
+            self.sl.on_foreign_0x203(now, bytes(data).hex())   # 우리 소켓은 자기 송신을 받지 않는다 → 남의 것
         elif aid == FRAME_ID_PIT_ZONE:
             pit = decode_pit_zone(data)
             if pit != self.pit:
@@ -154,6 +172,35 @@ class RaceRuntime:
             self.write_status(State.INIT, now)
         except Exception as e:   # noqa: BLE001
             self._fail(now, 'idle', e)
+
+    def startup(self, recv, send_203, clock, stop_requested):
+        """계획서 9.2·A5. 시작 거부면 종료 코드, 통과면 None. recv(timeout) → 프레임 또는 None, send_203(data) → bool."""
+        now = clock()
+        r = startup_check(self.last_limit_kph, self.sl_params, race_mode=not self.a.speed_limit_practice)
+        for name, detail in r.events:
+            self.ev(name, detail, now)
+        self.log(f'[can_guard] 0x202 시작 점검: {r.message}')
+        if r.action == ACTION_REFUSE:
+            self.log(f'[can_guard] 🛑 시작 거부(종료 코드 {r.exit_code}): {r.message}')
+            return r.exit_code
+        if self.sl_params.tx_enabled:
+            self.sl.start(now)
+        if r.action != ACTION_CORRECT:
+            return None
+        while not stop_requested():
+            now = clock()
+            m = recv(0.01)
+            if m is not None and not m.is_error_frame and not m.is_extended_id:
+                self.feed(m, now)
+            self._tick_speed_limit(now, send_203)
+            self.idle(now)
+            result = self.sl.startup_result(now)
+            if result is True:
+                return None
+            if result is False:
+                self.log(f'[can_guard] 🛑 0x203 으로 고쳤지만 {self.sl_params.startup_timeout_s:g}s 안에 0x202 에 반영되지 않음 — 시작 거부')
+                return EXIT_SPEED_LIMIT
+        return None
 
     # --- 주기 -------------------------------------------------------------------------------------------------
     def begin_cycle(self, now, vs_kph, vs_age_s, cmd_age_s, safety_state, cmd_has_auto, other_estop):
@@ -193,6 +240,8 @@ class RaceRuntime:
             self._emit_race_event(name, detail, now)
         self._go_reset_now = prev.phase == RacePhase.SUSPENDED and self.state.phase != RacePhase.SUSPENDED
 
+        if self.state.slow_active != prev.slow_active:
+            (self.sl.slow_on if self.state.slow_active else self.sl.slow_off)(now)
         if self.limits.long_override != self._override_on:
             self._override_on = self.limits.long_override
             self.ev('override_on' if self._override_on else 'override_off', f'phase={self.state.phase.value}', now)
@@ -332,14 +381,31 @@ class RaceRuntime:
             self._clamp_shown = reason
             self._clamp_cand = None
 
-    def after_tx(self, now, out, safety_state):
-        """0x210 송신 뒤."""
+    def after_tx(self, now, out, tx_failed, send_203, safety_state):
+        """0x210 송신 뒤. 0x210 송신이 실패한 주기에는 0x203 을 보내지 않는다(큐가 찬 버스에 더 쌓지 않음, 관리자 재시도는 이어짐)."""
         if out is not None:
             self.last_acc_pct = out.acc_cmd_pct
         try:
+            self._tick_speed_limit(now, send_203, skip_tx=tx_failed)
             self.write_status(safety_state, now)
         except Exception as e:   # noqa: BLE001
             self._fail(now, 'after_tx', e)
+
+    def _tick_speed_limit(self, now, send_203, skip_tx=False):
+        tick = self.sl.tick(now)
+        for name, detail in tick.events:
+            self.ev(name, detail, now)
+        if tick.tx_kph is None or skip_tx:
+            return
+        data = encode_speed_limit_command(tick.tx_kph)
+        raw = int.from_bytes(data[:2], 'little') & 0x3FF
+        if raw != tick.tx_raw:    # 관리자와 인코더의 반올림이 어긋나면 틀린 값을 차량에 남기지 않는다
+            self.ev('speed_limit_encode_mismatch', f'manager_raw={tick.tx_raw} encoder_raw={raw}', now)
+            return
+        ok = send_203(data)
+        if not ok and not self._last_203_failed:
+            self.ev('speed_limit_tx_fail', f'kph={tick.tx_kph:g}', now)
+        self._last_203_failed = not ok
 
     def write_status(self, safety_state, now):
         lim = self.limits
@@ -349,6 +415,8 @@ class RaceRuntime:
             cap = resume_cap if cap is None else min(cap, resume_cap)
         levels = self.decoder.levels
         age = self.decoder.age_s(now)
+        limit = self.sl.vehicle_limit_kph(now)
+        target = self.sl.target_kph
         self.status_ch.write(GuardStatus(
             race_enabled=True, guard_state=GUARD_STATE_CODE[safety_state.value], race_phase=race_phase_code(self.state),
             slow_active=self.state.slow_active, long_override=lim.long_override,
@@ -358,6 +426,8 @@ class RaceRuntime:
             speed_cap_kph=STATUS_NONE if cap is None else cap,
             speed_target_kph=STATUS_NONE if lim.speed_target_kph is None else lim.speed_target_kph,
             race_signal_age_s=STATUS_NONE if age is None else age,
+            vehicle_speed_limit_kph=STATUS_NONE if limit is None else limit,
+            speed_limit_target_kph=STATUS_NONE if target is None else target,
             model_healthy_s=self.model_healthy_s,
             pit_lat_deg=self.pit[0] if self.pit else float('nan'), pit_lon_deg=self.pit[1] if self.pit else float('nan')))
 

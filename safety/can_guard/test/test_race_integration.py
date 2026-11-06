@@ -55,6 +55,8 @@ class Rig:
                 '--event-log', self.event_path]
         if race:
             argv += ['--race', '--status-shm', self.status_name]
+            if allow_missing:
+                argv.append('--speed-limit-allow-missing')
         self.argv = argv + list(extra)
         self.bus = can.Bus(channel='r' + self.tag, interface='virtual')
         # 차량
@@ -696,6 +698,119 @@ def test_stopped_after_is_ceiling_after_commit(rig):
     r.run(script)
 
 
+# === 0x202 / 0x203 (WP4, A5) =========================================================================================
+
+def test_tx_off_default_30kph_passes_and_never_sends(rig):
+    """A5: 0x202 = 30.0 은 통과 + 기록. 송신 기본 꺼짐 — Slow On/Off 에도 0x203 이 안 나간다."""
+    r = rig(precheck=0.2, allow_missing=False)
+    r.limit_202 = 30.0
+    r.m_acc = 10.0
+
+    def script(r):
+        r.go()
+        r.send124(SLOW_ON, 2)
+        r.wait_status(lambda s: s.long_override)
+        st = r.wait_status(lambda s: s.vehicle_speed_limit_kph == 30.0)
+        assert st.speed_limit_target_kph == -1.0
+        r.send124(SLOW_OFF, 2)
+        r.wait_status(lambda s: not s.long_override)
+        r.wait_frames(10)
+        assert r.tx203 == []
+
+    assert r.run(script) == 0
+    assert any(e[0] == 'speed_limit_startup' and 'observed=30.0' in e[1] for e in r.events())
+
+
+def test_residual_slow_limit_refuses_with_exit_5(rig):
+    """A5: 잔류 서행 제한(0 < 값 ≤ slow_brake)은 시작 거부. 0x210 은 한 프레임도 안 나간다."""
+    r = rig(precheck=0.2, allow_missing=False)
+    r.limit_202 = 9.3
+    r.m_acc = 50.0
+    assert r.run(lambda r: r.done.wait(5)) == can_guard.EXIT_SPEED_LIMIT == 5
+    assert r.tx == [] and r.tx203 == []
+
+
+def test_missing_0x202_refuses_unless_allowed(rig):
+    r = rig(precheck=0.15, allow_missing=False)
+    assert r.run(lambda r: r.done.wait(5)) == 5
+    r2 = rig(precheck=0.15, allow_missing=True)
+
+    def script(r):
+        r.wait_status(lambda s: s.race_enabled)
+
+    assert r2.run(script) == 0
+
+
+def test_tx_on_corrects_at_startup_and_follows_slow(rig):
+    """tx on: 시작 때 고치고 3프레임 반영, Slow On → 93, Slow Off → 해제값. 인코더 raw 와 관리자 raw 일치."""
+    r = rig('--speed-limit-tx', '--speed-limit-release-kph', '100', precheck=0.15, allow_missing=False)
+    r.limit_202 = 9.3
+    r.apply_203 = True
+    r.m_acc = 10.0
+
+    def script(r):
+        r.go()
+        assert r.tx203 and r.tx203[0] == 1000
+        r.send124(SLOW_ON, 2)
+        r.wait_status(lambda s: s.speed_limit_target_kph == 9.3)
+        r.wait_status(lambda s: s.vehicle_speed_limit_kph == 9.3)
+        r.wait_frames(5)
+        assert 93 in r.tx203
+        r.send124(SLOW_OFF, 2)
+        r.wait_status(lambda s: s.vehicle_speed_limit_kph == 100.0)
+        r.wait_frames(5)
+        assert r.tx203[-1] == 1000
+
+    assert r.run(script) == 0
+    names = r.names()
+    assert names.count('speed_limit_confirm') >= 3 and 'speed_limit_tx' in names
+    assert 'speed_limit_encode_mismatch' not in names
+
+
+def test_tx_on_startup_timeout_refuses(rig):
+    r = rig('--speed-limit-tx', '--speed-limit-release-kph', '100', '--speed-limit-startup-timeout', '0.2',
+            precheck=0.15, allow_missing=False)
+    r.limit_202 = 9.3
+    assert r.run(lambda r: r.done.wait(5)) == 5
+    assert r.tx == [] and r.tx203 and all(v == 1000 for v in r.tx203)
+
+
+def test_0x203_send_failure_does_not_block_0x210(rig, monkeypatch):
+    """세부 보완 e: 0x203 송신 실패가 0x210 을 막지 않는다."""
+    real_send = can.interfaces.virtual.VirtualBus.send
+
+    def flaky(self, msg, timeout=None):
+        if msg.arbitration_id == 0x203:
+            raise can.CanOperationError('막힘')
+        return real_send(self, msg, timeout)
+
+    monkeypatch.setattr(can.interfaces.virtual.VirtualBus, 'send', flaky)
+    r = rig('--speed-limit-tx', '--speed-limit-release-kph', '100', precheck=0.1, allow_missing=False)
+    r.limit_202 = 100.0
+    r.m_acc = 10.0
+
+    def script(r):
+        r.go()
+        r.send124(SLOW_ON, 2)
+        r.wait_status(lambda s: s.speed_limit_target_kph == 9.3)
+        r.wait_frames(10)
+
+    assert r.run(script) == 0
+    assert 'speed_limit_tx_fail' in r.names()
+    assert 'race_internal_error' not in r.names()
+
+
+def test_foreign_0x203_logged(rig):
+    r = rig()
+
+    def script(r):
+        r.wait_status(lambda s: s.race_enabled)
+        r.send(0x203, bytes(8))
+        r.wait_event('foreign_0x203')
+
+    r.run(script)
+
+
 # === 예외 =============================================================================================================
 
 @pytest.mark.parametrize('target', ['next_race_state', 'apply_race_envelope'])
@@ -737,6 +852,8 @@ def test_internal_error_goes_estop_and_loop_survives(rig, monkeypatch, target):
     ['--race', '--stopped-mode', 'manual'],
     ['--race', '--auto-off-mode', 'send'],
     ['--race', '--init-mode', 'legacy'],
+    ['--speed-limit-tx', '--speed-limit-release-kph', '100'],
+    ['--race', '--speed-limit-tx'],
     ['--race', '--race-stop-action', 'nope'],
 ])
 def test_cli_rejects_dangerous_combinations(argv):
@@ -747,13 +864,16 @@ def test_cli_rejects_dangerous_combinations(argv):
 
 def test_cli_defaults_match_plan():
     a = can_guard.parse_args([])
-    assert a.race is False
+    assert a.race is False and a.speed_limit_tx is False and a.speed_limit_release_kph is None
     assert (a.race_confirm_frames, a.race_stop_action, a.race_signal_timeout_s, a.resume_mode) == (2, 'estop', 0.0, 'restart')
     assert (a.res_alive_timeout_s, a.pre_go_brake_pct) == (0.5, 30.0)
     assert (a.slow_target_kph, a.slow_acc_cut_kph, a.slow_brake_kph, a.finish_cap_kph) == (8.0, 8.8, 9.3, 20.0)
     assert (a.parked_speed_kph, a.parked_after_s, a.parked_brake_pct, a.input_grace_s) == (0.5, 5.0, 60.0, 1.0)
     assert (a.recover_budget_m, a.recover_delay_s, a.recover_alat_max, a.track_min_radius_m) == (0.30, 0.25, 3.0, None)
     assert a.resume_low_speed is False and a.adapter_hold_after_s == 0.10
+    assert (a.speed_limit_practice_kph, a.speed_limit_fast_period, a.speed_limit_keep_period) == (30.0, 0.02, 0.1)
+    assert (a.speed_limit_confirm_frames, a.speed_limit_mismatch_s, a.speed_limit_release_note_s,
+            a.speed_limit_startup_timeout) == (3, 0.3, 1.0, 2.0)
     assert os.path.samefile(a.race_flag_yaml, os.path.join(GUARD_DIR, 'race_flag.yaml'))
 
 

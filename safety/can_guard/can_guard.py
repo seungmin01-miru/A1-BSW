@@ -58,8 +58,9 @@ from rx_decode import decode_control_info, decode_vehicle_speed_kph
 from rx_decode import FRAME_ID_REMOTE_01, FRAME_ID_REMOTE_02, RemoteEstopDetector
 from state_machine import DEFAULT_PERCEPTION_LOST_STOPPED_AFTER_S, DEFAULT_PERCEPTION_TIMEOUT_S
 from state_machine import DEFAULT_STOP_SPEED_KPH, DEFAULT_STOPPED_AFTER_S, DEFAULT_WATCHDOG_T_S
+from speed_limit import EXIT_SPEED_LIMIT  # noqa: F401  시작 거부 종료 코드 5 (--race, 계획서 9.2)
 from state_machine import State, next_state
-from tx_encode import encode_0x210
+from tx_encode import FRAME_ID_SERVICE_COMMAND, encode_0x210
 
 SPIKE_THRESHOLD_S = 100e-6   # 스냅샷에서 "튐"으로 셀 자체측정 편차 문턱 — 8h 연속운전 관측용(§8, 2026-09-18)
 VS_MAX_AGE_S = 1.0           # 이보다 오래된 차속은 "모름" 취급(RX 가 없거나 끊겼을 때 시간 기반 안전망으로 복귀)
@@ -173,6 +174,17 @@ def _add_race_args(ap):
     g.add_argument('--race-flag-yaml', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'race_flag.yaml'),
                    help='가감속 프로파일(학습값). 기본 이 폴더 race_flag.yaml')
     g.add_argument('--status-shm', default=None, help='StatusChannel 공유메모리 이름(기본 a1_can_guard_status)')
+    g.add_argument('--speed-limit-tx', action='store_true', help='0x203 송신. 기본 꺼짐 — 대회측 허락(질의서 9-1) 전에는 켜지 않는다')
+    g.add_argument('--speed-limit-release-kph', type=float, default=None, help='0x203 해제값. 미정(업체 확인 대기) — 지어내지 않는다')
+    g.add_argument('--speed-limit-practice', action='store_true', help='연습 세션: 0x202 기대값을 practice 값으로')
+    g.add_argument('--speed-limit-practice-kph', type=float, default=30.0, help='연습 기대값')
+    g.add_argument('--speed-limit-allow-missing', action='store_true', help='시작 점검에서 0x202 가 안 보여도 통과')
+    g.add_argument('--speed-limit-fast-period', type=float, default=0.02, help='값 바꾸는 중 0x203 주기')
+    g.add_argument('--speed-limit-keep-period', type=float, default=0.1, help='반영 뒤 0x203 보험 주기')
+    g.add_argument('--speed-limit-confirm-frames', type=int, default=3, help='0x202 반영 확인 프레임 수')
+    g.add_argument('--speed-limit-mismatch-s', type=float, default=0.3, help='어긋남 판정')
+    g.add_argument('--speed-limit-release-note-s', type=float, default=1.0, help='해제 지연 기록 기준(D14)')
+    g.add_argument('--speed-limit-startup-timeout', type=float, default=2.0, help='시작 점검 대기 상한')
 
 
 def _check_race_args(ap, a):
@@ -184,6 +196,11 @@ def _check_race_args(ap, a):
             ap.error('--race 에서 --auto-off-mode send 금지(auto 000 = 페일세이프 브레이크 해제)')
         if a.init_mode == 'legacy':
             ap.error('--race 에서 --init-mode legacy 금지(auto 000 = 페일세이프 브레이크 해제)')
+    if a.speed_limit_tx:
+        if not a.race:
+            ap.error('--speed-limit-tx 는 --race 와 함께만 쓴다')
+        if a.speed_limit_release_kph is None:
+            ap.error('--speed-limit-tx 에는 --speed-limit-release-kph 가 필요하다(해제값은 지어내지 않는다)')
 
 
 _stop_requested = False
@@ -297,6 +314,21 @@ def run(a):
             if not seen.get(FRAME_ID_CONTROL_INFO) and not seen.get(FRAME_ID_WHEEL_INFO):
                 log('[can_guard] ⚠️ 차량 메시지(0x200/0x201)가 안 보임 — 비트레이트·배선 확인(송신은 진행)',
                     file=sys.stderr)
+
+        def send_203(data):
+            """0x203 송신. 실패해도 0x210 을 막지 않는다(0x210 은 이미 나갔고 다음 주기도 그대로 돈다)."""
+            try:
+                bus.send(can.Message(arbitration_id=FRAME_ID_SERVICE_COMMAND, data=data, is_extended_id=False),
+                         timeout=a.period / 2)
+                return True
+            except can.CanError:
+                return False
+
+        if race is not None:
+            refuse = race.startup(lambda timeout: bus.recv(timeout=timeout), send_203, time.monotonic,
+                                  lambda: _stop_requested)
+            if refuse is not None:
+                return refuse
 
         state = State.INIT
         last_valid_cmd = Command()
@@ -508,6 +540,7 @@ def run(a):
                 ev('estop_no_tx', '제어권을 받은 적 없음(auto 000) — 송신 안 함, 차량 페일세이프에 맡김')
                 estop_tx_pending = False
 
+            tx_fail_before = tx_fail
             try:
                 if out is None:
                     raise _SkipTx
@@ -527,7 +560,7 @@ def run(a):
                         file=sys.stderr)
 
             if race is not None:
-                race.after_tx(now, out, state)
+                race.after_tx(now, out, tx_fail != tx_fail_before, send_203, state)
 
             if a.status_interval_s > 0 and now - status_at >= a.status_interval_s:
                 status_at = now

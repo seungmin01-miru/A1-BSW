@@ -168,3 +168,27 @@ python3 sil_tests/e_estop.py --channel vcan0      # E1~E7 (E7 = 원격 우선 �
 ```
 
 ⚠️ 남은 문제: 제어 노드(어댑터 disarm, `lift_cmd` auto off)가 auto 000 명령을 쓰면 ACTIVE 에서 그대로 나가 브레이크가 풀린다 — silent INIT 은 "첫 명령 전"만 막는다.
+
+## 경기 모드 `--race` (2026-11-06, 계획서 `docs/2026-11-06_race_flag_dev_plan.md`)
+
+기본은 꺼짐이고 끄면 `race_runtime.py` 를 불러오지도 않는다(새 공유메모리·새 프레임 처리·새 이벤트 없음). 켜면 한 주기 흐름:
+
+```
+수신 0x124·0x125·0x126·0x127·0x128·0x202·0x203·0x710·0x711 → 디코더(2프레임 확인·A1 비대칭·A12 조용함 무장)·RES 감시
+→ next_race_state → SUSPENDED 면 ESTOP 원천 race_res(래치) → next_state(pre_go·recovery_phase·estop_go_reset)
+→ command_for_state(recovery_coast) → apply_race_envelope → clamp → 0x210 → 0x203 관리자 → StatusChannel
+```
+
+| 항목 | 내용 |
+|---|---|
+| CLI | 계획서 10절 + `--adapter-hold-after-s`, `--race-flag-yaml`, `--status-shm`, `--speed-limit-practice`, `--speed-limit-allow-missing` (`--help` 의 "경기 모드" 묶음) |
+| 거부하는 조합(CLI 오류 2) | `--race` + `--stopped-mode manual` / `--auto-off-mode send` / `--init-mode legacy`, `--speed-limit-tx` 인데 `--race`·해제값 없음 |
+| 종료 코드 | 5 = 0x202 시작 점검 거부(잔류 서행 제한, 0x202 안 보임 등), 2 = race_flag.yaml·경기 파라미터 오류 |
+| 시작 점검 | `--precheck-s` 동안 0x124·0x127·0x202 도 해석한다. **`--precheck-s 0` 이면 0x202 를 못 읽으므로 `--speed-limit-allow-missing` 없이는 시작 거부** |
+| 끊긴 시간 | `명령 나이 + --adapter-hold-after-s`. `--stopped-after` 는 경기 모드에서 정지 확정(committed) 이후 상한 |
+| 예외 | 경기 계산 예외 → 이벤트 `race_internal_error` + traceback → SUSPENDED + ESTOP(재시작으로만 빠져나감). 메인 루프는 계속 돈다 |
+| 의존성 | `--race` 일 때만 PyYAML(`import yaml`, 대회 PC 는 ROS Humble 의 python3-yaml) |
+
+이벤트: 계획서 WP3 목록(`race_signal`, `race_signal_unknown`, `race_signal_lost`, `race_phase`, `slow_on`, `slow_off`, `pre_go_motion`, `res`, `res_alive_lost`, `override_on`, `override_off`, `recover`, `commit`, `resume`, `speed_limit_tx`, `speed_limit_confirm`, `speed_limit_mismatch`, `speed_limit_release_slow`, `foreign_0x203`, `input_clamped`) + 추가: `race_internal_error`, `race_config_error`, `race_signal_restored`, `race_event_ignored`, `race_finish_pending`, `res_alive_restored`, `res_alive_jump`, `res_alive_never_changed`, `res_fb`, `race_pit_zone`, `race_repair`, `fb_user_can_err`, `speed_limit_startup`, `speed_limit_tx_fail`, `speed_limit_encode_mismatch`.
+
+시험: `test/test_race_integration.py`(python-can `virtual` 버스로 `can_guard.run` 을 그대로 돌림). 실제 vcan 시나리오는 `sil_tests/r_race.py`(WP7).
