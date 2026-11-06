@@ -18,8 +18,6 @@ bash tools/bsw/bsw_down.sh                 # 끄기 (차가 선 뒤) — 상태�
 | `bsw_monitor.py` | **상태판 창(실시간 UI)** — 속도·명령 vs 실제·앱·수신·can_guard 상태·경고 | 연습 주행 내내(자동으로 뜸) |
 | `bsw_status.sh` | **점검표(한 번 출력)** — 프로세스가 살았나, RT 인가, 녹화되나 | `bsw_up` 끝에 자동 1회, 이상할 때 |
 | `bsw.env` | 기본값 | — |
-| `race_args.sh` | 경기 모드 옵션 묶음(`bsw.env` → can_guard 옵션) | `--race` |
-| `race_status_cli.py` | **경기 시작 점검 표**·이벤트 요약(읽기 전용, `bsw_status`·`bsw_down` 이 부름) | `--race` |
 
 ## 켜면 무엇이 뜨나 (`bsw_up.sh` → `tools/track_day/bringup.sh`, 현장 시험과 같은 코드)
 
@@ -58,7 +56,6 @@ bash tools/bsw/bsw_down.sh                 # 끄기 (차가 선 뒤) — 상태�
 | 명령 vs 실제 | 핸들 °, 브레이크 %(실제 = 위치 × 10), 가속 %, auto 비트 — 왼쪽 0x210, 오른쪽 0x200 | 0x210 송신율 75 Hz 초과 |
 | 앱 | En, ACC_Cmd, EPS_Cmd | En = 1 "앱이 쥠: 차량은 0x210 무시" |
 | 수신 | ID 별 1 s 프레임 수(0x200·0x201 48, 0x210 50, 0x156·0x157 100 이 정상) | 0.2 s 넘게 안 옴 |
-| 경기 상태 | can_guard `--race` 일 때만 보임(StatusChannel 읽기 전용): 경기 상태·깃발 비트·RES·BSW 속도 상한·0x202 값(30.0 = 원격 조종 제한, 자율 상한 아님)·모델 정상 시간 | 값이 0.1 s 넘게 오래됨, StatusChannel 사라짐(글자로 표시) |
 
 ```bash
 python3 tools/bsw/bsw_monitor.py                          # 직접 띄우기(kv0 + 최신 세션)
@@ -116,35 +113,6 @@ tkinter 가 없으면 자동으로 글자 화면이 된다(설치: `sudo apt ins
 | `--no-app` | 앱 없이 시작(물리 E-stop 담당이 있을 때만) |
 | `--no-rt` | 비격리 실행(지연 값은 '비격리'로 표기) |
 | `--acc-limit P`, `--params YAML`, `--yes` | can_guard 가속 한계, 어댑터 표, 확인 질문 생략 |
-| `--race` | 경기 모드: can_guard `--race` + `bsw.env` 의 `BSW_RACE_*` 묶음 |
-| `--race-opt "…"` | 그날만 바꾸는 can_guard 옵션(묶음 뒤에 붙어 이김). 여러 번 가능 |
-| `--race-sil-server YAML` | `--sil --race` 에서 가짜 대회 서버로 시나리오 재생(리허설). 실차에서는 거부 |
-
-## 경기 모드 `--race` (2026-11-06)
-
-절차는 [`bsw_test/FIELD_MANUAL.md`](../../bsw_test/FIELD_MANUAL.md) 8절, 입력 순서는 `FIELD_CHEATSHEET.txt` "★ 경기 날", 실차 검증은 [`bsw_test/docs/race_flag_vehicle_test_plan.md`](../../bsw_test/docs/race_flag_vehicle_test_plan.md).
-
-```bash
-bash tools/bsw/bsw_up.sh --race --name RACE1 --no-ui          # 켜기(경기)
-bash tools/bsw/bsw_status.sh                                  # 끝에 시작 점검 표 — "✅ 출발 준비됨" 까지
-bash tools/bsw/bsw_down.sh                                    # 끄기(차가 선 뒤)
-bash tools/bsw/bsw_up.sh --sil --race --name REH1 --race-sil-server sil/vcan/race_scenarios/S02_go.yaml   # 리허설(vcan0)
-python3 -m pytest -q tools/bsw/test_race_ops.py               # 옵션 묶음·점검 표·문서 대조 시험(CAN 안 닿음)
-```
-
-| 달라지는 곳 | `--race` 일 때 | 없을 때 |
-|---|---|---|
-| can_guard 명령 줄 | `bsw.env` 의 `BSW_RACE_*`(계획서 10절) + `--race-opt` 를 `bringup --guard-args` 로 붙임 | 예전과 같음 |
-| 시작 전 확인 | 어댑터 `hold_after_s` 와 `BSW_RACE_ADAPTER_HOLD_AFTER_S` 가 다르면 거부. 모델이 이미 발행 중이어도 묻지 않음(Go 전에는 막힘) | 모델 발행 중이면 확인 질문 |
-| bringup | 0x202 시작 점검 줄을 기다려 기록. 종료 코드 5·2 를 원인대로 안내 | 예전과 같음 |
-| 안내문 | 모델 팀 문구(Go 전에도 발행, Go 전에는 BSW 가 막음, 끊김 규칙) | 예전과 같음 |
-| `bsw_status` | 끝에 시작 점검 표: 경기 상태 = PRE_GO · 안전 축 · 모델 정상 ≥ 10 s · 0x202(30.0 = 정상) · 0x124 · 0x127 | 예전과 같음 |
-| `SESSION.md` | 경기 옵션 전부, `race_flag.yaml` sha256, 끝낼 때 경기 상태, 이벤트 요약 | 예전과 같음 |
-| `bsw_down` | `can_guard.log` 도 압축·sha256, 가짜 대회 서버 정리 | 예전과 같음 |
-
-**`bsw_down` 은 경기 세션에서도 auto 000 을 내지 않는다**(코드 읽기로 확인, 2026-11-06): disarm 을 부르지 않고(`stop.sh --no-disarm`), ESTOP 이 auto 비트를 유지한다. PRE_GO·PARKED·SUSPENDED 의 브레이크는 `race_policy._hold_envelope` 가 `max(ESTOP 값, 유지값)` 으로 합쳐 줄지 않고, can_guard 는 auto 000 명령을 침묵으로 처리하며 `--race` 는 `--auto-off-mode send` 를 거부한다. 끈 뒤 0x210 끊김 동작은 여전히 TODO-2 — 바퀴 굄·사람 대기.
-
-**`race_status_cli.py check` 종료 코드:** 0 출발 준비됨, 1 ❌ 있음, 2 경기 상태 못 읽음, 3 이미 PRE_GO 아님(표시만). ⚠️(0x124·0x127 미수신 등)는 실패가 아니다. 판단은 can_guard 한 곳이고 이 표는 표시일 뿐이다.
 
 ## 확인 상태 (2026-11-05)
 
@@ -153,5 +121,4 @@ python3 -m pytest -q tools/bsw/test_race_ops.py               # 옵션 묶음·�
 | 어댑터 auto_arm (개발 PC, ROS2 Humble, can_guard virtual 버스) | 입력 0.30 s 뒤 자동 arm → 입력 끊김 151 ms 에 래치 → disarm 뒤 새 입력이 와도 다시 arm 안 됨 ✅ |
 | `bsw_down` (가짜 세션 폴더) | 12.3 km/h 이면 거부, 0.0 km/h 이면 ESTOP → 정리 → 압축·sha256 → 00 분석 ✅ |
 | 상태판 창 (개발 PC, 11-04 auto_bsw4 다시 보기 + 가짜 세션) | 정상 화면·ESTOP·경고 2개 표시 확인, 성능은 위 표 ✅ |
-| `--race` 옵션 묶음·점검 표·문서 대조 (`test_race_ops.py`, 개발 PC = 참고) | 통과 ✅. **`bsw_up`·`bringup`·`bsw_down`·`bsw_status` 의 `--race` 경로는 실행 안 함(2026-11-06) — 대회 PC 에서 `--sil --race` 로 확인 필요** |
 | `bsw_up` 전체 | **대회 PC 에서 `bash tools/bsw/bsw_up.sh --sil` 로 확인 필요**(vcan·sudo, 상태판 창이 뜨는지 포함). 그다음 실차 |

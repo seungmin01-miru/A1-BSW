@@ -10,11 +10,8 @@ docs/can_stack_development.md §5.D 참고:
   (모든 상태) 재시작 → 항상 INIT 부터
   (모든 상태) 비상 정지 요청 → ESTOP(최우선, 래치). ESTOP → (해제 요청 + 요청 원천 모두 꺼짐 + 차속 정지) → STOPPED
     — 2026-11-04 추가(bsw_test 00 SAF-ESTOP). ESTOP 은 명령이 다시 와도 풀리지 않는다.
-  경기 모드(`--race`, 2026-11-06, 계획서 8절) 인자는 전부 키워드이고 기본값이면 위 규칙과 비트 단위로 같다 — next_state 설명 참고.
 """
 import enum
-
-from recovery import PHASE_COMMITTED, PHASE_RECOVER
 
 
 class State(enum.Enum):
@@ -43,8 +40,7 @@ def next_state(current, cmd_age_s, holding_duration_s, perception_age_s,
                perception_lost_stopped_after_s=DEFAULT_PERCEPTION_LOST_STOPPED_AFTER_S,
                vehicle_speed_kph=None,
                stop_speed_kph=DEFAULT_STOP_SPEED_KPH,
-               estop=False, estop_reset=False,
-               pre_go=False, recovery_phase=None, committed_duration_s=None, estop_go_reset=False):
+               estop=False, estop_reset=False):
     """현재 상태 + 관측값 → 다음 상태. cmd_age_s/perception_age_s 는 None 이면 "한 번도 못 받음"(무한 나이 취급).
     degraded_duration_s/vehicle_speed_kph 도 마찬가지로 None 이면 "모름" — 새 조건 없이 기존 동작 그대로다
     (호출자가 안 넘기면 완전히 이전 버전과 동일하게 동작, 하위 호환).
@@ -75,24 +71,12 @@ def next_state(current, cmd_age_s, holding_duration_s, perception_age_s,
     **비상 정지(2026-11-04)**: `estop`=지금 어떤 원천이든 정지 요청이 켜져 있음, `estop_reset`=이번 주기에 해제 요청이
     들어옴. ESTOP 은 어느 상태보다 우선하고 래치된다. 해제는 정지 요청이 모두 꺼졌고 **실측 차속이 정지 문턱 이하일
     때만** 받아 STOPPED(브레이크 유지)로 간다 — 차속을 모르면(None) 해제하지 않는다(can_guard 재시작으로만 빠져나감).
-
-    **경기 모드(2026-11-06, `--race` 일 때만 can_guard 가 넘긴다. 안 넘기면 위 규칙 그대로):**
-    - `pre_go`: 출발 대기 중. 차가 서 있어 vehicle_near_stop 이 항상 참이므로 차속·지속시간으로 STOPPED 로 가는 길을 **전부** 막는다
-      (HOLDING·DEGRADED·ACTIVE, 브리프 A2, D11). 명령이 돌아오면 바로 ACTIVE. ESTOP 은 그대로 최우선, 이미 STOPPED 면 그대로.
-    - `recovery_phase`(recovery.PHASE_*, None = 기존 규칙): 계획서 8.2. NORMAL·명령 신선 → 기존 정상 계열. RECOVER → HOLDING(복구 구간,
-      신선한 입력 3주기 판정은 RecoveryTracker 가 하고 끝나면 NORMAL 을 넘긴다). COMMITTED → HOLDING 이다가 **차속 ≤ 정지 문턱 또는
-      committed_duration_s ≥ stopped_after_s 일 때만** STOPPED — "≤ 3 km/h → STOPPED" 는 committed 뒤에만(출발 직후 저속 끊김에
-      영구 정지되던 문제), `--stopped-after` 는 committed 이후 상한이다.
-    - `estop_go_reset`: `resume_mode=go-reset` 에서 SUSPENDED → 새 Go 가 받아들여진 주기에만 참. 다른 정지 요청이 없고 차속이 정지 문턱
-      이하면 ESTOP 을 풀고 명령 상태에 따라 ACTIVE·DEGRADED·HOLDING 으로 간다. 그 밖에는 ESTOP 유지(래치).
     """
     vehicle_near_stop = vehicle_speed_kph is not None and vehicle_speed_kph <= stop_speed_kph
     if current == State.ESTOP:
         if estop_reset and not estop and vehicle_near_stop:
             return State.STOPPED
-        if not (estop_go_reset and not estop and vehicle_near_stop):
-            return State.ESTOP
-        current = State.HOLDING   # go-reset 재개: 아래 공통 규칙으로 간다(STOPPED 로는 가지 않음 — recovery_phase 규칙)
+        return State.ESTOP
     if estop:
         return State.ESTOP
 
@@ -106,19 +90,6 @@ def next_state(current, cmd_age_s, holding_duration_s, perception_age_s,
 
     if current == State.STOPPED:
         return State.STOPPED   # 완전히 멈춘 뒤에는 재시작(INIT)으로만 빠져나간다 — 자동 복귀 없음(안전 우선)
-
-    if pre_go:   # 경기 모드 출발 대기: 차속·지속시간으로 STOPPED 금지(A2)
-        if cmd_stale:
-            return State.HOLDING
-        return State.DEGRADED if perception_lost else State.ACTIVE
-
-    if recovery_phase is not None:   # 경기 모드 끊김 복구(계획서 8.2)
-        if recovery_phase == PHASE_COMMITTED:
-            if vehicle_near_stop or (committed_duration_s is not None and committed_duration_s >= stopped_after_s):
-                return State.STOPPED
-            return State.HOLDING
-        if recovery_phase == PHASE_RECOVER or cmd_stale:
-            return State.HOLDING
 
     # ACTIVE / HOLDING / DEGRADED 공통: 명령이 살아있으면 정상 계열, 아니면 HOLDING 계열로
     if not cmd_stale:

@@ -1,4 +1,5 @@
-"""race_signal·encode_speed_limit_command — 1.2절 예시, cantools + A1_dbc_2_fixed.dbc 대조, 디바운스, A1, A7, alive 경계."""
+"""race_signal — 1.3절 byte0 예시, cantools + A1_dbc_2_fixed.dbc 대조, 2프레임 확인·seen 래치, RES 1프레임 즉시, alive 경계."""
+import math
 import os
 import random
 
@@ -6,7 +7,6 @@ import cantools
 import pytest
 
 import race_signal as rs
-from tx_encode import FRAME_ID_SERVICE_COMMAND, encode_speed_limit_command
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc'))
@@ -42,464 +42,290 @@ def res_frame(start=0, alive=0):
     (rs.FRAME_ID_RACE_SIGNAL, 'KIAPI_Race_Signal'), (rs.FRAME_ID_PIT_ZONE, 'KIAPI_PIT_ZONE'),
     (rs.FRAME_ID_REPAIR, 'KIAPI_REPAIR'), (rs.FRAME_ID_RES, 'KIAPI_RES'),
     (rs.FRAME_ID_RES_FB, 'KIAPI_RES_FB'), (rs.FRAME_ID_SERVICE_INFO, 'USER_service_info'),
-    (rs.FRAME_ID_FB_STEER, 'KIAPI_FB_Steer'), (rs.FRAME_ID_FB_ACC, 'KIAPI_FB_Acc'),
-    (FRAME_ID_SERVICE_COMMAND, 'USER_service_command'),
 ])
 def test_frame_ids_match_dbc(const, msg):
     assert DB.get_message_by_name(msg).frame_id == const
 
 
-@pytest.mark.parametrize('flag,byte0', sorted(BYTE0.items()))
-def test_race_signal_byte0_examples_section_1_2(flag, byte0):
-    """계획서 1.2절 byte0 예시 그대로 + cantools 도 같은 값."""
-    data = bytes([byte0]) + bytes(7)
-    got = rs.decode_race_signal(data)
-    assert got == {k: 1 if k == flag else 0 for k in BYTE0}
-    dbc = DB.decode_message(0x124, data, decode_choices=False)
-    assert {k: dbc[SIGNAL[k]] for k in BYTE0} == got
+@pytest.mark.parametrize('flag,byte0', list(BYTE0.items()))
+def test_race_signal_byte0_examples_section_1_3(flag, byte0):
+    d = rs.decode_race_signal(bytes([byte0]) + bytes(7))
+    assert d[flag] == 1 and sum(d.values()) == 1
 
 
 def test_race_signal_all_byte0_values_match_dbc():
     for b0 in range(256):
         data = bytes([b0]) + bytes(7)
-        dbc = DB.decode_message(0x124, data, decode_choices=False)
-        assert {k: dbc[SIGNAL[k]] for k in BYTE0} == rs.decode_race_signal(data)
+        d = DB.decode_message(0x124, data, decode_choices=False)
+        got = rs.decode_race_signal(data)
+        assert {k: got[k] for k in SIGNAL} == {k: d[v] for k, v in SIGNAL.items()}
 
 
 def test_other_decoders_match_dbc_random():
-    rnd = random.Random(20261106)
+    rng = random.Random(1)
     for _ in range(300):
-        data = bytes(rnd.randrange(256) for _ in range(8))
+        data = bytes(rng.randrange(256) for _ in range(8))
         d = DB.decode_message(0x125, data, decode_choices=False)
         lat, lon = rs.decode_pit_zone(data)
-        assert lat == pytest.approx(d['PITZONE_LAT'])
-        assert lon == pytest.approx(d['PITZONE_LONG'])
+        assert (lat, lon) == pytest.approx((d['PITZONE_LAT'], d['PITZONE_LONG']))
         assert rs.decode_repair(data) == DB.decode_message(0x126, data, decode_choices=False)['SIG_REPAIR']
         d = DB.decode_message(0x127, data, decode_choices=False)
-        assert rs.decode_res(data) == {'res_start': d['RES_START'], 'alive': d['alive_count']}
+        r = rs.decode_res(data)
+        assert (r['res_start'], r['alive']) == (d['RES_START'], d['alive_count'])
         d = DB.decode_message(0x128, data, decode_choices=False)
-        assert rs.decode_res_fb(data) == {'res_end': d['RES_END'], 'res_error': d['RES_ERROR']}
+        r = rs.decode_res_fb(data)
+        assert (r['res_end'], r['res_error']) == (d['RES_END'], d['RES_ERROR'])
         d = DB.decode_message(0x202, data, decode_choices=False)
         assert rs.decode_speed_limit_info(data) == pytest.approx(d['speed_limit_info'])
-        d = DB.decode_message(0x710, data, decode_choices=False)
-        g = rs.decode_fb_steer(data)
-        assert g['str_ang_deg'] == pytest.approx(d['StrAng'])
-        assert (g['eps_user_can_err'], g['eps_err'], g['eps_sas_err']) == \
-               (d['EPS_USER_CAN_ERR'], d['EPS_ERR'], d['EPS_SAS_ERR'])
-        assert (g['acc_mode'], g['brake_mode'], g['steer_mode'], g['alive']) == \
-               (d['acc_mode'], d['brake_mode'], d['steer_mode'], d['EPS_Alive_Cnt'])
-        d = DB.decode_message(0x711, data, decode_choices=False)
-        g = rs.decode_fb_acc(data)
-        assert g['vs_kph'] == pytest.approx(d['VS'])
-        assert (g['acc_user_can_err'], g['acc_err'], g['alive']) == \
-               (d['ACC_USER_CAN_ERR'], d['ACC_ERR'], d['ACC_Alive_Cnt'])
 
 
-def test_speed_limit_info_real_value_a5():
-    """A5: 11-04 실측 `2C01...` = raw 300 = 30.0 km/h."""
-    data = bytes.fromhex('2C01000000000000')
-    assert rs.decode_speed_limit_info_raw(data) == 300
-    assert rs.decode_speed_limit_info(data) == pytest.approx(30.0)
+def test_speed_limit_info_real_value_1104():
+    """11-04 실측 `2C01...` = raw 300 = 30.0 km/h."""
+    assert rs.decode_speed_limit_info(bytes.fromhex('2C01000000000000')) == pytest.approx(30.0)
 
 
 def test_short_frames_do_not_raise():
     for fn in (rs.decode_race_signal, rs.decode_pit_zone, rs.decode_repair, rs.decode_res, rs.decode_res_fb,
-               rs.decode_speed_limit_info, rs.decode_fb_steer, rs.decode_fb_acc):
+               rs.decode_speed_limit_info):
         fn(b'\x80')
         fn(b'')
     assert rs.decode_race_signal(b'\x80')['go'] == 1
 
 
-@pytest.mark.parametrize('kph,raw', [(0, 0), (9.3, 93), (30.0, 300), (100.0, 1000), (0.1, 1)])
-def test_encode_speed_limit_matches_dbc(kph, raw):
-    data = encode_speed_limit_command(kph)
-    assert len(data) == 8
-    assert int.from_bytes(data[:2], 'little') == raw and not any(data[2:])
-    assert DB.decode_message(0x203, data, decode_choices=False)['speed_limit'] == pytest.approx(kph)
-    assert data == DB.encode_message(0x203, {'speed_limit': kph})
+# --- 깃발: 2프레임 확인 + seen 래치 --------------------------------------------------------------------------------------
 
-
-@pytest.mark.parametrize('kph,clamped', [(-5.0, 0.0), (100.1, 100.0), (250.0, 100.0)])
-def test_encode_speed_limit_clamps(kph, clamped):
-    assert DB.decode_message(0x203, encode_speed_limit_command(kph), decode_choices=False)['speed_limit'] == \
-           pytest.approx(clamped)
-
-
-# --- RaceSignalDecoder ------------------------------------------------------------------------------------------------
-
-@pytest.mark.parametrize('flag', sorted(BYTE0))
-def test_two_frames_needed_then_one_edge(flag):
-    dec = rs.RaceSignalDecoder()
-    t = feed_n(dec, f124(), 3)
-    assert dec.take_events() == ()
-    dec.feed(f124(flag), t)
-    assert dec.take_events() == () and not dec.levels[flag]
-    dec.feed(f124(flag), t + DT)
-    assert dec.take_events() == (flag,) and dec.levels[flag]
-    feed_n(dec, f124(flag), 10, t + 2 * DT)
-    assert dec.take_events() == ()   # 계속 켜져 있어도 이벤트는 한 번
-
-
-def test_single_frame_is_rejected_d12():
-    dec = rs.RaceSignalDecoder()
-    t = feed_n(dec, f124(), 3)
-    dec.feed(f124('slow_off'), t)
-    feed_n(dec, f124(), 3, t + DT)
-    assert dec.take_events() == () and not dec.levels['slow_off']
-
-
-def test_single_zero_frame_does_not_make_new_edge():
-    dec = rs.RaceSignalDecoder()
-    t = feed_n(dec, f124(), 2)
-    t = feed_n(dec, f124('go'), 2, t)
-    assert dec.take_events() == ('go',)
-    dec.feed(f124(), t)
-    feed_n(dec, f124('go'), 2, t + DT)
-    assert dec.take_events() == () and dec.levels['go']
-
-
-def test_level_falls_after_two_zero_frames_and_new_edge_after():
-    dec = rs.RaceSignalDecoder()
-    t = feed_n(dec, f124(), 2)
-    t = feed_n(dec, f124('go'), 2, t)
-    dec.take_events()
-    t = feed_n(dec, f124(), 2, t)
-    assert not dec.levels['go']
-    feed_n(dec, f124('go'), 2, t)
-    assert dec.take_events() == ('go',)
-
-
-def test_custom_confirm_frames():
-    dec = rs.RaceSignalDecoder(confirm_frames=3)
-    t = feed_n(dec, f124(), 3)
-    t = feed_n(dec, f124('stop'), 2, t)
-    assert dec.take_events() == ()
-    dec.feed(f124('stop'), t)
-    assert dec.take_events() == ('stop',)
-
-
-def test_events_accumulate_until_taken():
-    dec = rs.RaceSignalDecoder()
-    t = feed_n(dec, f124(), 2)
-    t = feed_n(dec, f124('go'), 2, t)
-    feed_n(dec, f124('slow_on'), 2, t)
-    assert dec.take_events() == ('go', 'slow_on')
-    assert dec.take_events() == ()
-
-
-def test_trigger_t_is_first_frame_of_run():
-    dec = rs.RaceSignalDecoder()
-    feed_n(dec, f124(), 2)
-    dec.feed(f124('stop'), 1.00)
-    dec.feed(f124('stop'), 1.02)
-    assert dec.trigger_t('stop') == pytest.approx(1.00)
-
-
-# A1 비대칭
-@pytest.mark.parametrize('flag', rs.RELEASE_FLAGS)
-def test_a1_release_flag_on_at_start_is_no_event(flag):
-    dec = rs.RaceSignalDecoder()
-    feed_n(dec, f124(flag), 20)
-    assert dec.take_events() == ()
-    assert dec.levels[flag]
-    assert dec.take_records() == [('race_signal', f'{flag}_level_at_start')]   # 한 번만 기록
-
-
-def test_a1_go_at_start_single_zero_glitch_does_not_arm():
-    """옛 Go 위의 단발 0 + 복귀를 새 Go 로 보면 R-01 위반 — 0 도 2프레임 확인."""
-    dec = rs.RaceSignalDecoder()
-    t = feed_n(dec, f124('go'), 5)
-    dec.feed(f124(), t)
-    feed_n(dec, f124('go'), 5, t + DT)
-    assert dec.take_events() == ()
-
-
-def test_a1_go_after_seen_zero_is_event():
-    dec = rs.RaceSignalDecoder()
-    t = feed_n(dec, f124('go'), 5)
-    t = feed_n(dec, f124(), 2, t)
-    assert dec.take_events() == ()
-    feed_n(dec, f124('go'), 2, t)
-    assert dec.take_events() == ('go',)
-
-
-@pytest.mark.parametrize('flag', ['stop', 'finish', 'slow_on'])
-def test_a1_restrictive_flag_on_at_start_is_event(flag):
+@pytest.mark.parametrize('flag', list(BYTE0))
+def test_two_frames_confirm_and_seen_latches(flag):
     dec = rs.RaceSignalDecoder()
     dec.feed(f124(flag), 0.0)
-    assert dec.take_events() == ()
+    assert not dec.levels[flag] and not dec.seen_flags[flag] and dec.last_signal == 'NONE'
     dec.feed(f124(flag), DT)
-    assert dec.take_events() == (flag,)
-    assert dec.take_records() == []
+    assert dec.levels[flag] and dec.seen_flags[flag]
+    assert dec.last_signal == flag.upper() and dec.last_signal_t == 0.0     # 첫 프레임 시각
+    feed_n(dec, f124(), 2, 2 * DT)
+    assert not dec.levels[flag] and dec.seen_flags[flag]                    # 꺼져도 seen 유지
+    assert dec.last_signal == flag.upper()
 
 
-# 정의 밖
-@pytest.mark.parametrize('data', [f124('slow_on', 'slow_off'), f124('go', 'stop'), bytes([0x01]) + bytes(7),
-                                  bytes([0, 0, 0, 0, 0, 0, 0, 1])])
+def test_one_frame_is_ignored_and_recorded():
+    dec = rs.RaceSignalDecoder()
+    dec.feed(f124('go'), 0.0)
+    dec.feed(f124(), DT)
+    assert not dec.seen_flags['go'] and dec.last_signal == 'NONE'
+    assert ('race_signal_ignored', 'go frames=1 suppressed=0') in dec.take_records()
+
+
+def test_flicker_never_confirms_and_log_is_rate_limited():
+    dec = rs.RaceSignalDecoder()
+    t = 0.0
+    for _ in range(10):
+        dec.feed(f124('go'), t)
+        dec.feed(f124(), t + DT)
+        t += 2 * DT
+    assert not dec.seen_flags['go']
+    assert sum(1 for n, _ in dec.take_records() if n == 'race_signal_ignored') == 1
+
+
+def test_two_frame_pulse_is_seen_then_level_falls():
+    dec = rs.RaceSignalDecoder()
+    t = feed_n(dec, f124('go'), 2)
+    assert dec.levels['go'] and dec.seen_flags['go']
+    feed_n(dec, f124(), 2, t)
+    assert not dec.levels['go']
+    names = [d for n, d in dec.take_records() if n == 'race_signal']
+    assert names == ['go on', 'go off']
+
+
+def test_single_zero_frame_does_not_drop_level_or_new_edge():
+    dec = rs.RaceSignalDecoder()
+    t = feed_n(dec, f124('go'), 2)
+    first = dec.last_signal_t
+    dec.feed(f124(), t)
+    assert dec.levels['go']
+    feed_n(dec, f124('go'), 2, t + DT)
+    assert dec.last_signal_t == first
+
+
+def test_new_rise_updates_last_signal_stamp():
+    dec = rs.RaceSignalDecoder()
+    t = feed_n(dec, f124('go'), 2)
+    t = feed_n(dec, f124(), 2, t)
+    t2 = t
+    feed_n(dec, f124('go'), 2, t)
+    assert dec.last_signal_t == t2
+
+
+def test_last_signal_follows_latest_rise():
+    dec = rs.RaceSignalDecoder()
+    t = feed_n(dec, f124('go'), 2)
+    t = feed_n(dec, f124('go', 'slow_on'), 2, t)
+    assert dec.last_signal == 'SLOW_ON'
+    feed_n(dec, f124('go', 'slow_on', 'slow_off'), 2, t)
+    assert dec.last_signal == 'SLOW_OFF'
+    assert all(dec.levels[f] for f in ('go', 'slow_on', 'slow_off'))   # 해제 규칙 없음 — 해석은 모델
+
+
+def test_go_already_on_at_start_is_passed_as_is():
+    """전달만: 시작 때 이미 켜져 있어도 비트대로 올린다. 재시작 후 옛 Go 를 구분하는 일은 모델(M-09)."""
+    dec = rs.RaceSignalDecoder()
+    feed_n(dec, f124('go'), 2)
+    assert dec.seen_flags['go'] and dec.levels['go']
+
+
+@pytest.mark.parametrize('data', [b'\xC0' + bytes(7), b'\x81' + bytes(7), b'\x00\x01' + bytes(6)])
 def test_undefined_pattern_recorded_once_until_it_changes(data):
     dec = rs.RaceSignalDecoder()
-    feed_n(dec, data, 5)
-    recs = dec.take_records()
-    assert [r for r in recs if r[0] == 'race_signal_unknown'] == [('race_signal_unknown', f'raw={data.hex()}')]
+    feed_n(dec, data, 3)
+    assert [n for n, _ in dec.take_records()].count('race_signal_unknown') == 1
 
 
-def test_undefined_pattern_still_gives_flag_events():
-    """둘 다 올리는 건 맞고 우선순위는 race_state 가 정한다(stop 을 잃지 않음)."""
-    dec = rs.RaceSignalDecoder()
-    t = feed_n(dec, f124(), 2)
-    feed_n(dec, f124('go', 'stop'), 2, t)
-    assert set(dec.take_events()) == {'go', 'stop'}
-
-
-@pytest.mark.parametrize('flag', sorted(BYTE0))
-def test_defined_patterns_not_unknown(flag):
-    dec = rs.RaceSignalDecoder()
-    t = feed_n(dec, f124(), 2)
-    feed_n(dec, f124(flag), 2, t)
-    assert not [r for r in dec.take_records() if r[0] == 'race_signal_unknown']
-
-
-def test_empty_frame_is_ignored_and_recorded():
+def test_empty_frame_ignored_and_recorded():
     dec = rs.RaceSignalDecoder()
     dec.feed(b'', 0.0)
-    assert not dec.seen and dec.take_records() == [('race_signal_unknown', 'empty_frame')]
+    assert dec.age_s(1.0) is None
+    assert dec.take_records() == [('race_signal_unknown', 'empty_frame')]
 
 
 def test_age():
     dec = rs.RaceSignalDecoder()
-    assert dec.age_s(5.0) is None and not dec.seen
+    assert dec.age_s(5.0) is None
     dec.feed(f124(), 5.0)
-    assert dec.age_s(5.3) == pytest.approx(0.3)
+    assert dec.age_s(5.5) == pytest.approx(0.5)
 
 
-# --- ResMonitor -------------------------------------------------------------------------------------------------------
+# --- RES: 1 프레임 즉시, alive ----------------------------------------------------------------------------------------
 
-def test_res_start_needs_two_frames_a7():
+def test_res_active_on_first_frame_and_off_on_first_frame():
     m = rs.ResMonitor()
-    m.feed(res_frame(1, 0), 0.0)
-    assert not m.active
-    m.feed(res_frame(0, 1), 0.02)
-    m.feed(res_frame(1, 2), 0.04)
-    assert not m.active
-    m.feed(res_frame(1, 3), 0.06)
-    assert m.active and m.asserted and m.trigger_t == pytest.approx(0.04)
-    assert ('res_start', 'alive=3') in m.take_records()
-
-
-def test_res_on_from_first_frame_is_active():
-    m = rs.ResMonitor()
-    m.feed(res_frame(1, 0), 0.0)
-    m.feed(res_frame(1, 1), 0.02)
+    m.feed(res_frame(1, 1), 0.0)
     assert m.active
-
-
-def test_res_release_needs_two_frames():
-    m = rs.ResMonitor()
-    m.feed(res_frame(1, 0), 0.0)
-    m.feed(res_frame(1, 1), 0.02)
-    m.feed(res_frame(0, 2), 0.04)
-    assert m.active
-    m.feed(res_frame(0, 3), 0.06)
+    m.feed(res_frame(0, 2), DT)
     assert not m.active
-    assert ('res_end', 'alive=3') in m.take_records()
+    assert [d.split()[0] for n, d in m.take_records() if n == 'res'] == ['start', 'end']
 
 
-def test_res_not_seen_is_not_lost():
+def test_alive_ok_needs_moving_counter():
+    m = rs.ResMonitor(alive_timeout_s=0.5)
+    assert not m.alive_ok
+    m.feed(res_frame(0, 0), 0.0)
+    m.feed(res_frame(0, 1), DT)
+    assert m.alive_ok
+
+
+def test_alive_wrap_255_to_0_is_normal():
     m = rs.ResMonitor()
-    m.update(1000.0)
-    assert not m.seen and not m.alive_lost and not m.asserted
-
-
-def test_res_lost_after_timeout_only_past_0_5s():
-    m = rs.ResMonitor()
-    m.feed(res_frame(0, 0), 1.0)
-    m.update(1.5)
-    assert not m.alive_lost
-    m.update(1.51)
-    assert m.alive_lost and m.asserted
-    assert ('res_alive_lost', 'timeout') in m.take_records()
-
-
-def test_res_lost_restored_when_frames_resume():
-    m = rs.ResMonitor()
-    m.feed(res_frame(0, 0), 1.0)
-    m.update(2.0)
-    assert m.alive_lost
-    m.feed(res_frame(0, 1), 2.1)
-    m.update(2.1)
-    assert not m.alive_lost
-    assert ('res_alive_restored', 'alive=1') in m.take_records()
-
-
-def test_alive_boundary_255_to_0_is_not_a_jump():
-    m = rs.ResMonitor()
-    t = 0.0
-    for a in [253, 254, 255, 0, 1]:
-        m.feed(res_frame(0, a), t)
-        t += DT
+    m.feed(res_frame(0, 255), 0.0)
+    m.feed(res_frame(0, 0), DT)
+    assert m.alive_ok
     assert not [r for r in m.take_records() if r[0] == 'res_alive_jump']
 
 
-@pytest.mark.parametrize('seq,detail', [([5, 7], '5->7'), ([255, 1], '255->1'), ([10, 9], '10->9')])
-def test_alive_jump_recorded_but_not_lost(seq, detail):
-    m = rs.ResMonitor()
-    m.feed(res_frame(0, seq[0]), 0.0)
-    m.feed(res_frame(0, seq[1]), DT)
-    m.update(DT)
-    assert ('res_alive_jump', detail) in m.take_records()
-    assert not m.alive_lost
-
-
-def test_alive_stall_after_counting_is_lost():
+def test_alive_jump_is_recorded_only():
     m = rs.ResMonitor()
     m.feed(res_frame(0, 1), 0.0)
-    m.feed(res_frame(0, 2), 0.02)
-    t = 0.02
-    while t < 0.5:
+    m.feed(res_frame(0, 5), DT)
+    assert m.alive_ok
+    assert ('res_alive_jump', '1->5') in m.take_records()
+
+
+def test_frames_lost_times_out():
+    m = rs.ResMonitor(alive_timeout_s=0.5)
+    m.feed(res_frame(0, 1), 0.0)
+    m.feed(res_frame(0, 2), DT)
+    m.update(DT + 0.49)
+    assert m.alive_ok
+    m.update(DT + 0.51)
+    assert not m.alive_ok
+    assert ('res_alive_lost', 'timeout') in m.take_records()
+    assert m.age_s(1.0) == pytest.approx(1.0 - DT)
+
+
+def test_alive_stall_with_frames_still_coming():
+    m = rs.ResMonitor(alive_timeout_s=0.5)
+    m.feed(res_frame(0, 1), 0.0)
+    m.feed(res_frame(0, 2), DT)
+    t = DT
+    while t < 0.6:
         t += DT
         m.feed(res_frame(0, 2), t)
-        m.update(t)
-    assert not m.alive_lost
-    t = 0.53
-    m.feed(res_frame(0, 2), t)
-    m.update(t)
-    assert m.alive_lost
+    assert not m.alive_ok
     assert ('res_alive_lost', 'alive_stall') in m.take_records()
     m.feed(res_frame(0, 3), t + DT)
-    m.update(t + DT)
-    assert not m.alive_lost
+    assert m.alive_ok
+    assert ('res_alive_restored', 'alive=3') in m.take_records()
 
 
-def test_alive_never_changed_only_recorded():
-    """서버가 카운터를 안 올려도 경기를 끝내지 않는다."""
-    m = rs.ResMonitor()
+def test_alive_never_changing_reports_false_and_records_once():
+    m = rs.ResMonitor(alive_timeout_s=0.5)
     t = 0.0
-    for _ in range(100):
-        m.feed(res_frame(0, 0), t)
-        m.update(t)
+    while t < 1.5:
+        m.feed(res_frame(0, 7), t)
         t += DT
-    assert not m.alive_lost
-    assert m.take_records() == [('res_alive_never_changed', 'alive=0')]
+    assert not m.alive_ok
+    assert [n for n, _ in m.take_records()].count('res_alive_never_changed') == 1
 
 
-def test_timeout_zero_disables_lost():
-    m = rs.ResMonitor(alive_timeout_s=0)
-    m.feed(res_frame(0, 0), 0.0)
-    m.update(100.0)
-    assert not m.alive_lost
+# --- RaceTracker: /race/state 필드 --------------------------------------------------------------------------------------
+
+def test_tracker_defaults_mean_no_data():
+    f = rs.RaceTracker().fields(10.0)
+    assert f['race_signal_age_s'] == -1.0 and f['res_age_s'] == -1.0 and f['vehicle_speed_limit_kph'] == -1.0
+    assert f['last_signal'] == 'NONE' and f['last_signal_t'] is None
+    assert not f['res_active'] and not f['res_alive_ok'] and not f['remote_app_active']
+    assert math.isnan(f['pit_lat_deg']) and math.isnan(f['pit_lon_deg'])
 
 
-# --- A12 조용함 무장 ------------------------------------------------------------------------------------------------
-def test_silence_arms_release_flags_from_listen_start():
-    dec = rs.RaceSignalDecoder()
-    dec.note_silence(0.0)
-    dec.note_silence(0.49)
-    feed_n(dec, f124('go'), 2, t0=0.492)   # 0.5 s 전 → 옛 Go 로 본다
-    assert dec.take_events() == ()
-    dec = rs.RaceSignalDecoder()
-    dec.note_silence(0.0)
-    dec.note_silence(0.5)
-    assert any('silence_armed' in r[1] for r in dec.take_records())
-    feed_n(dec, f124('go'), 2, t0=0.6)
-    assert dec.take_events() == ('go',)
+def test_tracker_routes_every_id():
+    tr = rs.RaceTracker()
+    tr.feed(0x124, f124('finish'), 1.0)
+    tr.feed(0x124, f124('finish'), 1.02)
+    tr.feed(0x127, res_frame(1, 3), 1.02)
+    tr.feed(0x128, bytes([0x80 | 0x05]) + bytes(7), 1.03)
+    tr.feed(0x202, bytes.fromhex('2C01000000000000'), 1.03)
+    tr.feed(0x156, bytes([1]) + bytes(7), 1.04)
+    lat = int(37.5 / 1e-7).to_bytes(4, 'little')
+    lon = int(127.25 / 1e-7).to_bytes(4, 'little')
+    tr.feed(0x125, lat + lon, 1.04)
+    f = tr.fields(1.1)
+    assert f['sig_finish'] and f['seen_finish'] and f['last_signal'] == 'FINISH' and f['last_signal_t'] == 1.0
+    assert f['res_active'] and f['res_end'] and f['res_error'] == 5
+    assert f['vehicle_speed_limit_kph'] == pytest.approx(30.0)
+    assert f['remote_app_active']
+    assert f['pit_lat_deg'] == pytest.approx(37.5) and f['pit_lon_deg'] == pytest.approx(127.25)
+    assert f['race_signal_age_s'] == pytest.approx(0.08)
 
 
-def test_old_go_held_without_silence_never_arms():
-    dec = rs.RaceSignalDecoder()
-    dec.note_silence(0.0)
-    t = 0.0
-    for _ in range(500):
-        dec.feed(f124('go'), t)
-        dec.note_silence(t)
-        t += DT
-    assert dec.take_events() == ()
-    assert dec.levels['go'] is True
+def test_tracker_ignores_other_ids():
+    tr = rs.RaceTracker()
+    key = tr.state_key()
+    assert tr.feed(0x200, bytes(8), 1.0) is False
+    assert tr.state_key() == key
 
 
-def test_silence_after_old_go_arms_and_clears_level_and_runs():
-    dec = rs.RaceSignalDecoder()
-    dec.note_silence(0.0)
-    feed_n(dec, f124('go'), 3, t0=0.0)
-    dec.take_records()
-    dec.note_silence(1.0)
-    assert dec.levels['go'] is False
-    dec.feed(f124('go'), 1.1)
-    assert dec.take_events() == ()      # 조용함을 사이에 둔 프레임은 연속이 아니다 — 1 프레임은 아직 Go 아님
-    dec.feed(f124('go'), 1.12)
-    assert dec.take_events() == ('go',)
+def test_state_key_changes_on_values_not_on_age():
+    tr = rs.RaceTracker()
+    tr.feed(0x124, f124(), 1.0)
+    key = tr.state_key()
+    tr.feed(0x124, f124(), 1.02)
+    assert tr.state_key() == key
+    tr.feed(0x127, res_frame(1, 1), 1.04)
+    assert tr.state_key() != key
 
 
-def test_single_frames_across_silence_are_not_consecutive():
-    dec = rs.RaceSignalDecoder()
-    dec.note_silence(0.0)
-    dec.feed(f124('go'), 0.6)
-    dec.feed(f124('go'), 1.5)           # 메인 루프가 note_silence 를 못 불렀어도 feed 가 반영
-    assert dec.take_events() == ()
-    assert dec.levels['go'] is False
+def test_state_key_with_nan_is_stable():
+    tr = rs.RaceTracker()
+    assert tr.state_key() == tr.state_key()
 
 
-def test_silence_arm_off_when_zero():
-    dec = rs.RaceSignalDecoder(silence_arm_s=0)
-    dec.note_silence(0.0)
-    dec.note_silence(100.0)
-    feed_n(dec, f124('go'), 2, t0=101.0)
-    assert dec.take_events() == ()
+def test_records_cover_can_guard_events():
+    tr = rs.RaceTracker()
+    tr.feed(0x202, bytes.fromhex('2C01000000000000'), 1.0)
+    tr.feed(0x202, bytes.fromhex('2C01000000000000'), 1.02)
+    tr.feed(0x127, res_frame(1, 1), 1.02)
+    names = [n for n, _ in tr.take_records()]
+    assert names.count('speed_limit_info') == 1 and 'res' in names
+    assert tr.take_records() == []
 
 
-def test_restrict_flag_can_fire_again_after_silence():
-    dec = rs.RaceSignalDecoder()
-    dec.note_silence(0.0)
-    feed_n(dec, f124('slow_on'), 2, t0=0.0)
-    assert dec.take_events() == ('slow_on',)
-    dec.note_silence(1.0)
-    feed_n(dec, f124('slow_on'), 2, t0=1.1)
-    assert dec.take_events() == ('slow_on',)
-
-
-# === 계획서 S3 "무시, 이벤트 기록" (WP7 에서 발견: 1프레임 Go 가 흔적 없이 사라졌다) =====================================
-
-def _ignored(dec):
-    return [r for r in dec.take_records() if r[0] == 'race_signal_ignored']
-
-
-def test_single_frame_flag_is_recorded_as_ignored():
-    dec = rs.RaceSignalDecoder(2)
-    dec.feed(f124('go'), 0.0)
-    dec.feed(f124(), 0.02)
-    assert dec.take_events() == ()
-    ignored = _ignored(dec)
-    assert len(ignored) == 1 and 'go' in ignored[0][1] and 'frames=1' in ignored[0][1]
-
-
-def test_confirmed_flag_is_not_recorded_as_ignored():
-    dec = rs.RaceSignalDecoder(2)
-    feed_n(dec, f124(), 2)
-    feed_n(dec, f124('go'), 2, t0=0.04)
-    dec.feed(f124(), 0.08)
-    assert dec.take_events() == ('go',)
-    assert _ignored(dec) == []
-
-
-def test_ignored_flicker_is_rate_limited_and_counts_suppressed():
-    """깜빡임이 계속돼도 이벤트 로그가 쏟아지지 않는다(1 초에 한 줄, 그동안 버린 수를 적음)."""
-    dec = rs.RaceSignalDecoder(2)
-    t = 0.0
-    for _ in range(40):     # 1.6 s, 40 펄스
-        dec.feed(f124('go'), t)
-        dec.feed(f124(), t + 0.02)
-        t += 0.04
-    ignored = _ignored(dec)
-    assert len(ignored) == 2
-    assert 'suppressed=0' in ignored[0][1] and 'suppressed=24' in ignored[1][1]
-
-
-def test_single_frame_then_silence_is_recorded():
-    """깃발 있을 때만 송신하는 방식: 1프레임 뒤 조용해져도 기록된다."""
-    dec = rs.RaceSignalDecoder(2)
-    dec.note_silence(0.0)
-    dec.note_silence(0.6)       # 무장
-    dec.take_records()
-    dec.feed(f124('go'), 0.7)
-    dec.note_silence(1.3)
-    assert dec.take_events() == ()
-    assert len(_ignored(dec)) == 1
+def test_guard_log_ids_exclude_app():
+    assert 0x156 not in rs.GUARD_LOG_FRAME_IDS and 0x127 in rs.GUARD_LOG_FRAME_IDS

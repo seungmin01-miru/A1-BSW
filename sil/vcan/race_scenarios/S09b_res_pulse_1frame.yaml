@@ -1,11 +1,9 @@
-# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음).
 name: S09b_res_pulse_1frame
-desc: 브리프 A7 — RES_START 가 1 프레임만 켜짐(2프레임 확인)
+desc: RES_START 가 1 프레임만 켜짐(RES 는 1 프레임 즉시)
 duration_s: 8.0
 events:
   - {t: 1.0, flag: go, mode: level}
   - {t: 4.0, flag: res, mode: pulse, frames: 1}
 harness:
-  vehicle: {physics: true}
-  model: {note: 계속 가속 명령}
-  expect: ESTOP 래치 없음(A7, 2프레임 확인)
+  expect: res_active 가 1 프레임이라도 true 로 발행됨

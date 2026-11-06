@@ -12,7 +12,6 @@
 #         --estop-required 핸드폰 앱(0x156/0x157)이 시작 전 점검에서 안 보이면 can_guard 시작 거부
 #         --auto-arm       어댑터 자동 arm(제어기 입력 0.3 s 신선 → 두 축 1회). 경주 모드 tools/bsw/bsw_up.sh 가 씀
 #         --no-bag         ROS bag 녹화 안 함(다른 팀이 딴다) — CAN 로그(Kvaser 원본 + candump)만
-#         --guard-args "…" can_guard 에 덧붙일 옵션(공백으로 나눔). 경기 모드 tools/bsw/bsw_up.sh --race 가 씀. 없으면 명령 줄은 예전과 같다
 #   can_guard 비상 정지 이벤트는 항상 <세션>/can_guard_events.csv 에 남는다(bsw_test 00 판정용).
 #
 # 끝낼 때: bash tools/track_day/stop.sh   (disarm → 녹화 종료 → 노드 → can_guard → 미러 순서)
@@ -24,18 +23,15 @@ WS="$REPO/ros2_ws"
 MODE=""; KV_CH=0; CAN=""; RT=1; ACC_LIMIT=30; OUT=""; ADAPTER=true; AUTO_ARM=false; NO_BAG=0
 PARAMS="$WS/src/a1_control_adapter/config/track.yaml"
 ESTOP_REQ=()
-GUARD_EXTRA=(); RACE=0         # --guard-args: 비어 있으면 can_guard 명령 줄이 예전과 같다
 GUARD_CPU=8; NODE_CPU=10       # 격리 코어 8-15 (tools/rt). 물리 코어당 한 스레드 원칙으로 8, 10
 while [ $# -gt 0 ]; do case "$1" in
   --sil) MODE=sil;; --kvaser) MODE=kvaser; [ "${2:-}" ] && [[ "$2" != --* ]] && { KV_CH=$2; shift; };;
   --peak) MODE=peak; CAN=${2:?--peak can0}; shift;;
   --params) PARAMS=$(readlink -f "$2"); shift;; --no-rt) RT=0;; --no-adapter) ADAPTER=false;; --acc-limit) ACC_LIMIT=$2; shift;;
   --out) OUT=$2; shift;; --estop-required) ESTOP_REQ=(--estop-can-required);;
-  --auto-arm) AUTO_ARM=true;; --no-bag) NO_BAG=1;; -h|--help) sed -n 2,20p "$0"; exit 0;;
-  --guard-args) read -r -a GUARD_EXTRA <<< "${2:?--guard-args 값 필요}"; shift;;
+  --auto-arm) AUTO_ARM=true;; --no-bag) NO_BAG=1;; -h|--help) sed -n 2,19p "$0"; exit 0;;
   *) echo "모르는 옵션 $1"; exit 2;; esac; shift; done
-[ -n "$MODE" ] || { sed -n 2,16p "$0"; exit 2; }
-[[ " ${GUARD_EXTRA[*]:-} " == *" --race "* ]] && RACE=1
+[ -n "$MODE" ] || { sed -n 2,15p "$0"; exit 2; }
 D=${OUT:-$HOME/a1_race_capture/track_$(date +%Y%m%d_%H%M%S)}; mkdir -p "$D"
 mkdir -p "$HOME/a1_race_capture"; ln -sfn "$D" "$HOME/a1_race_capture/track_latest"
 say() { echo "[bringup] $*" | tee -a "$D/bringup.log"; }
@@ -72,8 +68,7 @@ fi
 
 # ── 2. can_guard ────────────────────────────────────────
 GUARD=(python3 "$REPO/safety/can_guard/can_guard.py" "${GUARD_IF[@]}" --steer-limit-deg 150 --brake-limit-pct 100
-       --acc-limit-pct "$ACC_LIMIT" --status-interval-s 1 --event-log "$D/can_guard_events.csv" "${ESTOP_REQ[@]}"
-       "${GUARD_EXTRA[@]}")
+       --acc-limit-pct "$ACC_LIMIT" --status-interval-s 1 --event-log "$D/can_guard_events.csv" "${ESTOP_REQ[@]}")
 if [ $RT = 1 ]; then
   sudo -v || die "sudo 필요(격리 코어·SCHED_FIFO). 없이 하려면 --no-rt"
   # 11-04: `setsid sudo …` 는 터미널이 없는 새 세션이라 sudo 가 방금 받은 인증(터미널별 기록)을 못 쓰고
@@ -92,20 +87,7 @@ else
 fi
 for _ in $(seq 60); do [ -e /dev/shm/a1_can_guard_cmd ] && break; sleep 0.1; done
 sleep 1.2   # 시작 전 점검(1 s) 대기
-if [ $RACE = 1 ]; then   # 경기 모드: 0x202 시작 점검은 시작 전 점검 끝에 온다. 결과 줄을 기다리고, 0x203 으로 고치는 중이면 그 상한까지
-  for _ in $(seq 30); do
-    grep -qE "0x202 시작 점검|시작 거부" "$D/can_guard.log" && break; sleep 0.1
-  done
-  grep -q "0x203 으로 .* 고침" "$D/can_guard.log" && sleep 2.5
-  say "$(grep -m1 '0x202 시작 점검' "$D/can_guard.log")"
-fi
 grep -q "앱 연결 후 재실행" "$D/can_guard.log" && die "can_guard 시작 거부 — 핸드폰 앱 0x156/0x157 이 안 보임(--estop-required)"
-# 종료 코드 5·2 는 --race 에서만 나온다(문구가 있을 때만 걸린다). 아래 "다른 0x210" 줄보다 먼저 봐야 원인이 맞게 나온다
-grep -qE "시작 거부\(종료 코드 5\)|0x202 에 반영되지 않음" "$D/can_guard.log" && die "can_guard 시작 거부(종료 코드 5) — 0x202 시작 점검: $(grep -E '시작 거부\(종료 코드 5\)|0x202 에 반영되지 않음' "$D/can_guard.log" | tail -1)
-   · 0x202 = 30.0 은 원격 조종 제한값이라 거부 사유가 아니다. 거부는 0 < 값 ≤ 서행 브레이크 값(잔류 서행 제한)이거나 0x202 가 안 보일 때다.
-   · 잔류 제한: 실무자·업체에 확인. 0x203 해제는 대회측 허락 + 해제값 확인 뒤에만(현장 매뉴얼 8-2절)
-   · 안 보임: 케이블·전원·차량 상태 확인. --speed-limit-allow-missing 은 사람 판단으로만"
-grep -q "경기 설정 오류" "$D/can_guard.log" && die "can_guard 시작 거부(종료 코드 2) — 경기 설정 오류: $(grep -m1 '경기 설정 오류' "$D/can_guard.log")"
 grep -q "시작 거부" "$D/can_guard.log" && die "can_guard 시작 거부 — 다른 0x210 송신자(원격조종 0x210? 미확인 송신자?) $(grep '시작 거부' "$D/can_guard.log")"
 [ -e /dev/shm/a1_can_guard_cmd ] || die "can_guard 공유메모리 없음 — $D/can_guard.log"
 say "can_guard 시작: $(grep -m1 '실행 환경' "$D/can_guard.log")"
@@ -149,15 +131,6 @@ if [ $ADAPTER = false ]; then
    메모:  echo "\$(date +%s.%N) \$(date +%H:%M:%S) 내용" >> $D/notes.txt
    비상 정지: python3 $REPO/safety/can_guard/estop.py   (해제: --reset, 정지 상태에서만)
    종료:  lift_cmd 에서 brake 100 → q, 그다음 bash $HERE/stop.sh
-MSG
-  exit 0
-fi
-if [ $AUTO_ARM = true ] && [ $RACE = 1 ]; then
-  cat <<MSG | tee -a "$D/bringup.log"
-
-✅ 준비 완료(경기 모드, 자동 arm) — 모델이 /control/target 을 내면 arm 되지만 **Go 전에는 can_guard 가 막는다**(가속 0, 브레이크 유지).
-   Go 를 받은 뒤에야 모델 명령이 차로 나간다. 다음 줄부터 시작 점검 표를 본다.
-   상태:  ros2 topic echo /race/state   |  비상 정지: python3 $REPO/safety/can_guard/estop.py
 MSG
   exit 0
 fi

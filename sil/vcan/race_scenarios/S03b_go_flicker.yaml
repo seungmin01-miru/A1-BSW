@@ -1,10 +1,8 @@
-# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음).
 name: S03b_go_flicker
 desc: Go 가 1 프레임 켜짐·1 프레임 꺼짐을 10 번 반복 — 2 프레임 연속은 한 번도 없다
 duration_s: 5.0
 events:
   - {t: 2.0, flag: go, mode: flicker, on_frames: 1, off_frames: 1, repeat: 10}
 harness:
-  vehicle: {physics: true}
-  model: {note: 계속 가속 명령}
-  expect: 무시(2프레임 확인), 이벤트 기록
+  expect: 깃발 무시 — seen_go=false, last_signal=NONE

@@ -18,11 +18,8 @@ bsw_up.sh 가 기본으로 띄운다(nice 10, 격리 코어 밖). 대회 본 주
   우리 명령  0x210 핸들·브레이크 %·가속 %·auto 비트, 송신율(Hz) — 75 Hz 넘으면 "송신자 둘"
   앱         0x156 En, 0x157 ACC_Cmd·EPS_Cmd — En=1 이면 "앱이 쥠: 차량은 0x210 무시"
   수신       ID 별 수신율·마지막 수신 뒤 시간 — 0.2 s 넘게 안 오면 ❌
-  경기       can_guard --race 일 때만 보임: 경기 상태·깃발 비트·RES·속도 상한·0x202 값·모델 정상 시간.
-             판단하지 않고 StatusChannel(공유메모리, can_guard 가 씀)을 읽기만 한다. 다시 보기에는 --status-shm 을 줄 때만.
 """
 import argparse
-import atexit
 import collections
 import os
 import socket
@@ -38,8 +35,6 @@ WHEEL_SCALE = 0.958
 IDS = {0x200: '0x200 차량 상태', 0x201: '0x201 바퀴', 0x210: '0x210 명령', 0x156: '0x156 앱 En', 0x157: '0x157 앱 명령'}
 STALE_S = 0.2
 TWO_SENDERS_HZ = 75
-CAN_GUARD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'safety', 'can_guard')
-RACE_STALE_S = 0.1     # protocol.STATUS_MAX_AGE_S_DEFAULT 와 같은 기준 — 넘으면 어댑터도 경기 규칙을 끈다
 
 
 def s16(b, i):
@@ -172,79 +167,6 @@ def warnings(v, ev):
     return w
 
 
-# ── 경기 상태(StatusChannel, 읽기 전용) ─────────────────
-class RaceStatus:
-    """can_guard 가 쓰는 StatusChannel 을 읽는다. name=None 이면 끔. 재시작한 can_guard 의 새 세그먼트는 1 s 마다 다시 열어 본다."""
-
-    def __init__(self, name, can_guard_dir=CAN_GUARD_DIR):
-        self.name, self.proto, self.ch, self.last, self.last_open = name, None, None, None, 0.0
-        self.seen_race = False             # 한 번이라도 경기 모드를 봤나 — 그 뒤 사라지면 칸을 숨기지 않고 알린다
-        if name is None:
-            return
-        if can_guard_dir not in sys.path:
-            sys.path.insert(0, can_guard_dir)
-        try:
-            import protocol
-            self.proto = protocol if hasattr(protocol, 'StatusChannel') else None
-        except ImportError:
-            self.proto = None
-
-    def close(self):
-        if self.ch is not None:
-            self.ch.close()
-        self.ch = None
-
-    def _reopen(self):
-        if time.monotonic() - self.last_open < 1.0:
-            return
-        self.last_open = time.monotonic()
-        self.close()
-        try:
-            self.ch = self.proto.StatusChannel.open_or_none(self.name)
-        except (ValueError, OSError):      # 만드는 도중이거나 크기가 다른 구버전 세그먼트
-            self.ch = None
-
-    def poll(self):
-        """GuardStatus(나이는 age_s) 또는 None. 판단에 쓰지 않으므로 오래된 값도 돌려주고 화면에서 표시만 한다."""
-        if self.proto is None:
-            return None
-        if self.ch is None or self.last is None or self.last.age_s > RACE_STALE_S:
-            self._reopen()
-        if self.ch is None:
-            self.last = None
-        else:
-            try:
-                self.last = self.ch.read(max_age_s=None)
-            except self.proto.TornReadError:
-                pass                       # 이번 주기 새 값 없음 — 직전 값을 그대로 보여 준다
-        if self.last is not None and self.last.race_enabled:
-            self.seen_race = True
-        return self.last
-
-
-def race_lines(st, seen_race=False):
-    """화면 줄 목록. --race 아니면(또는 StatusChannel 없으면) 빈 목록 = 칸 숨김. [0] 이 머리 줄."""
-    if st is None or not st.race_enabled:
-        return ['경기 상태 없음 — StatusChannel 사라짐(can_guard 종료?) · 어댑터는 기존 규칙'] if seen_race else []
-    phase = st.race_phase_name
-    if phase == 'RACING' and st.slow_active:
-        phase = 'SLOW'
-    head = f'{phase}  (안전 축 {st.guard_state_name}'
-    head += ' · 종방향 BSW)' if st.long_override else ')'
-    if st.age_s > RACE_STALE_S:
-        head = f'⚠️ 오래됨 {st.age_s:.1f} s(마지막 값) · 어댑터는 기존 규칙 — ' + head
-    bit = lambda x: int(bool(x))           # noqa: E731
-    age = '0x124 수신 없음' if st.race_signal_age_s < 0 else f'0x124 {st.race_signal_age_s:.2f} s 전'
-    cap = '없음' if st.speed_cap_kph < 0 else ('정지 유지' if st.speed_cap_kph == 0 else f'{st.speed_cap_kph:.1f} km/h')
-    lim = '수신 없음' if st.vehicle_speed_limit_kph < 0 else f'{st.vehicle_speed_limit_kph:.1f} km/h'
-    return [head,
-            f'깃발  Go {bit(st.sig_go)} · SlowOn {bit(st.sig_slow_on)} · SlowOff {bit(st.sig_slow_off)} · '
-            f'Finish {bit(st.sig_finish)} · Stop {bit(st.sig_stop)}   ({age})',
-            f'RES  {"작동 중" if st.res_active else "대기"} · alive {"정상" if st.res_alive_ok else "❌ 끊김"}',
-            f'BSW 속도 상한 {cap}   ·   0x202 {lim}(차량 표시값, 30.0 = 원격 조종 제한)',
-            f'모델 정상 {st.model_healthy_s:.1f} s']
-
-
 # ── 입력 ────────────────────────────────────────────────
 def replay_frames(path, speed):
     txt = subprocess.run(['zstd', '-dc', path], capture_output=True, text=True, check=True).stdout \
@@ -298,7 +220,7 @@ def start_reader(a, s):
 
 
 # ── 터미널 화면 ──────────────────────────────────────────
-def render_text(v, st, ev, d, src, race=()):
+def render_text(v, st, ev, d, src):
     out = []
     w = out.append
     w(f'── BSW 상태판  {time.strftime("%H:%M:%S")}  입력 {src}  세션 {d or "-"}')
@@ -308,10 +230,6 @@ def render_text(v, st, ev, d, src, race=()):
         w(f'  마지막 상태 전이: {ev["state"][-1][:90]}')
     for lvl, msg in warnings(v, ev):
         w(f'  {"❌" if lvl == "red" else "⚠️"} {msg}')
-    if race:
-        w(f'경기        {race[0]}')
-        for ln in race[1:]:
-            w(f'            {ln}')
     w('')
     if v['speed']:
         w(f'차량 속도   {v["speed"][0]:6.1f} km/h   (좌 {v["speed"][1]:.1f} 우 {v["speed"][2]:.1f}, ÷{WHEEL_SCALE})')
@@ -328,14 +246,14 @@ def render_text(v, st, ev, d, src, race=()):
     return '\n'.join(out)
 
 
-def run_text(a, s, g, d, src, rs):
+def run_text(a, s, g, d, src):
     t_end = time.monotonic() + a.once if a.once else None
     try:
         while True:
             time.sleep(0.2)
             fin = (t_end and time.monotonic() >= t_end) or s.done
             st, ev = g.poll()
-            txt = render_text(s.snapshot(), st, ev, d, src, race_lines(rs.poll(), rs.seen_race))
+            txt = render_text(s.snapshot(), st, ev, d, src)
             if fin or a.once:
                 if fin:
                     print(txt)
@@ -353,7 +271,7 @@ C = {'bg': '#eef0f3', 'card': '#ffffff', 'ink': '#111827', 'muted': '#6b7280', '
      'ok': '#1f9d55', 'bad': '#dc2626', 'amber': '#d97706', 'okbg': '#e7f6ee', 'badbg': '#fde8e8'}
 
 
-def run_gui(a, s, g, d, src, rs):
+def run_gui(a, s, g, d, src):
     import tkinter as tk
     from tkinter import font as tkfont
 
@@ -446,15 +364,6 @@ def run_gui(a, s, g, d, src, rs):
         lb.grid(row=0, column=k, padx=(0, 4))
         rxl[i] = lb
 
-    # 경기 상태 — can_guard --race 일 때만 보인다
-    c6 = card(body, '경기 상태 (StatusChannel, 읽기 전용)')
-    c6.grid(row=4, column=0, columnspan=2, sticky='nsew', pady=6)
-    race_head = tk.Label(c6, bg=C['card'], fg=C['ink'], font=F(14, 'bold'), justify='left', anchor='w')
-    race_head.pack(anchor='w', fill='x')
-    race_body = tk.Label(c6, bg=C['card'], fg=C['ink'], font=F(11), justify='left', anchor='w')
-    race_body.pack(anchor='w', fill='x')
-    c6.grid_remove()
-
     t_end = time.monotonic() + a.once if a.once else None
 
     def tick():
@@ -500,13 +409,6 @@ def run_gui(a, s, g, d, src, rs):
         for i, r, ok in v['rx']:
             put(rxl[i], ('rx', i), text=f'0x{i:03X}\n{r}/s', bg=C['okbg'] if ok else C['badbg'],
                 fg=C['ok'] if ok else C['bad'])
-        race = race_lines(rs.poll(), rs.seen_race)
-        if race:
-            c6.grid()
-            put(race_head, 'race_head', text=race[0])
-            put(race_body, 'race_body', text='\n'.join(race[1:]))
-        else:
-            c6.grid_remove()
         if (t_end and time.monotonic() >= t_end) or (a.replay and s.done):
             if a.shot:                                 # 시험용 창 캡처(xwd 형식, 실차에서는 안 씀)
                 root.update()
@@ -527,15 +429,12 @@ def main():
     ap.add_argument('--speed', type=float, default=1.0)
     ap.add_argument('--text', action='store_true', help='터미널 글자 화면')
     ap.add_argument('--once', type=float, default=0.0, help='이만큼(s) 받고 끝(글자 화면이면 한 번 출력, 시험용)')
-    ap.add_argument('--status-shm', help='StatusChannel 이름(기본: a1_can_guard_status, 다시 보기에서는 끔)')
     ap.add_argument('--shot', help=argparse.SUPPRESS)          # 시험용: 끝날 때 창 캡처(ImageMagick import)
     a = ap.parse_args()
     d = os.path.realpath(a.session) if os.path.isdir(a.session) else ''
     s = State()
     g = GuardLog(d)
     src = start_reader(a, s)
-    rs = RaceStatus(a.status_shm or (None if a.replay else 'a1_can_guard_status'))
-    atexit.register(rs.close)
     gui = not a.text
     if gui:
         try:
@@ -545,7 +444,7 @@ def main():
         except (ImportError, RuntimeError) as e:
             print(f'창을 띄울 수 없음({e}) — 글자 화면으로. tkinter 가 없으면: sudo apt install python3-tk', file=sys.stderr)
             gui = False
-    (run_gui if gui else run_text)(a, s, g, d, src, rs)
+    (run_gui if gui else run_text)(a, s, g, d, src)
 
 
 if __name__ == '__main__':

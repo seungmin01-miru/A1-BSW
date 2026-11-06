@@ -1,9 +1,0 @@
-# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
-name: S17b_residual_limit_tx_on
-desc: 시작할 때 0x202 에 9.3 이 남아 있음, 0x203 송신 켜짐(해제값 100 은 시험용 — 업체 답변 대기)
-duration_s: 5.0
-events: []
-harness:
-  vehicle: {physics: true, speed_limit_kph: 9.3, speed_limit_latency_s: 0.05}
-  guard_args: ['--speed-limit-tx', '--speed-limit-release-kph', '100']
-  expect: 해제 후 통과

@@ -114,7 +114,7 @@ CARDS = {
         expect='엔코더 설정(바퀴 지름 cm, 좌우)', rule='현재 설정값을 먼저 받아 기록 — 바꾸면 0x201 속도 계산이 달라짐',
         safety='업체 입회·원래 값 확보 전 송신 금지', prior='❌ 미확인'),
 
-    # ── A1_dbc_2 추가 메시지 (2026-11-06) — 경기 깃발 대응은 docs/2026-11-06_race_flag_dev_plan.md ──
+    # ── A1_dbc_2 추가 메시지 (2026-11-06) — 경기 깃발 대응은 docs/2026-11-06_engine_room_dev_plan.md ──
     (0x2B0, '*'): dict(phase='P2', stim='다른 단자에서 듣기만', expect='각도 센서', rule='0x200 steer_postion 과 비교', safety='—', prior='미확인'),
     (0x120, '*'): dict(phase='P2', stim='다른 단자에서 듣기만', expect='허브 카운터', rule='증가 여부', safety='—', prior='미확인'),
     (0x202, '*'): dict(phase='P0', stim='없음', expect='현재 차량 속도 제한 표시', rule='값 기록(11-04 30.0, 자율 상한 아님)',

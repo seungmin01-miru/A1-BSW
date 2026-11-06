@@ -1,4 +1,4 @@
-# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음).
 name: S10b_res_alive_freeze
 desc: 0x127 프레임은 오는데 alive_count 만 멈춤
 duration_s: 10.0
@@ -6,6 +6,4 @@ events:
   - {t: 1.0, flag: go, mode: level}
   - {t: 5.0, stream: res, action: freeze}
 harness:
-  vehicle: {physics: true}
-  model: {note: 계속 가속 명령}
-  expect: 0.5 s 뒤 SUSPENDED
+  expect: alive 정지 → res_alive_ok=false, res_age_s 는 작게 유지

@@ -6,11 +6,7 @@ a1_cmd_adapter:
     cmd_shm: a1_can_guard_cmd
     hb_shm: a1_can_guard_perception_hb
     period_s: 0.02              # 공유메모리 기록 주기 — can_guard 워치독 50 ms 의 2.5배 여유
-    stale_timeout_s: 0.15       # arm 중 제어기 입력이 이보다 오래 끊기면 고장 래치 → can_guard HOLDING (경기 모드 아닐 때)
-    # ── 경기 모드(can_guard --race, StatusChannel 이 신선할 때만. 계획서 8.2·8.4)
-    status_shm: a1_can_guard_status
-    hold_after_s: 0.10          # 입력이 이보다 오래 끊기면 기록만 멈춤(래치 없음). 모델 주기의 2배 이상이어야 함. can_guard --adapter-hold-after-s 와 같게
-    pre_go_relatch_s: 1.0       # 출발 대기 중 래치를 정상 입력 이만큼 뒤 자동 해제 + 다시 arm(D11)
+    stale_timeout_s: 0.15       # arm 중 제어기 입력이 이보다 오래 끊기면 고장 래치 → can_guard HOLDING
     perception_heartbeat: true  # 인지 프로세스가 생기면 false
 
     # ── 조향: 타이어각 → 핸들각 (T2 에서 실측). 좌우 비대칭이면 점을 더 넣는다. x 는 오름차순.

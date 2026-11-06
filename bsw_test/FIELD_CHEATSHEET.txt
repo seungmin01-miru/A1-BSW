@@ -233,53 +233,6 @@ A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)         
   (up 은 매번:  up LAT-PROF-01_s<N> <acc>)
 
 =============================================================================================
-★ 경기 날 (--race) — 이유·판단은 FIELD_MANUAL.md 8절.  위 시험용 up/down 이 아니다
-=============================================================================================
-  지키기   원격 유닛 OFF(세션 내내) / 앱 En 해제는 차가 선 뒤에만 / auto 000·disarm 금지 / 0x202 = 30.0 은 정상(원격 조종 제한값)
-  브리핑   일정 시간 값 · 신호 방식(0x124 계속/깃발 때만, 프레임 수) · 0x127/0x124 평소 송신 여부 · 0x203 허용 + 해제값
-           점검 중 재시작 허용 · Go 전 움직임 기준 · 우선순위/Stop · 속도 판정 기준 · 앱 사용  → 기록 → PC 담당
-
-  시작
-  [T1] bash ~/git/A1-BSW/tools/bsw/bsw_up.sh --race --name RACE1 --no-ui        # 볼 사람 있으면 --no-ui 빼기
-       그날만 바꿈:  --race-opt "--pre-go-brake-pct 20"                         # 뒤에 붙어 이김, SESSION.md 에 남음
-       재시작 금지:  --race-opt "--resume-mode go-reset"
-       0x203 허용 + 해제값 확인 때만:  --race-opt "--speed-limit-tx --speed-limit-release-kph <값>"
-  (모델 팀) /control/target 발행 시작 — Go 전에도 계속. Go 전에는 BSW 가 막음
-  [T2] watch -n 1 bash ~/git/A1-BSW/tools/bsw/bsw_status.sh
-       → "✅ 출발 준비됨" = PRE_GO · 안전 축 ACTIVE · 모델 정상 ≥ 10 s · 0x202 값 있음
-       ⚠️ 0x124/0x127 수신 없음 = 깃발·RES 때만 보내는 방식이면 정상(실패 아님)
-
-  시작 거부 (bsw_up 이 이유 출력 → 정리: 안내에 나온 bsw_down.sh <세션> --force)
-       종료 3  다른 0x210    → 원격 유닛 끄기
-       종료 4  앱 안 보임    → 앱 연결(못 쓰면 --no-app: 물리 E-stop 담당 확인 후)
-       종료 5  0x202 점검    → 잔류 서행 제한(0 < 값 ≤ 9.3) 또는 0x202 없음. 값 기록, 실무자·업체 확인. 30.0 은 사유 아님
-       종료 2  경기 설정 오류 → can_guard.log 보고 BSW 팀
-
-  경기 중  사람은 개입 안 함. 정지가 필요하면 맨 위 킬스위치만.
-
-  Go 순간 모델 죽음 → STOPPED(자동 복귀 없음) → 대회 측에 알림 → 허락 뒤 아래 재시작
-  ESTOP / STOPPED    → 차 선 뒤 아래 재시작.   ESTOP 인데 브레이크 안 오름 → 물리 E-stop
-  PARKED(Finish 끝)  → 정차 인정 확인 → [T1] bash ~/git/A1-BSW/tools/bsw/bsw_down.sh
-
-  중단 → 재개 (restart, 기본)
-    1 차 완전 정지(앱 쥐었으면 그 뒤에 En 해제)
-    2 [T1] bash ~/git/A1-BSW/tools/bsw/bsw_down.sh      → 바퀴 굄·사람 대기, 세션 폴더 보관
-    3 원격 유닛 ON(반드시 down 뒤) → 팀장이 피트 이동 → 점검 → 원격 유닛 OFF → 출발 위치
-    4 [T1] bash ~/git/A1-BSW/tools/bsw/bsw_up.sh --race --name RACE1b --no-ui → 모델 발행 → "✅ 출발 준비됨"
-    5 녹기 + Go
-  중단 → 재개 (go-reset, 세션 시작부터 켠 때만)
-    RES=0 · Stop=0 · 차속 ≤ 3 km/h → 새 Go 로 그대로 재개. can_guard 끄지 않음. esr 치지 않음.
-    피트 이동(원격 유닛) 필요하면 못 씀 → restart 절차
-
-  증거 (세션마다)
-    bsw_down → SESSION.md 에 옵션·이벤트 요약, can_logs.sha256
-    세션 폴더 통째로 외장 복사(재시작했으면 앞 세션도), 원본 안 지움
-    can_guard_events.csv / kvaser_ch0.log / candump_kv0.log / can_guard.log / SESSION.md / race_flag.yaml
-
-  리허설 (차량 없이, vcan0)
-    bash ~/git/A1-BSW/tools/bsw/bsw_up.sh --sil --race --name REH1 --race-sil-server ~/git/A1-BSW/sil/vcan/race_scenarios/S02_go.yaml
-
-=============================================================================================
 그날 끝 — 데이터 옮기기 (세션마다)
 =============================================================================================
   T=~/git/A1-BSW/bsw_test/<00_SAF_estop|01_…|…>/raw            # 그 테스트 폴더

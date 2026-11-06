@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CanFrame.msg"
@@ -18,7 +19,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ControllerOutput.msg"
   "msg/AdapterStatus.msg"
   "msg/RaceState.msg"
-  DEPENDENCIES std_msgs
+  DEPENDENCIES std_msgs builtin_interfaces
 )
 
 if(BUILD_TESTING)

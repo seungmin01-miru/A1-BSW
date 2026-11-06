@@ -9,7 +9,7 @@
 | `A1_dbc_2_CAN.xlsx` | `DBC/` | 위 DBC 의 신호 설명 엑셀 | `9832d84a19cbbc72fe389b4fc0aad8b9c0629a7791009ad39a4b6b636254e217` |
 
 함께 보는 문서
-- 개발 지시서: [`docs/2026-11-06_race_flag_dev_plan.md`](../../2026-11-06_race_flag_dev_plan.md)
+- 개발 지시서: [`docs/2026-11-06_engine_room_dev_plan.md`](../../2026-11-06_engine_room_dev_plan.md)
 - 대회 측 질의서: [`docs/2026-11-06_race_flag_questions.md`](../../2026-11-06_race_flag_questions.md)
 - 모델 팀 전달 데이터시트: [`docs/A1_BSW_토픽_데이터시트_v0.2.xlsx`](../../A1_BSW_토픽_데이터시트_v0.2.xlsx)
 

@@ -1,12 +1,9 @@
-# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음).
 name: S11a_race_signal_lost_default
-desc: 0x124 가 5 s 에 끊김, can_guard 기본(timeout 끔)
+desc: 0x124 가 5 s 에 끊김
 duration_s: 10.0
 events:
   - {t: 1.0, flag: go, mode: level}
   - {t: 5.0, stream: race_signal, action: stop}
 harness:
-  vehicle: {physics: true}
-  guard_args: []
-  model: {note: 계속 가속 명령}
-  expect: 기록만(race_signal_lost), 주행 유지
+  expect: 0x124 끊김 → race_signal_age_s 증가, 값 유지(전달만)

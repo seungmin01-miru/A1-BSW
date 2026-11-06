@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """fake_race_server.py 시험 — 인코딩(cantools + DBC 대조)·재생 방식·시나리오 파일. vcan 없이 돈다(가상 시계·virtual 버스)."""
 import glob
-import inspect
 import os
 import sys
 import threading
@@ -15,7 +14,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
 sys.path.insert(0, HERE)
 import fake_race_server as frs  # noqa: E402
-from fake_a1_vehicle import FakeVehicle  # noqa: E402
 from fake_race_server import RaceServer, load_scenario  # noqa: E402
 
 DBC = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc'))
@@ -272,27 +270,12 @@ def test_bad_scenarios_rejected(bad):
 
 
 # ---- 시나리오 파일 ----------------------------------------------------------------------------------------------------
-def test_every_server_scenario_of_plan_exists():
-    names = {os.path.basename(p).split('_')[0] for p in ALL_YAML}
-    for sid in ('S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10', 'S11a', 'S11b',
-                'S12a', 'S12b', 'S13', 'S16', 'S17a', 'S17b'):
-        assert sid in names
-
-
 @pytest.mark.parametrize('path', ALL_YAML, ids=[os.path.basename(p) for p in ALL_YAML])
 def test_yaml_loads_name_matches_and_plays(path):
     s = load_scenario(path)
     assert s['name'] == os.path.splitext(os.path.basename(path))[0]
     assert s['harness'].get('expect'), '합격 기준 없음'
     assert of(play(path), 0x124), '0x124 프레임이 있어야 한다'
-
-
-@pytest.mark.parametrize('path', ALL_YAML, ids=[os.path.basename(p) for p in ALL_YAML])
-def test_yaml_vehicle_args_are_real_fake_vehicle_arguments(path):
-    allowed = set(inspect.signature(FakeVehicle.__init__).parameters) - {'self', 'bus'}
-    vehicle = load_scenario(path)['harness'].get('vehicle', {})
-    assert set(vehicle) <= allowed
-    FakeVehicle(_Rec(), **vehicle)      # 값까지 받아들여지는지
 
 
 def _yaml(name):
@@ -302,11 +285,6 @@ def _yaml(name):
 def test_s03_is_one_frame_s04_is_two_frames():
     assert len(go_frames(play(_yaml('S03_go_pulse_1frame')))) == 1
     assert len(go_frames(play(_yaml('S04_go_pulse_2frames')))) == 2
-
-
-def test_s02b_go_on_from_first_frame_then_falls_and_rises():
-    bits = [bool(d[0] & 0x80) for _, d in of(play(_yaml('S02b_go_on_at_start')), 0x124)]
-    assert bits[0] and not bits[225] and bits[260] and bits[-1]
 
 
 def test_s09_res_window():
@@ -320,13 +298,6 @@ def test_s10_frames_end_and_s10b_counter_freezes():
     assert len({d[7] for _, d in tail}) == 1
 
 
-def test_s11_gap_and_s12_bytes():
-    assert of(play(_yaml('S11a_race_signal_lost_default')), 0x124)[-1][0] == pytest.approx(4.98)
-    assert 0x18 in {d[0] & 0x18 for _, d in of(play(_yaml('S12a_slow_on_and_off')), 0x124)}
-    assert 0x90 in {d[0] for _, d in of(play(_yaml('S12b_go_and_slow_on')), 0x124)}
-    assert 0xE0 in {d[0] for _, d in of(play(_yaml('S12c_stop_finish_go')), 0x124)}
-
-
 def test_x01_optional_frames_appear_and_vanish():
     frames = play(_yaml('X01_pit_repair_record_only'))
     assert of(frames, 0x125)[0][0] == pytest.approx(2.0) and of(frames, 0x125)[-1][0] == pytest.approx(4.98)
@@ -334,38 +305,6 @@ def test_x01_optional_frames_appear_and_vanish():
 
 
 # ---- 진짜 virtual 버스 ------------------------------------------------------------------------------------------------
-def test_virtual_bus_server_drives_fake_vehicle_res():
-    """서버 → 가상 버스 → 차량. RES 중 감속, 0x128 이 버스로 나온다."""
-    ch = f'srv_{uuid.uuid4().hex[:8]}'
-    b_srv, b_car, b_mon = [can.Bus(channel=ch, interface='virtual') for _ in range(3)]
-    try:
-        srv = RaceServer(b_srv, sc([dict(t=0.1, flag='res', until=1.5)], duration=2.0))
-        car = FakeVehicle(b_car, period_s=0.02, initial_kph=10.0, res_decel_mps2=5.0)
-        srv.start(0.0)
-        res_seen = False
-        for i in range(0, 100):
-            now = i * 0.02
-            srv.step(now)
-            car.step(now)
-            res_seen = res_seen or car.res_active
-            if i == 74:
-                assert car.res_active and car.kph == 0.0 and car.res_end
-        assert res_seen and not car.res_active and not car.res_end
-        ids, fb = set(), []
-        while True:
-            m = b_mon.recv(timeout=0)
-            if m is None:
-                break
-            ids.add(m.arbitration_id)
-            if m.arbitration_id == 0x128:
-                fb.append(DBC.decode_message(0x128, bytes(m.data))['RES_END'])
-        assert {0x124, 0x127, 0x128, 0x200, 0x201, 0x202} <= ids
-        assert fb[0] == 0 and 1 in fb and fb[-1] == 0
-    finally:
-        for b in (b_srv, b_car, b_mon):
-            b.shutdown()
-
-
 def test_cli_plays_on_virtual_bus(tmp_path):
     ch = f'cli_{uuid.uuid4().hex[:8]}'
     p = tmp_path / 's.yaml'

@@ -237,30 +237,3 @@ def test_holding_disarm_still_silent_by_design():
 
 def test_never_armed_estop_still_sends_nothing():
     assert _run(State.ESTOP, Command(), last_auto_cmd=None, estop_profile=ESTOP) is None
-
-
-# --- 복구 구간 관성 주행(2026-11-06, 계획서 8.2) -----------------------------------------------------------------------
-def test_recovery_coast_zero_brake_zero_accel_steer_held():
-    armed = Command(steer_auto=True, brake_auto=True, acc_auto=True, steer_cmd_deg=5.0, acc_cmd_pct=40.0, brake_cmd_pct=20.0)
-    ramp = BrakeRamp()
-    ramp.reset(20.0)
-    acc = RateLimiter(10.0)
-    acc.reset(40.0)
-    out = command_for_state(State.HOLDING, armed, 7.5, RateLimiter(), acc, ramp, 0.02, recovery_coast=True)
-    assert (out.steer_cmd_deg, out.acc_cmd_pct, out.brake_cmd_pct) == (7.5, 0.0, 0.0)
-    assert out.steer_auto and out.brake_auto and out.acc_auto
-    assert ramp.value == 0.0
-    # 정지 확정: 기존 hold 램프가 시작값부터
-    out = command_for_state(State.HOLDING, armed, 7.5, RateLimiter(), acc, ramp, 0.02, recovery_coast=False)
-    assert out.brake_cmd_pct >= 30.0 and out.acc_cmd_pct == 0.0
-
-
-def test_recovery_coast_keeps_silence_rule_and_other_states():
-    off = Command(steer_cmd_deg=5.0)
-    assert command_for_state(State.HOLDING, off, 7.5, RateLimiter(), RateLimiter(), BrakeRamp(), 0.02, recovery_coast=True) is None
-    armed = Command(steer_auto=True, brake_auto=True, acc_auto=True, acc_cmd_pct=40.0)
-    # HOLDING 이 아닌 상태에는 영향 없음
-    for st in (State.ACTIVE, State.ESTOP, State.STOPPED, State.DEGRADED):
-        a = command_for_state(st, armed, 1.0, RateLimiter(), RateLimiter(), BrakeRamp(), 0.02)
-        b = command_for_state(st, armed, 1.0, RateLimiter(), RateLimiter(), BrakeRamp(), 0.02, recovery_coast=True)
-        assert a == b

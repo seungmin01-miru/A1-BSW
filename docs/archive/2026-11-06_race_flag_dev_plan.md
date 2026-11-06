@@ -1,5 +1,7 @@
 # 경기 깃발(Flag) CAN 대응 — BSW 개발 지시서
 
+> **폐기(2026-11-06).** 회의 결정으로 대체됨 → [`../2026-11-06_engine_room_dev_plan.md`](../2026-11-06_engine_room_dev_plan.md). 구현은 태그 `race-flag-full-3309cd1` 에 있다.
+
 작성 2026-11-06 · 대상: Claude Code(개발 실행) + BSW 팀 · 상태: **설계 확정, 구현 전**
 근거 자료(저장소 안 위치):
 - 규정집: `docs/reference/2026_race/2026_A1_CHALLENGE_RACE_rulebook.pdf` (이하 규정집)

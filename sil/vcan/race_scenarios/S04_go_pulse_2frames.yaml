@@ -1,10 +1,8 @@
-# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음).
 name: S04_go_pulse_2frames
 desc: Go 가 정확히 2 프레임만 켜지고 내려감
 duration_s: 5.0
 events:
   - {t: 2.0, flag: go, mode: pulse, frames: 2}
 harness:
-  vehicle: {physics: true}
-  model: {note: 계속 가속 명령}
-  expect: RACING 진입, 비트가 내려가도 유지
+  expect: seen_go=true 로 남고 sig_go 는 다시 false

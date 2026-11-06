@@ -40,7 +40,3 @@ if [ -f "$ev" ]; then
   [ "$n_fx" -gt 0 ] && bad "다른 0x210 송신자 감지 $n_fx 줄 — 원격 유닛 끌 것"
   grep ",state," "$ev" | tail -1 | awk -F, '{print "     마지막 상태 전이: " $4}'
 fi
-# 경기 모드 세션만: 시작 점검 표(StatusChannel 읽기 전용, 0x202·0x124·PRE_GO·모델 정상 시간). 그 밖의 세션은 출력이 예전과 같다
-if grep -q "^- 경기 모드: 켜짐" "$D/SESSION.md" 2>/dev/null; then
-  python3 "$HERE/race_status_cli.py" check --slow-brake-kph "$BSW_RACE_SLOW_BRAKE_KPH" --min-model-s "$BSW_RACE_MIN_MODEL_S"
-fi

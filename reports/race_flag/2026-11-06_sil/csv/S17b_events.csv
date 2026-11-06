@@ -1,9 +1,0 @@
-t_s,event,detail
-0.007,start,virtual:ra06f3930 init=silent estop_can=remote
-0.022,res_fb,res_end=0 res_error=0
-0.316,speed_limit_startup,observed=9.3 expected=100.0 tx=on race=True action=correct
-0.316,speed_limit_tx,target=100 reason=startup
-0.441,speed_limit_confirm,target=100 after=0.126s
-0.442,state,INIT->ACTIVE cmd_age=0.00013665300139109604 speed_kph=None
-0.482,input_clamped,none->hold_PRE_GO
-5.002,stop,cycles=229 tx_fail=0

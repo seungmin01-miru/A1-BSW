@@ -1,4 +1,0 @@
-t_s,event,detail
-0.002,start,virtual:r5dacee61 init=silent estop_can=remote
-0.316,state,INIT->ACTIVE cmd_age=0.015633022998372326 speed_kph=0.0
-5.017,stop,cycles=236 tx_fail=0
