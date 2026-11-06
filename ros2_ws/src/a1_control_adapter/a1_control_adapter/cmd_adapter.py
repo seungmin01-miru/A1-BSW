@@ -23,6 +23,13 @@
     한 번뿐이다: 운영자가 disarm 하거나 고장 래치가 나면 다시 자동으로 arm 하지 않는다(arm 서비스로만).
   - 인지 하트비트: 인지 프로세스가 아직 없으므로(can_guard README) 이 노드가 대신 보낸다 — disarm 중엔 항상,
     arm 중엔 입력이 신선할 때만. perception_heartbeat:=false 로 끌 수 있다(진짜 인지 프로세스가 생기면).
+
+경기 모드(2026-11-06, 계획서 8.2·8.4, 판단은 race_rules.py): can_guard StatusChannel 이 있고 race_enabled 이고 stamp 가 0.1 s 안일 때만.
+  - 입력이 hold_after_s(0.10 s) 넘게 끊기면 기록·하트비트만 멈춘다(래치 없음). 돌아오면 재개 → 판정은 can_guard(D3).
+  - ±15 m/s²·±45° 밖 입력은 input_grace·long_override·PRE_GO/SLOW/PARKED/SUSPENDED 면 잘라 쓰고 래치 안 함(D7). NaN·inf 는 항상 래치.
+  - PRE_GO 래치는 정상 입력 pre_go_relatch_s(1 s) 뒤 자동 해제 + 다시 arm(D11). 운영자 disarm 뒤 wait_restart 규칙은 그대로.
+  - PRE_GO·PARKED·SUSPENDED 동안 SlewLimiter 를 실제 핸들각으로 붙여 둔다(Go 순간 조향 계단 방지).
+  StatusChannel 없음·오래됨·race_enabled=false → 위 규칙 전부 끄고 기존 규칙 그대로.
 """
 import os
 import sys
@@ -34,7 +41,12 @@ from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_srvs.srv import SetBool, Trigger
 
 from a1_can_msgs.msg import AdapterStatus, ControlInfo, ControllerOutput
-from a1_control_adapter.conversion import InputLimits, LongMap, SlewLimiter, SteerMap, validate
+from a1_can_bridge.race_status import StatusReader
+from a1_control_adapter.conversion import InputLimits, LongMap, SlewLimiter, SteerMap
+from a1_control_adapter.race_rules import RaceRules
+
+NOTE_HOLD = '경기 모드: 모델 입력 끊김 — 기록 멈춤(래치 아님, can_guard 가 판정)'
+NOTE_CLIP = '경기 모드: 범위 밖 입력을 잘라 씀(D7)'
 
 
 def _import_protocol(can_guard_dir):
@@ -61,6 +73,7 @@ class CmdAdapter(Node):
         self.period_s = p('period_s', 0.02).value
         self.stale_s = p('stale_timeout_s', 0.15).value
         self.hb_enabled = p('perception_heartbeat', True).value
+        self.status_shm = p('status_shm', getattr(self.proto, 'STATUS_SHM_NAME_DEFAULT', 'a1_can_guard_status')).value
         self.steer = SteerMap(
             list(p('steer_map.tire_deg', [-20.0, 0.0, 20.0]).value),
             list(p('steer_map.wheel_deg', [-150.0, 0.0, 150.0]).value),
@@ -76,6 +89,9 @@ class CmdAdapter(Node):
             brake_max_pct=p('brake_max_pct', 100.0).value)
         self.lim = InputLimits(p('input_accel_abs_mps2', 15.0).value, p('input_steer_tire_abs_deg', 45.0).value)
         self.slew = SlewLimiter(p('steer_rate_limit_deg_s', 120.0).value)
+        self.status = StatusReader(self.proto, self.status_shm)
+        self.rules = RaceRules(self.lim, stale_s=self.stale_s, hold_after_s=float(p('hold_after_s', 0.10).value),
+                               pre_go_relatch_s=float(p('pre_go_relatch_s', 1.0).value))
         self.auto_arm = bool(p('auto_arm', False).value)
         self.auto_arm_fresh_s = float(p('auto_arm_fresh_s', 0.3).value)
         self.auto_arm_spent = False   # 자동 arm 은 노드 생애에 한 번
@@ -113,7 +129,9 @@ class CmdAdapter(Node):
 
     # ── 입력 ───────────────────────────────────────────────
     def on_target(self, msg):
-        why = validate(msg.accel_mps2, msg.steer_tire_deg, self.lim)
+        now = time.monotonic()
+        d = self.rules.check_input(msg.accel_mps2, msg.steer_tire_deg, now)
+        why = d.why
         if why:
             self.rejected += 1
             self.last = self.last_rx = None   # 마지막 유효값도 버린다 — 고장 난 제어기의 이전 값을 믿지 않는다
@@ -121,8 +139,12 @@ class CmdAdapter(Node):
             if self.steer_armed or self.long_armed:
                 self._latch(f'입력 거부: {why}')
             return
-        self.last = (msg.accel_mps2, msg.steer_tire_deg)
-        self.last_rx = time.monotonic()
+        if d.clipped:
+            self._set_note(NOTE_CLIP)
+        elif self.note == NOTE_CLIP:
+            self.note = ''
+        self.last = (d.accel_mps2, d.steer_tire_deg)
+        self.last_rx = now
 
     def on_info(self, msg):
         self.meas_wheel_deg = msg.steer_position_deg
@@ -134,6 +156,9 @@ class CmdAdapter(Node):
     def _fresh(self, now):
         age = self._age(now)
         return age is not None and age <= self.stale_s
+
+    def _actual_steer_fresh(self, now):
+        return self.meas_rx is not None and now - self.meas_rx <= 0.5
 
     # ── 서비스 ─────────────────────────────────────────────
     def _arm_check(self, axis):
@@ -239,6 +264,7 @@ class CmdAdapter(Node):
         now = time.monotonic()
         dt = 0.0 if self.last_tick is None else now - self.last_tick
         self.last_tick = now
+        self.rules.set_status(self.status.poll(now), now)
         armed = self.steer_armed or self.long_armed
         fresh = self._fresh(now)
         self.fresh_since = (self.fresh_since or now) if fresh else None
@@ -253,15 +279,24 @@ class CmdAdapter(Node):
                 self.get_logger().warn(f'자동 arm(조향·종방향) — 제어기 입력 {now - self.fresh_since:.2f} s 신선')
             else:
                 self._set_note('자동 arm 대기: ' + '; '.join(w for ok, w in oks if not ok))
-        if armed and not fresh and not self.fault:
-            age = self._age(now)
-            self._latch('제어기 입력 끊김' + (f' ({age * 1000:.0f} ms)' if age is not None else ''))
+        d = self.rules.decide(now, self._age(now), self.steer_armed, self.long_armed, bool(self.fault),
+                              self.wait_restart, self._actual_steer_fresh(now))
+        if d.latch_reason:
+            self._latch(d.latch_reason)
+        if d.release_latch:
+            # 축 플래그는 래치 중에도 그대로다 → 래치만 풀면 다시 arm. auto_arm_spent 는 보지 않는다(D11)
+            self.get_logger().warn(f'출발 대기 중 래치 자동 해제({self.fault}) — 정상 입력 {self.rules.pre_go_relatch_s:g} s')
+            self.fault = ''
+            self.note = ''
 
         accel, tire = self.last if self.last is not None else (0.0, 0.0)
         wheel_target = self.steer.to_wheel(tire)
         acc, brake = self.long.to_pedals(accel)
         if self.steer_armed:
-            wheel = self.slew.step(wheel_target, dt)
+            if (d.reset_slew and self._actual_steer_fresh(now)) or d.release_latch:
+                self.slew.reset(self.meas_wheel_deg)
+            # 끊김 동안은 쓰지 않으므로 움직이지 않는다 — 재개는 마지막으로 쓴 값에서 속도 제한으로
+            wheel = self.slew.y if d.holding and self.slew.y is not None else self.slew.step(wheel_target, dt)
         else:
             self.slew.reset(None)
             wheel = wheel_target       # disarm 중에는 표시용으로 속도 제한 없이
@@ -270,7 +305,11 @@ class CmdAdapter(Node):
         if self.wait_restart:
             self._ensure_open(now)   # 재시작 감지(inode 변화)만 — 쓰지 않는다
             self._set_note('래치 해제됨 — can_guard 재시작 대기(그동안 기록 안 함, can_guard 가 브레이크 유지)')
-        if not self.fault and not self.wait_restart and self._ensure_open(now):
+        if d.holding and not self.fault:
+            self._set_note(NOTE_HOLD)
+        elif self.note == NOTE_HOLD:
+            self.note = ''
+        if not self.fault and not self.wait_restart and self._ensure_open(now) and not d.holding:
             cmd = self.proto.Command(
                 steer_auto=self.steer_armed, brake_auto=self.long_armed, acc_auto=self.long_armed,
                 steer_cmd_deg=wheel if self.steer_armed else 0.0,
@@ -279,7 +318,7 @@ class CmdAdapter(Node):
             try:
                 self.cmd_ch.write(cmd)
                 writing = True
-                if self.hb_ch is not None and (not armed or fresh):
+                if self.hb_ch is not None and (not armed or d.input_ok):
                     self.hb_ch.beat()
             except (ValueError, OSError) as e:   # can_guard 재시작으로 세그먼트가 바뀌면 다시 연다
                 self._set_note(f'공유메모리 쓰기 실패({e}) — 다시 연결')
@@ -307,6 +346,7 @@ class CmdAdapter(Node):
 
     def destroy_node(self):
         self._close()
+        self.status.close()
         super().destroy_node()
 
 
