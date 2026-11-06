@@ -87,9 +87,11 @@ if mode == 'session':
     out(bool(deg) and all(d['acc_command'] == 0 for d in deg) and {d['steer_command'] for d in deg} == {7}
         and deg[-1]['break_command'] > deg[0]['break_command'], f'C6: 하트비트 끊김 → 조향 {sorted({d["steer_command"] for d in deg})}° 고정(마지막 명령 7°)·가속 0·브레이크 {deg[0]["break_command"] if deg else "?"}→{deg[-1]["break_command"] if deg else "?"} %')
     stp = win(m_percoff + 3.6, m_end)
-    out(bool(stp) and all(auto(d) == (1, 1, 1) and d['break_command'] == 30 and d['acc_command'] == 0
-        and d['steer_command'] == 7 for d in stp),
-        f'C6: STOPPED(hold) = auto 유지·조향 7° 유지·브레이크 30 %·가속 0 ({len(stp)}프레임)')
+    # 브레이크는 고정값이 아니라 30 % → 20 %/s → 60 %(can_guard --hold-brake-*, 2026-11-04 설계) — 내려가면 안 된다
+    brk = [d['break_command'] for d in stp]
+    out(bool(stp) and all(auto(d) == (1, 1, 1) and 30 <= d['break_command'] <= 60 and d['acc_command'] == 0
+        and d['steer_command'] == 7 for d in stp) and brk == sorted(brk),
+        f'C6: STOPPED(hold) = auto 유지·조향 7° 유지·브레이크 {brk[0] if brk else "?"}→{brk[-1] if brk else "?"} %(30~60, 안 내려감)·가속 0 ({len(stp)}프레임)')
 elif mode == 'stops_after':
     after = [t for t, _ in ours if t > marks[0] + 0.05]
     out(not after, f'can_guard 강제 종료 뒤 0x210 {len(after)}개 (기대 0 — 이후는 차량 자체 타임아웃의 몫)')
@@ -102,8 +104,9 @@ elif mode == 'p1':
         and hold[-1]['break_command'] > hold[0]['break_command'],
         f'lift_cmd kill -9 → 조향 {sorted({d["steer_command"] for d in hold})}° 고정(마지막 명령 12°), 브레이크 {hold[0]["break_command"] if hold else "?"}→{hold[-1]["break_command"] if hold else "?"} %')
     late = win(m_kill + 2.3, m_kill + 3.0)
-    out(bool(late) and all(d['break_command'] == 30 and auto(d) == (1, 1, 1) and d['steer_command'] == 12 for d in late),
-        'STOPPED: 조향 12° 유지·브레이크 30 % 유지·auto 유지')
+    brk = [d['break_command'] for d in late]
+    out(bool(late) and all(30 <= d['break_command'] <= 60 and auto(d) == (1, 1, 1) and d['steer_command'] == 12 for d in late)
+        and brk == sorted(brk), f'STOPPED: 조향 12° 유지·브레이크 {brk[0] if brk else "?"}→{brk[-1] if brk else "?"} %(30~60, 안 내려감)·auto 유지')
 EOF
 }
 

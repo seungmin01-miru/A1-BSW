@@ -4,7 +4,7 @@
 #
 #   bash tools/track_day/rehearse_track.sh
 #
-# 확인하는 것: disarm 중 0x210 침묵(auto 000 안 보냄) / 입력 없을 때 arm 거부 / 타이어각→핸들각(조향비 7.5)·가감속→% 변환이 0x210 raw 로 /
+# 확인하는 것: disarm 중 0x210 침묵(auto 000 안 보냄) / 입력 없을 때 arm 거부 / 타이어각→핸들각(track.yaml 7점 표: 타이어 4° = 핸들 33.9°, 2026-11-06)·가감속→% 변환이 0x210 raw 로 /
 # arm 순간 핸들 속도 제한 / 10 Hz 느린 제어기에서도 can_guard 워치독 미발동 / 제어기 kill → 고장 래치 → HOLDING →
 # STOPPED(조향 고정·가속 0·브레이크) / 래치 중 arm 거부·disarm 해제 / can_guard 재시작 후 자동 재연결 /
 # NaN 입력 → 고장 래치.
@@ -64,8 +64,8 @@ start_pub -p rate_hz:=10.0 -p steer_tire_deg:=4.0 -p accel_mps2:=-1.0
 sleep 3
 M_DIS0=$(mark); sleep 1.5; M_DIS1=$(mark)
 st=$(timeout 5 ros2 topic echo --once /control/adapter/status 2>/dev/null | tr '\n' ' ')
-echo "$st" | grep -q "out_steer_wheel_deg: 30.0" && echo "$st" | grep -q "out_brake_pct: 40.0" \
-  && ok "shadow 상태 토픽: 핸들 30.0°·브레이크 40 % (disarm 중에도 변환값 표시)" || bad "상태 토픽 값 이상: $st"
+echo "$st" | grep -q "out_steer_wheel_deg: 33.9" && echo "$st" | grep -q "out_brake_pct: 40.0" \
+  && ok "shadow 상태 토픽: 핸들 33.9°·브레이크 40 % (disarm 중에도 변환값 표시)" || bad "상태 토픽 값 이상: $st"
 r1=$(svc arm_steer SetBool "{data: true}"); M_ARM_S=$(mark)
 r2=$(svc arm_long SetBool "{data: true}"); M_ARM=$(mark)
 echo "$r1 $r2" | grep -o "success=True" | wc -l | grep -q 2 && ok "arm_steer·arm_long 수락" || bad "arm 실패: $r1 / $r2"
@@ -120,19 +120,19 @@ out(max(dts) < 0.03, f'0x210 주기 중앙값 {statistics.median(dts)*1000:.1f} 
 d = win(dis0, dis1)
 out(not d, f'disarm(shadow): 0x210 송신 안 함({len(d)}프레임) — auto 000 = 페일세이프 브레이크 해제라 침묵(2026-11-04)')
 first = [x['steer_command'] for x in win(arm_s - 2.5, arm_s + 1.5) if x['steer_is_auto_command']]
-out(bool(first) and first[0] < 29.0 and 30.0 in first,
-    f'arm 순간 핸들 속도 제한: 첫 값 {first[0] if first else None}° → 30.0° (120 °/s)')
+out(bool(first) and first[0] < 33.0 and any(abs(x - 33.9) < 0.06 for x in first),
+    f'arm 순간 핸들 속도 제한: 첫 값 {first[0] if first else None}° → 33.9° (120 °/s)')
 a = win(arm + 0.3, acc0)
-out(bool(a) and all(auto(x) == (1, 1, 1) and x['steer_command'] == 30.0 and x['break_command'] == 40
+out(bool(a) and all(auto(x) == (1, 1, 1) and abs(x['steer_command'] - 33.9) < 0.06 and x['break_command'] == 40
         and x['acc_command'] == 0 for x in a),
-    f'타이어 4° → 핸들 30.0°(raw 300), −1.0 m/s² → 브레이크 40 %, 가속 0 ({len(a)}프레임)')
+    f'타이어 4° → 핸들 33.9°(raw 339), −1.0 m/s² → 브레이크 40 %, 가속 0 ({len(a)}프레임)')
 b = win(acc + 0.4, kill)
 out(bool(b) and all(x['acc_command'] == 100 and x['break_command'] == 0 for x in b),
     f'+0.7 m/s² → 가속 100 % (11-04 표: 0.57 이상 포화), 브레이크 0 ({sorted({x["acc_command"] for x in b})})')
 out('INIT → ACTIVE' in guard and guard.count('→ HOLDING') == 1,
     f'10 Hz 입력 구간 워치독 미발동(HOLDING 전이는 kill 때 1번뿐: {guard.count("→ HOLDING")}회)')
 h = win(kill + 0.35, kill + 3.0)
-out(bool(h) and {x['steer_command'] for x in h} == {30.0} and all(x['acc_command'] == 0 for x in h)
+out(bool(h) and all(abs(x['steer_command'] - 33.9) < 0.06 and x['acc_command'] == 0 for x in h)
     and max(x['break_command'] for x in h) > 0,
     f'kill 뒤 조향 {sorted({x["steer_command"] for x in h})}° 고정·가속 0·브레이크 최대 {max((x["break_command"] for x in h), default=None)} %')
 out('→ STOPPED' in guard, 'can_guard STOPPED 도달')

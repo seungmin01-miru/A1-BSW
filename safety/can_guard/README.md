@@ -101,7 +101,7 @@ python3 can_guard.py --interface kvaser --channel 0 --bitrate 500000 --steer-lim
 - "공유메모리 ring" → **seqlock 단일 슬롯**. 제어 명령은 최신값만 의미가 있어 큐가 불필요.
 - 변화율 상한은 **의도적으로 비워 둔다** — 모르는 안전 숫자는 추측으로 채우지 않는다.
 - HOLDING/DEGRADED/STOPPED(hold): 조향은 ACTIVE 에서 처음 벗어나는 순간 값에 고정, 가속 0, 브레이크는
-  `max(유지값 30 %, 마지막 명령)` 까지 30 %/s 램프. **auto 비트는 마지막 명령 그대로** — can_guard 는 넘겨받지 않은
+  `max(유지값 30 %, 마지막 명령)` 에서 시작해 20 %/s 로 60 % 까지(`--hold-brake-*`, 2026-11-04). **auto 비트는 마지막 명령 그대로** — can_guard 는 넘겨받지 않은
   축의 제어권을 스스로 가져가지 않는다. AEB 신호가 없어 정지 수단은 브레이크 명령뿐.
 - STOPPED 기본은 `hold`(auto 유지 + 브레이크 유지) — `manual`(auto 0 으로 사람에게 넘김)은 무인 차량에선 아무도
   제어하지 않게 되므로 비권장. STOPPED 는 재시작으로만 풀린다.
