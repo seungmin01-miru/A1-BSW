@@ -17,7 +17,7 @@ LINE = re.compile(r'^\((\d+\.\d+)\)\s+\S+\s+([0-9A-Fa-f]+)#([0-9A-Fa-f]*)')
 
 
 def _ids():
-    db = dbc_lite.load(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
+    db = dbc_lite.load(os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc'))
     rm = dbc_lite.remote_messages()
     return {0x210: db[0x210], 0x200: db[0x200], 0x201: db[0x201], 0x156: rm[0x156], 0x157: rm[0x157]}
 

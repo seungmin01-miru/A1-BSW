@@ -6,7 +6,7 @@
   python3 tools/signal_audit/plot.py <세션폴더> --raw ~/a1_race_capture/vehicle_20261007    # 원본이 다른 곳
 
 출력 <세션폴더>/plots/:
-  timeline[_tag].png  5단: 조향(0x210·원격 0x157 명령 vs 0x200 위치) / 브레이크(명령 ÷ 10 vs 위치) /
+  timeline[_tag].png  5단: 조향(0x210·원격 0x157 명령 vs 0x200 위치) / 브레이크(명령 % vs 위치 %) /
                       가속(0x210 % · 원격 m/s²) / 바퀴 속도(0x201) / auto 비트·원격 En. 세로선 = notes.txt 메모
   limits.png          명령 → 응답 산점도(정착 상태만, limits.md 와 같은 표본) + 구간 중앙값 + DBC 명령 한계
   freespin.png        뒷바퀴 공회전 계단 응답 겹쳐 보기(명령 시작 = 0 s, rpm) — 바퀴가 돈 녹화에서만
@@ -96,9 +96,9 @@ def timeline(s, raw, t0, t1, path):
     ax[0].set_ylabel('조향 핸들각 (°)')
     # 2 브레이크
     t, v = masked(s, 0x210, 'break_command', 0x210, 'break_is_auto_command')
-    line(ax[1], t, v / 10 if len(v) else v, color=C['cmd'], label='0x210 브레이크 % ÷ 10 (auto)')
-    line(ax[1], *s.sig(0x200, 'break_postion'), color=C['resp'], label='0x200 브레이크 위치')
-    ax[1].set_ylabel('브레이크 위치')
+    line(ax[1], t, v, color=C['cmd'], label='0x210 브레이크 % (auto)')
+    line(ax[1], *s.sig(0x200, 'break_postion'), color=C['resp'], label='0x200 브레이크 위치 %')
+    ax[1].set_ylabel('브레이크 위치 (%)')
     # 3 가속
     line(ax[2], *masked(s, 0x210, 'acc_command', 0x210, 'acc_is_auto_command'), color=C['cmd'], label='0x210 가속 % (auto)')
     ax[2].set_ylabel('가속 명령 (%)')

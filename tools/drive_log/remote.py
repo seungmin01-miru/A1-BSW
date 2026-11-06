@@ -1,7 +1,7 @@
 import sys, numpy as np
 sys.path.insert(0, '/home/ailab/git/A1-BSW/tools/signal_audit')
 import dbc_lite
-db = dbc_lite.load('/home/ailab/git/A1-BSW/DBC/A1_dbc_fixed.dbc')
+db = dbc_lite.load('/home/ailab/git/A1-BSW/DBC/A1_dbc_2_fixed.dbc')
 log = sys.argv[1]
 rows = {0x200: [], 0x201: [], 0x210: []}
 for line in open(log):
@@ -75,7 +75,7 @@ rate = np.abs(np.gradient(smooth(pos,5), ts)); print('steer rate p99 deg/s', np.
 # 명령 사용 분포
 print('acc cmd use: >0 frac', np.mean(s210['acc_command']>0), 'p50 when>0', np.median(s210['acc_command'][s210['acc_command']>0]), 'max', s210['acc_command'].max())
 print('brk cmd use: >0 frac', np.mean(s210['break_command']>0), 'max', s210['break_command'].max())
-print('brake pos max', s200['break_postion'].max())
+print('brake pos max %', s200['break_postion'].max())
 # 좌우 바퀴 속도 차
 dv = s201['left_speed']-s201['right_speed']
 print('L-R speed diff p50/p99 (moving>5kph)', np.median(dv[v*3.6>5]), np.percentile(abs(dv[v*3.6>5]),99))

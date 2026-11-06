@@ -7,7 +7,7 @@ can_guard — 안전 임계 CAN TX 메인 루프 (§7.2, docs/can_stack_developm
   python3 can_guard.py --channel can0 --steer-limit-deg 15 --brake-limit-pct 60 --acc-limit-pct 10 \
       --status-interval-s 1          # 리프트 시험(tools/race_day/VEHICLE_MANUAL.md "C. 리프트 송신 시험")
 
-2026-10-06 실차 프로토콜(0x200/0x201/0x210, DBC/A1_dbc_fixed.dbc)로 전환 — 이전 EAIT 0x156/0x157 는 git 기록.
+2026-10-06 실차 프로토콜(0x200/0x201/0x210, DBC/A1_dbc_2_fixed.dbc)로 전환 — 이전 EAIT 0x156/0x157 는 git 기록.
 
 매 주기(기본 20ms — 10-07 실측 차량 상태 주기 21.0 ms 보다 약간 빠르게):
   CommandChannel.read() → (0x201 차속·0x200 상태 non-blocking 수신) → state_machine.next_state()
@@ -100,7 +100,7 @@ def parse_args(argv=None):
     ap.add_argument('--estop-brake-ramp-pct-s', type=float, default=40.0,
                     help='ESTOP 브레이크를 올리는 속도 %%/s — 브레이크 응답이 느려 휠락 방지로 서서히(잠정)')
     ap.add_argument('--estop-brake-max-pct', type=float, default=82.0,
-                    help='ESTOP 브레이크 상한 %% (82 이상은 차량 위치 8.2 포화, 11-03)')
+                    help='ESTOP 브레이크 상한 %% (82 %% 이상은 차량 위치 포화, 11-03)')
     ap.add_argument('--init-mode', choices=INIT_MODES, default='silent',
                     help='silent=첫 유효 명령 전엔 0x210 안 보냄(기본), legacy=auto 000·명령 0 송신(브레이크 풀림 주의)')
     ap.add_argument('--auto-off-mode', choices=AUTO_OFF_MODES, default='silent',
@@ -442,7 +442,7 @@ def run(a):
 
             if a.status_interval_s > 0 and now - status_at >= a.status_interval_s:
                 status_at = now
-                fb = (f'조향위치 {last_info["steer_pos_deg"]:+.1f}° 브레이크위치 {last_info["brake_pos"]:.1f} '
+                fb = (f'조향위치 {last_info["steer_pos_deg"]:+.1f}° 브레이크위치 {last_info["brake_pos_pct"]:.0f}% '
                       f'auto {last_info["steer_auto"]}{last_info["brake_auto"]}{last_info["acc_auto"]}'
                       if last_info else '0x200 없음')
                 sent = ('송신 안 함' if out is None else

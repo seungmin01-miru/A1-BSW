@@ -13,7 +13,7 @@ import lift_tx
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
-DB_FIXED = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
+DB_FIXED = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc'))
 DB_VENDOR = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc.dbc'), strict=False)
 SAMPLES = os.path.join(HERE, 'testdata', 'a1_20261007_samples.csv')
 
@@ -77,7 +77,7 @@ def test_decode_0x200_matches_fixed_dbc_on_real_frames():
         mine = p.decode_0x200(raw)
         ref = DB_FIXED.decode_message(0x200, raw, decode_choices=False)
         assert mine['steer_pos_deg'] == pytest.approx(ref['steer_postion'])
-        assert mine['brake_pos'] == pytest.approx(ref['break_postion'])
+        assert mine['brake_pos_pct'] == pytest.approx(ref['break_postion'])
         assert (mine['steer_auto'], mine['brake_auto'], mine['acc_auto']) == \
             (ref['steer_is_auto'], ref['break_is_auto'], ref['acc_is_auto'])
         assert (mine['steer_cnt'], mine['brake_cnt'], mine['acc_cnt']) == \
@@ -97,9 +97,9 @@ def test_decode_0x201_matches_fixed_dbc_on_real_frames():
 
 
 def test_fake_vehicle_encoders_roundtrip():
-    raw = p.encode_0x200(-12.3, 4.5, 1, 0, 1, 7, 8, 9)
+    raw = p.encode_0x200(-12.3, 45, 1, 0, 1, 7, 8, 9)
     d = p.decode_0x200(raw)
-    assert d['steer_pos_deg'] == pytest.approx(-12.3) and d['brake_pos'] == pytest.approx(4.5)
+    assert d['steer_pos_deg'] == pytest.approx(-12.3) and d['brake_pos_pct'] == pytest.approx(45)
     assert (d['steer_auto'], d['brake_auto'], d['acc_auto'], d['steer_cnt'], d['acc_cnt']) == (1, 0, 1, 7, 9)
     raw = p.encode_0x201(25.7, 243, 3.1, 30, 1, 2)
     d = p.decode_0x201(raw)

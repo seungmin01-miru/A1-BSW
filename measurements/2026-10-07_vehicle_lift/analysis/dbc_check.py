@@ -1,7 +1,7 @@
 import os
 import glob,collections,cantools,sys
 S=os.path.dirname(os.path.abspath(__file__))
-fx=cantools.database.load_file('/home/ailab/git/A1-BSW/DBC/A1_dbc_fixed.dbc')
+fx=cantools.database.load_file('/home/ailab/git/A1-BSW/archive/dbc_2026-10/A1_dbc_fixed.dbc')
 vd=cantools.database.load_file('/home/ailab/git/A1-BSW/DBC/A1_dbc.dbc',strict=False)
 ea=cantools.database.load_file(os.path.join(S,'eait.dbc'),strict=False)
 fr=[]

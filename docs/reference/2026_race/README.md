@@ -13,6 +13,6 @@
 - 대회 측 질의서: [`docs/2026-11-06_race_flag_questions.md`](../../2026-11-06_race_flag_questions.md)
 - 모델 팀 전달 데이터시트: [`docs/A1_BSW_토픽_데이터시트_v0.2.xlsx`](../../A1_BSW_토픽_데이터시트_v0.2.xlsx)
 
-기준 DBC 는 여전히 `DBC/A1_dbc_fixed.dbc` 이다. `A1_dbc_2.dbc` 를 고친 `A1_dbc_2_fixed.dbc` 로의 전환은 개발 지시서 WP0 에서 한다.
+기준 DBC 는 `A1_dbc_2.dbc` 를 고친 `DBC/A1_dbc_2_fixed.dbc` 이다(2026-11-06 개발 지시서 WP0 에서 전환). 이전 기준 `A1_dbc_fixed.dbc` 는 `archive/dbc_2026-10/` 에 있다.
 
 > ⚠ 이 저장소는 공개다. 규정집·업체 자료를 원격(GitHub)에 올리기 전에 대회 측 공개 허락을 확인한다(`CLAUDE.md` 4절과 같은 원칙).

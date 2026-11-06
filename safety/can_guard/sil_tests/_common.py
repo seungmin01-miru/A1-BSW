@@ -1,5 +1,5 @@
 """P-1/P-2 공용: can_guard 를 vcan0 에 띄우고, 0x210 프레임을 시각과 함께 받아 두는 헬퍼.
-2026-10-06 실차 프로토콜(DBC/A1_dbc_fixed.dbc)로 전환 — 이전 EAIT 0x156/0x157·Aliv_Cnt 검사는 git 기록."""
+2026-10-06 실차 프로토콜(DBC/A1_dbc_2_fixed.dbc)로 전환 — 이전 EAIT 0x156/0x157·Aliv_Cnt 검사는 git 기록."""
 import os
 import subprocess
 import sys
@@ -9,7 +9,7 @@ import can
 import cantools
 
 CAN_GUARD_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DBC = os.path.join(CAN_GUARD_DIR, '..', '..', 'DBC', 'A1_dbc_fixed.dbc')
+DBC = os.path.join(CAN_GUARD_DIR, '..', '..', 'DBC', 'A1_dbc_2_fixed.dbc')
 
 
 def can_guard_cmd(cmd_shm, hb_shm, channel='vcan0', watchdog_t=0.05, period=0.02, extra_args=()):

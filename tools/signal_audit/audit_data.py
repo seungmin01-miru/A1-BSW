@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(REPO, 'tools', 'race_day'))
 import dbc_lite  # noqa: E402
 from summarize_session import LINE  # noqa: E402
 
-DEFAULT_DBC = os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc')
+DEFAULT_DBC = os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc')
 HOLD_S = 0.75         # 명령이 이만큼 그대로였던 표본만 쓴다(정착 상태) — 바뀌는 순간·깜빡임 제외. 10-07 63 % 응답 약 0.2 s
 CMD_SAMPLE_S = 0.1    # 명령-응답 쌍을 만들 때 명령을 이 간격으로 솎는다
 
@@ -152,7 +152,7 @@ def pairs(s):
         out.append(dict(axis='steer', label='0x210 조향 → 0x200 위치', cmd=steer[sa], resp=pos[sa],
                         cmd_unit='°', resp_unit='°', dbc=(-150, 150), ident=True))
         out.append(dict(axis='brake', label='0x210 브레이크 % → 0x200 위치', cmd=brake[ba], resp=brk[ba],
-                        cmd_unit='%', resp_unit='위치', dbc=(0, 100), ident=False))
+                        cmd_unit='%', resp_unit='위치 %', dbc=(0, 100), ident=False))
         wt, wa = wheel_accel(s)
         if len(wt):
             ws = np.interp(t, wt, wa)
@@ -171,7 +171,7 @@ def pairs(s):
                         cmd_unit='°', resp_unit='°', dbc=(-500, 500), ident=True))
         dec = ae & (accc < 0)
         out.append(dict(axis='brake', label='원격 ACC_Cmd(감속) → 0x200 브레이크 위치', cmd=accc[dec], resp=brk[dec],
-                        cmd_unit='m/s²', resp_unit='위치', dbc=(-3, 0), ident=False))
+                        cmd_unit='m/s²', resp_unit='위치 %', dbc=(-3, 0), ident=False))
         wt, wa = wheel_accel(s)
         if len(wt):
             ws = np.interp(t, wt, wa)

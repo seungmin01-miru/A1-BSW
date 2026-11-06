@@ -52,7 +52,7 @@ class _Payload(ctypes.Structure):
     _fields_ = [
         ('seq', ctypes.c_uint64),            # 홀수=쓰는 중, 짝수=완료. 0 = 아직 한 번도 안 씀(초기값)
         ('timestamp_ns', ctypes.c_int64),    # time.monotonic_ns() — 벽시계 아님(NTP 점프에 안전)
-        # 실차 USER_control_command(0x210) 기준 — DBC/A1_dbc_fixed.dbc (2026-10-06 EAIT 0x156/0x157 에서 전환)
+        # 실차 USER_control_command(0x210) 기준 — DBC/A1_dbc_2_fixed.dbc (2026-10-06 EAIT 0x156/0x157 에서 전환)
         ('steer_auto', ctypes.c_uint8),       # 축별 auto(1) / manual(0) — 0x210 bit40
         ('brake_auto', ctypes.c_uint8),       # bit41
         ('acc_auto', ctypes.c_uint8),         # bit42

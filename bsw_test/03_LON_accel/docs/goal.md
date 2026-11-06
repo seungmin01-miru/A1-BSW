@@ -30,7 +30,7 @@
 
 ## 측정 신호
 - [ ] 0x210 명령: `acc_command` %, `break_command` %, `*_is_auto_command`
-- [ ] 0x200 응답: `break_postion`(0~10), `*_is_auto`
+- [ ] 0x200 응답: `break_postion`(%), `*_is_auto`
 - [ ] 0x201 후륜 좌/우 `speed`(km/h), `rpm` — 전진 구간만, 가속 중 슬립 주의
 - [ ] GNSS/IMU 위치·속도·요레이트·가속도 — **토픽·시간 동기 미정(TODO-5, localization 팀 전달 대기)**
 - [ ] can_guard 상태 로그(`--status-interval-s 1`), 프로파일 생성기 명령 로그

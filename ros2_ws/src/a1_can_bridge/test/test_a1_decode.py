@@ -9,7 +9,7 @@ from a1_can_bridge.a1_status_decoder import (decode_control_command, decode_cont
                                              decode_wheel_info)
 
 REPO = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')
-DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
+DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc'))
 DB_VENDOR = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc.dbc'), strict=False)
 SAMPLES = os.path.join(REPO, 'tools', 'race_day', 'testdata', 'a1_20261007_samples.csv')
 
@@ -29,7 +29,7 @@ def test_control_info_real_frames():
         ref = DB.decode_message(0x200, raw, decode_choices=False)
         out = decode_control_info(raw)
         assert out.steer_position_deg == pytest.approx(ref['steer_postion'])
-        assert out.brake_position == pytest.approx(ref['break_postion'])
+        assert out.brake_position == pytest.approx(ref['break_postion'] / 10)  # ROS 0~10 유지(D13), 새 DBC 는 %
         assert (out.steer_auto, out.brake_auto, out.acc_auto) == (
             bool(ref['steer_is_auto']), bool(ref['break_is_auto']), bool(ref['acc_is_auto']))
         assert (out.steer_live_counter, out.brake_live_counter, out.acc_live_counter) == (

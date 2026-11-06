@@ -322,7 +322,7 @@ def cmd_run(a):
 
     header = ['tick', 'mono_s', 'wall_s', 'phase', 't_prof_s', 'seg', 'label',
               'steer_cmd_deg', 'brake_cmd_pct', 'acc_cmd_pct', 'auto',
-              'speed_kph', 'speed_age_s', 'steer_pos_deg', 'brake_pos', 'tx210_steer_deg', 'tx210_brake_pct',
+              'speed_kph', 'speed_age_s', 'steer_pos_deg', 'brake_pos_pct', 'tx210_steer_deg', 'tx210_brake_pct',
               'tx210_acc_pct', 'tx210_auto',
               'steer_prof_deg', 'steer_offset_deg', 'v_ref_kph', 'ctrl_mode', 'dist_m', 'heading_deg', 'item']
     log(f'시작 {a.run}: {a.profile} {len(items)}회차 → {out}  (차속 감시 {"on" if speed_check else "OFF(SIL)"}, '
@@ -606,7 +606,7 @@ def cmd_run(a):
                              p.label if ph == 'run' else (S['end_reason'] or '' if ph == 'end' else ''),
                              f'{cur["steer"] + off:.3f}', f'{cur["brake"]:.3f}', f'{cur["acc"]:.3f}', auto_s,
                              f'{speed:.1f}' if speed is not None else '', f'{age:.3f}' if age is not None else '',
-                             f'{s200["steer_pos_deg"]:.1f}' if s200 else '', f'{s200["brake_pos"]:.1f}' if s200 else '',
+                             f'{s200["steer_pos_deg"]:.1f}' if s200 else '', f'{s200["brake_pos_pct"]:.0f}' if s200 else '',
                              s210['steer_deg'] if s210 else '', s210['brake_pct'] if s210 else '',
                              s210['acc_pct'] if s210 else '',
                              f'{s210["steer_auto"]}{s210["brake_auto"]}{s210["acc_auto"]}' if s210 else '',

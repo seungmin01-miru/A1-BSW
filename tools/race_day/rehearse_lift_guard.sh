@@ -44,7 +44,7 @@ say() { echo "$*" >&4; }
 stop_lcmd() { exec 4>&- ; wait $L_PID 2>/dev/null; L_PID=""; }
 mark() { date +%s.%N; }
 
-analyze() { python3 - "$REPO/DBC/A1_dbc_fixed.dbc" "$@" <<'EOF'
+analyze() { python3 - "$REPO/DBC/A1_dbc_2_fixed.dbc" "$@" <<'EOF'
 import sys, re, statistics, cantools
 db = cantools.database.load_file(sys.argv[1]); mode = sys.argv[2]; path = sys.argv[3]; marks = [float(x) for x in sys.argv[4:]]
 ours, info, foreign = [], [], []

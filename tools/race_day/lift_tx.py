@@ -249,7 +249,7 @@ def print_status(cmd, status, log):
         i, w, it, wt, ni, nw = status.info, status.wheel, status.info_t, status.wheel_t, status.n_info, status.n_wheel
     if i:
         log(f'차량 0x200({now - it:.2f}초 전, 누적 {ni}): 조향 위치 {i["steer_pos_deg"]:+.1f}°  브레이크 위치 '
-            f'{i["brake_pos"]:.1f}  auto(S/B/A)={i["steer_auto"]}{i["brake_auto"]}{i["acc_auto"]}  '
+            f'{i["brake_pos_pct"]:.0f} %  auto(S/B/A)={i["steer_auto"]}{i["brake_auto"]}{i["acc_auto"]}  '
             f'카운터 {i["steer_cnt"]}/{i["brake_cnt"]}/{i["acc_cnt"]}')
     else:
         log('차량 0x200: 아직 못 받음')

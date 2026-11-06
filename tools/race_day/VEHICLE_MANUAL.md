@@ -20,12 +20,12 @@
 >    옛 숫자를 그대로 넣으면 핸들이 10배로 돈다. lift_cmd·lift_tx 기본 한계는 ±15°(10-07 에 시험한 최대).
 > 2. **원격조종 메시지는 0x156/0x157**(EAIT_Control_01/02 형식, 10 ms). 0x210 보다 ID 가 낮아 버스 중재에서 이기고,
 >    차량도 0x156 의 EPS_En/ACC_En 이 1 이면 원격을 우선한다(녹화: En=1 → 차량 auto 111 이 약 20 ms 안에,
->    0x157 감속 −3.0 m/s² → 브레이크 위치 10.0). 원격 유닛은 켜져 있으면 En=0 으로 계속 보낸다 — 이건 정상.
+>    0x157 감속 −3.0 m/s² → 브레이크 위치 100 %). 원격 유닛은 켜져 있으면 En=0 으로 계속 보낸다 — 이건 정상.
 > 3. **대회측 확인: 강제 종료 시 자동 브레이크**가 걸린다(실차에서 아직 직접 재 보지 않음 — C6 에서 확인).
 >    반면 **0x210 만 끊기면 차량은 auto 를 풀지 않는다**(10-07: 59.9초 동안 auto 111 유지) → can_guard 를 끌 때는
 >    lift_cmd 에서 `auto off` 를 먼저 보낸다.
-> 4. 브레이크 위치 ≈ 명령 % ÷ 10(20 % → 1.9, 50 % → 5.0). 0x201 바퀴 속도는 10-07 내내 0(미해결).
-> 현장 디코드·코드는 `DBC/A1_dbc_fixed.dbc`(업체 DBC 에서 0x200 `steer_is_auto` 배율 오타 1곳만 고친 사본) 기준.
+> 4. 브레이크 위치 ≈ 명령 %(20 % → 19 %, 50 % → 50 %). 0x201 바퀴 속도는 10-07 내내 0(미해결).
+> 현장 디코드·코드는 `DBC/A1_dbc_2_fixed.dbc`(대회 배포 `A1_dbc_2.dbc` 의 오타만 고친 사본, 고친 곳은 파일 안 `CM_`) 기준.
 > 10-07 결과 전체: `~/a1_race_capture/vehicle_20261007/summary/findings.md`, 요약 도구 `tools/race_day/summarize_session.py`.
 
 ### CAN 장치 — PEAK(기본) 또는 Kvaser
@@ -157,7 +157,7 @@ m(){ echo "$(date +%s.%N) $(date +%H:%M:%S) $*" | tee -a "$D/notes.txt"; }
 |---|---|---|
 | V1 | ★ | 받은 `A1_dbc.dbc` 가 **이 차량의 최신 버전인가?** 더 새 버전·변경 이력·신호 설명 문서가 있나? |
 | V2 | ★ | 비트레이트(DBC 에 없음), classic CAN인지 CAN-FD인지, 종단저항 위치 |
-| V3 | ☆ | ~~0x210 조향 배율~~ → **10-07 해결: ×0.1 맞음**. 남은 것: 브레이크·가속 % 의 실제 의미(브레이크 위치 = 명령 ÷ 10 은 확인), 0 근처 조향 불감대·오프셋(약 +1°) |
+| V3 | ☆ | ~~0x210 조향 배율~~ → **10-07 해결: ×0.1 맞음**. 남은 것: 브레이크·가속 % 의 실제 의미(브레이크 위치 % = 명령 % 는 확인), 0 근처 조향 불감대·오프셋(약 +1°) |
 | V4 | ☆ | auto 비트(0x210 bit40~42, 0x200 bit32~34)를 켜는 데 다른 조건(키·스위치·모드)이 있나? 0 을 보내면 즉시 수동? |
 | V5 | ☆ | 명령이 끊기면 몇 ms 뒤 무엇을 하나? alive counter가 필요한가? 범위·변화율 검증을 하나? |
 | V6 | ☆ | DBC 에 없는 0x004·0x204 는 무엇인가? SYS 계열(0x100·0x110~0x114·0x301)은 어느 버스에 있나, 0x301 은 언제 쓰나? |
@@ -348,16 +348,16 @@ cansniffer -c can0          # 끝내려면 Ctrl+C
 - DBC 에 **있지만 10-07 버스엔 없는 것**: SYS 계열 0x100·0x110~0x114·0x301 → 다른 버스로 추정. **0x301(엔코더 설정)은 절대 송신 금지**
 
 그래서 현장에서는 "확보"가 아니라 **"오늘 버스에서도 맞는지 + 업체 확인"**만 하면 된다.
-현장 디코드는 항상 **수정본** 으로: `F=~/git/A1-BSW/DBC/A1_dbc_fixed.dbc`
+현장 디코드는 항상 **수정본** 으로: `F=~/git/A1-BSW/DBC/A1_dbc_2_fixed.dbc`
 
 ### B-1. 오늘 버스와 대조 (5분, S0 기준선 녹화 중에 같이)
 ```bash
-F=~/git/A1-BSW/DBC/A1_dbc_fixed.dbc
+F=~/git/A1-BSW/DBC/A1_dbc_2_fixed.dbc
 # (1) DBC 에 없는 ID 목록 — 0x004·0x204 외에 새 ID 가 있으면 사진·메모 후 업체 질문
 timeout --foreground 10 candump can0 | python3 -m cantools decode "$F" \
   | grep -o 'Unknown frame id [0-9]* (0x[0-9a-f]*)' | sort | uniq -c
 # (2) 해석값이 말이 되는지 — 정지·핸들 중앙에서 조향≈0, 속도 0, 카운터 증가
-candump can0 | python3 -m cantools decode --single-line "$F" | grep -E 'USER_control_info|USER_right_wheel' | head -20
+candump can0 | python3 -m cantools decode --single-line "$F" | grep -E 'USER_control_info|USER_wheel' | head -20
 # (3) SYS 계열이 이 단자에 보이나(0x100·0x110~0x114·0x301) — 보이면 이 버스가 차량 내부 버스일 수 있다
 timeout --foreground 5 candump can0 | awk '{print $2}' | grep -E '^(100|11[0-4]|301)$' | sort | uniq -c
 ```
@@ -445,7 +445,7 @@ cd "$D" && python3 ~/git/A1-BSW/safety/can_guard/lift_cmd.py --channel can0
 |---|---|---|
 | C2 | `auto on` | 차량 0x200 auto 비트가 `111` 로, 핸들은 그대로 |
 | C3 | `steer 1` → `steer 0` → `steer -1` → `steer 0`, 이어서 ±5, ±10, ±15 (단위 °) | 차량 **조향 위치 ≈ 명령**(10-07: 8° → 8.8°, 10° → 11.0°, 63 % 응답 약 0.2초). 10배로 움직이면 즉시 `zero` |
-| C4 | `brake 20` → `brake 50` → `brake 0` | 브레이크 위치 ≈ 명령 ÷ 10 (10-07: 1.9 / 5.0 / 0) |
+| C4 | `brake 20` → `brake 50` → `brake 0` | 브레이크 위치 ≈ 명령 % (10-07: 19 / 50 / 0 %) |
 | C5 | `acc 5` (2초 뒤 자동 0) → `acc 10` → `brake 20` | 바퀴 속도 상승·하강(0x201) |
 
 - 입력 한계는 조향 ±15°, 브레이크 60 %, 가속 10 % — 넘는 값은 **거부**(자르지 않음). can_guard 도 같은 한계로

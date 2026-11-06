@@ -184,7 +184,7 @@ def write_ranges(out, msgs, sessions, summaries):
     L = []
     w = L.append
     w('# 표 2. DBC 신호 정의 범위 vs 실측 최소·최대\n')
-    w('> 생성: `tools/paper_data/bus_stats.py`. DBC = `DBC/A1_dbc_fixed.dbc` + 원격 0x156/0x157(대회측 형식, `dbc_lite.remote_messages`).')
+    w('> 생성: `tools/paper_data/bus_stats.py`. DBC = `DBC/A1_dbc_2_fixed.dbc` + 원격 0x156/0x157(대회측 형식, `dbc_lite.remote_messages`).')
     for s in sessions:
         w(f'> 세션 **{s["name"]}** (원본 직접 계산): {", ".join(s["files"])} — {s["n"]:,} 프레임, '
           f'{hms(s["t0"])}~{hms(s["t1"])}.')
@@ -230,7 +230,7 @@ def write_ranges(out, msgs, sessions, summaries):
     w('- 10-07 의 0x210 값에는 11:03:30~11:09:05 미확인 송신자 값(조향 −58.9°, 가속 100 %)이 섞여 있다(송신자 구분 불가). '
       '11-03 의 0x210 은 원격 유닛이 송신한 값이다.')
     w('- 0x157 `ACC_Cmd` 범위 위반 112건 = 원격이 +1.17 m/s² 송신(대회측 문서 상한 +1). 0x201 바퀴 신호는 10-07 내내 0.')
-    w('- 활용률이 낮은 신호(브레이크 위치 3.3 %, 바퀴 2.5 %)는 DBC 범위가 실제보다 크게 잡힌 것 — 제어 범위는 04 데이터시트.\n')
+    w('- 활용률이 낮은 신호(바퀴 등)는 DBC 범위가 실제보다 크게 잡힌 것 — 제어 범위는 04 데이터시트.\n')
     w('## 2. 메시지 단위 형식 대조 (실측 프레임 vs DBC)\n')
     w('| 세션 | ID | 프레임 | DLC 불일치 | 정의 밖 비트가 1 인 프레임 |')
     w('|---|---|---|---|---|')
@@ -437,7 +437,7 @@ def main():
     ap.add_argument('--session', action='append', default=[], help='이름=원본 폴더')
     ap.add_argument('--summary', action='append', default=[], help='이름=results.md')
     ap.add_argument('--exclude', action='append', default=[], help='세션:0xID:HH:MM:SS-HH:MM:SS')
-    ap.add_argument('--dbc', default=os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
+    ap.add_argument('--dbc', default=os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc'))
     ap.add_argument('--out', default=os.path.join(REPO, 'docs', 'paper_data'))
     a = ap.parse_args()
     os.makedirs(os.path.join(a.out, 'fig'), exist_ok=True)

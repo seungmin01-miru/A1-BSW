@@ -50,7 +50,8 @@ class Message:
 
 
 def remote_messages():
-    """대회측 원격조종 0x156/0x157 — DBC 파일에는 없고(9월 EAIT DBC 는 archive/ 로 뺐다) 원격 유닛이 이 형식으로 보낸다.
+    """대회측 원격조종 0x156/0x157 — 원격 유닛이 이 형식으로 보낸다. A1_dbc_2 에도 정의가 있지만 ACC_Cmd 가 (1,-1023), 즉
+    0.01 m/s² 단위이고 EPS_Speed 가 없다. 도구는 m/s² 로 쓰므로 load() 뒤 update(remote_messages()) 로 이 정의를 우선한다.
 
     배치는 tools/race_day/summarize_session.py 의 decode_remote_156/157 과 같다(10-07 녹화로 확인). 범위는 원격 유닛 기준
     (ACC_Cmd 는 −3~+1 이라고 되어 있으나 10-07 에 +1.17 관측). 이 정의는 듣기·분석 전용 — 우리는 0x156/0x157 을 보내지 않는다.

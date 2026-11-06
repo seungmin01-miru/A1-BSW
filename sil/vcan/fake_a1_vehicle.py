@@ -3,7 +3,7 @@
 0x210 을 받으면 auto 비트가 켜진 축만 반응한다.
 
   - 조향 위치: 명령을 1차 지연(시정수 0.2 s)으로 추종 — 배율은 0.1 deg/raw(업체 DBC, 10-07 실차 확정)
-  - 브레이크 위치: 명령 % / 10 로 추종(10-07 실측: 위치 = 명령 % ÷ 10)
+  - 브레이크 위치(%): 명령 % 로 추종(10-07 실측: 위치 = 명령 %)
   - 바퀴 속도: 가속 % − 브레이크 % 로 단순 적분(물리 모델 아님, 숫자가 움직이는지만 보는 용도)
   - auto 비트(0x200 byte4): 마지막으로 받은 0x210 의 auto 비트를 그대로 보고, **0x210 이 끊겨도 유지**한다
     (10-07 실차: 0x210 없이 59.9 s 동안 auto 111 유지, auto 0 프레임이 와야 해제). 다른 동작을 시험하려면
@@ -14,7 +14,7 @@
 
 --physics (2026-11-04, bsw_test 02 세션 SIL): 가속 % → 가속도(불감대 5 %, track.yaml accel_map 비슷하게),
 브레이크 % → 감속도(track.yaml brake_map), 주행 저항 0.15 + 0.01·v m/s², 구동·제동 1차 지연 0.15 s, 브레이크 위치는
-82 % 에서 8.2 포화. 자세(x, y, 방위)는 자전거 모델(휠베이스 2.36 m, 조향비 --steer-ratio)로 적분해 --pose-log 에 남긴다.
+82 % 에서 포화. 자세(x, y, 방위)는 자전거 모델(휠베이스 2.36 m, 조향비 --steer-ratio)로 적분해 --pose-log 에 남긴다.
 **물리 모델이 실차와 같다는 뜻이 아니다** — 제어 로직이 닫히고 멈추는지만 본다(실차 판정에 쓰지 않음).
 """
 import csv
@@ -69,7 +69,7 @@ def main():
     if a.pose_log:
         pose_f = open(a.pose_log, 'w', newline='', buffering=1)
         pose_w = csv.writer(pose_f)
-        pose_w.writerow(['mono_s', 'x_m', 'y_m', 'yaw_deg', 'kph', 'steer_deg', 'brake_pos'])
+        pose_w.writerow(['mono_s', 'x_m', 'y_m', 'yaw_deg', 'kph', 'steer_deg', 'brake_pos_pct'])
 
     def interp(v, xs, ys):
         if v <= xs[0]:
@@ -98,7 +98,7 @@ def main():
             if sa:
                 steer += (cmd['steer_deg'] - steer) * min(1.0, dt / 0.2)
             if ba:
-                brake += (cmd['brake_pct'] / 10.0 - brake) * min(1.0, dt / 0.2)
+                brake += (cmd['brake_pct'] - brake) * min(1.0, dt / 0.2)
             acc = cmd['acc_pct'] if aa else 0
             bpct = cmd['brake_pct'] if ba else 0
             if not a.physics:
@@ -109,7 +109,7 @@ def main():
                 kph = max(0.0, kph - 0.5 * dt)
         if a.physics:
             if ba and live:
-                brake = min(brake, 8.2)
+                brake = min(brake, 82.0)
             k = min(1.0, dt / 0.15)
             a_drive += (interp(acc, [0, 5, 30, 100], [0, 0, 1.3, 3.0]) - a_drive) * k
             a_brake += (interp(min(bpct, 82), [0, 40, 70, 82], [0, 1.0, 2.0, 2.8]) - a_brake) * k
@@ -125,7 +125,7 @@ def main():
             y += v * math.sin(yaw) * dt
             if pose_w:
                 pose_w.writerow([f'{now:.4f}', f'{x:.3f}', f'{y:.3f}', f'{math.degrees(yaw):.2f}', f'{kph:.2f}',
-                                 f'{steer:.1f}', f'{brake:.2f}'])
+                                 f'{steer:.1f}', f'{brake:.1f}'])
         rpm = int(kph * 9.5)   # 속도·rpm 비율은 미확인(10-07 은 바퀴 0) — 숫자 확인용 임의값
         bus.send(can.Message(arbitration_id=FRAME_CONTROL_INFO, is_extended_id=False,
                              data=encode_0x200(steer, brake, sa, ba, aa, cnt, cnt, cnt)))

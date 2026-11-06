@@ -7,7 +7,7 @@ import sys, os, csv, glob, json, numpy as np
 sys.path.insert(0, '/home/ailab/git/A1-BSW/tools/signal_audit'); sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dbc_lite, minidf
 
-DBC = dbc_lite.load('/home/ailab/git/A1-BSW/DBC/A1_dbc_fixed.dbc'); DBC.update(dbc_lite.remote_messages())
+DBC = dbc_lite.load('/home/ailab/git/A1-BSW/DBC/A1_dbc_2_fixed.dbc'); DBC.update(dbc_lite.remote_messages())
 OUT = sys.argv[1]; os.makedirs(OUT, exist_ok=True)
 ANA = os.path.dirname(os.path.abspath(__file__))
 L = 2.36; WHEEL_SCALE = 0.958
@@ -377,7 +377,7 @@ for grp, keys in [('all', list(SRC))]:
         for vname, vm in [('stopped', Vv < 0.5), ('moving', Vv >= 0.5)]:
             m = (C >= lo) & (C < hi) & vm
             if m.sum() < 20: continue
-            rows.append([f'{lo}-{hi}', vname, int(m.sum()), np.mean(C[m]), np.mean(Pp[m]), q(Pp[m], 5), q(Pp[m], 95), np.mean(Pp[m]) * 10 - np.mean(C[m])])
+            rows.append([f'{lo}-{hi}', vname, int(m.sum()), np.mean(C[m]), np.mean(Pp[m]), q(Pp[m], 5), q(Pp[m], 95), np.mean(Pp[m]) - np.mean(C[m])])
 rows2 = []
 for k in SRC:
     t0, s0, t1, s1, t2, s2 = frames(k)
@@ -391,8 +391,8 @@ for k in SRC:
             if m.sum() >= 20: rows2.append([k, f'{lo}-{hi}', vname, int(m.sum()), np.mean(C[m]), np.mean(Pp[m]), q(Pp[m], 5), q(Pp[m], 95)])
 wcsv('brake_position_by_session.csv', ['source', 'cmd_pct', 'state', 'n', 'cmd_mean', 'pos_mean', 'pos_p5', 'pos_p95'], rows2,
      '3-4b. 높은 브레이크 명령(≥ 82 %)을 1.5 s 유지했을 때 세션별 0x200 break_postion — 세션마다 포화값이 다르다')
-wcsv('brake_position_static.csv', ['cmd_pct', 'state', 'n', 'cmd_mean', 'pos_mean(0-10)', 'pos_p5', 'pos_p95', 'pos*10 - cmd'], rows,
-     '3-4. 브레이크 명령 % 를 1.5 s 유지한 뒤 0x200 break_postion. 기대값 = 명령 ÷ 10, 82 % 이상 8.2 포화(10-07)')
+wcsv('brake_position_static.csv', ['cmd_pct', 'state', 'n', 'cmd_mean', 'pos_mean(%)', 'pos_p5', 'pos_p95', 'pos - cmd'], rows,
+     '3-4. 브레이크 명령 % 를 1.5 s 유지한 뒤 0x200 break_postion. 기대값 = 명령 %, 82 % 포화(10-07)')
 
 # 3-5 브레이크 계단 응답(위치)
 rows = []
@@ -408,15 +408,15 @@ for src in SRC:
         m = (t0 >= ts) & (t0 <= ts + 2.0); tp, pp = t0[m], s0['break_postion'][m]
         if len(tp) < 20: continue
         p0 = np.interp(ts, t0, s0['break_postion']); sgn = np.sign(b1 - b0)
-        mv = np.where(sgn * (pp - p0) > 0.2)[0]
+        mv = np.where(sgn * (pp - p0) > 2)[0]
         dead = (tp[mv[0]] - ts) * 1000 if len(mv) else np.nan
-        target = min(b1, 82) / 10 if b1 > 0 else 0.0
+        target = min(b1, 82) if b1 > 0 else 0.0
         span = target - p0
-        a90 = np.where(sgn * (pp - p0) >= 0.9 * abs(span))[0] if abs(span) > 0.5 else []
+        a90 = np.where(sgn * (pp - p0) >= 0.9 * abs(span))[0] if abs(span) > 5 else []
         t90 = (tp[a90[0]] - ts) * 1000 if len(a90) else np.nan
         v = np.interp(ts, t1, (s1['left_speed'] + s1['right_speed']) / 2) if len(t1) else np.nan
         rows.append([src, round(ts, 3), b0, b1, round(p0, 2), v, dead, t90, np.mean(pp[-10:])])
-wcsv('brake_steps.csv', ['source', 't_unix', 'cmd_from', 'cmd_to', 'pos_at_step', 'speed_kph', 'dead_ms(>0.2)', 't90_ms', 'pos_final(2s)'], rows,
+wcsv('brake_steps.csv', ['source', 't_unix', 'cmd_from', 'cmd_to', 'pos_at_step', 'speed_kph', 'dead_ms(>2%)', 't90_ms', 'pos_final(2s)'], rows,
      '3-5. 브레이크 계단(한 프레임 20 %p 이상, 2 s 유지) → 0x200 break_postion 응답')
 
 # 3-6 출발 지연(정지 → 가속 명령 ≥ 75 %, 브레이크 0)

@@ -464,14 +464,14 @@ can_guard CLI(→ `bsw_up.sh --race` 가 묶어서 넘김). `race_flag.yaml` 표
 ## 11. 작업 순서 (WP)
 
 ### WP0. 기준 정리
-- [ ] `DBC/A1_dbc_2_fixed.dbc` 만들기 — `A1_dbc_2.dbc` 에서 아래만 고친다. 고친 줄마다 `CM_` 주석으로 이유를 남긴다.
+- [x] (2026-11-06) `DBC/A1_dbc_2_fixed.dbc` 만들기 — `A1_dbc_2.dbc` 에서 아래만 고친다. 고친 줄마다 `CM_` 주석으로 이유를 남긴다.
   - 0x200 `steer_is_auto`: 배율 0.1 → 1, 범위 [0|0.1] → [0|1] (기존 수정본과 같은 오타)
   - 0x710 `EPS_Alive_Cnt`, 0x711 `ACC_Alive_Cnt`, 0x120 `live_counter`: 범위 [0|1] → [0|255]
   - 0x124 `SIG_GO` 에 `VAL_` 추가, 0x100 `steer_command` 단위 깨짐("��") → "deg", 0x125 `PITZONE_LONG` 단위 → "deg"
-- [ ] 저장소 전체에서 `A1_dbc_fixed.dbc` 참조를 찾아 새 파일로 바꾼다. 옛 파일은 `archive/dbc_2026-10/` 로 옮기고 README 를 쓴다.
-- [ ] 브레이크 단위 % 통일(D13): `rx_decode.decode_control_info()` 의 `brake_pos`(×0.1) → `brake_pos_pct`(×1). can_guard·문서의 "÷10", "8.2 포화" → "82 % 포화". **ROS `ControlInfo.brake_position` 은 바꾸지 않는다.**
-- [ ] `CLAUDE.md` 2절 표 갱신: 0x128 = RES 응답(기록만), 0x710~0x712 = 관제용 피드백, 0x202 = 속도 제한 현재값(TODO-1 종료), 0x124~0x127·0x203 추가, 기준 DBC 경로.
-- [ ] `docs/race_flag_requirements.md` — R-01~R-09 (1.1절 기반, 쪽수 포함). 이후 모든 시험이 이 번호를 쓴다.
+- [x] (2026-11-06) 저장소 전체에서 `A1_dbc_fixed.dbc` 참조를 찾아 새 파일로 바꾼다. 옛 파일은 `archive/dbc_2026-10/` 로 옮기고 README 를 쓴다.
+- [x] (2026-11-06) 브레이크 단위 % 통일(D13): `rx_decode.decode_control_info()` 의 `brake_pos`(×0.1) → `brake_pos_pct`(×1). can_guard·문서의 "÷10", "8.2 포화" → "82 % 포화". **ROS `ControlInfo.brake_position` 은 바꾸지 않는다.**
+- [x] (2026-11-06) `CLAUDE.md` 2절 표 갱신: 0x128 = RES 응답(기록만), 0x710~0x712 = 관제용 피드백, 0x202 = 속도 제한 현재값(TODO-1 종료), 0x124~0x127·0x203 추가, 기준 DBC 경로.
+- [x] (2026-11-06) `docs/race_flag_requirements.md` — R-01~R-09 (1.1절 기반, 쪽수 포함). 이후 모든 시험이 이 번호를 쓴다.
 
 | ID | 요구사항 |
 |---|---|
@@ -614,7 +614,7 @@ can_guard CLI(→ `bsw_up.sh --race` 가 묶어서 넘김). `race_flag.yaml` 표
 
 | 날짜 | WP | 결과 | 커밋 | 남은 일 |
 |---|---|---|---|---|
-| | | | | |
+| 2026-11-06 | WP0 | 결과는 커밋 메시지 참조 | 이 커밋 | `rehearse_lift_guard.sh` 대회 PC 실행 |
 
 ## 15. 변경 이력
 

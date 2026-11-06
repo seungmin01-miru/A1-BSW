@@ -1,6 +1,6 @@
 # sil/vcan — vcan0 SIL 환경
 
-실물 CAN 없이 `vcan0`(가상 버스) 위에서 실차 A1 프로토콜(`DBC/A1_dbc_fixed.dbc`)을 흉내 내 can_guard·브리지·리프트
+실물 CAN 없이 `vcan0`(가상 버스) 위에서 실차 A1 프로토콜(`DBC/A1_dbc_2_fixed.dbc`)을 흉내 내 can_guard·브리지·리프트
 도구를 시험하는 도구. 2026-10-07 EAIT DBC 시절 도구(`eait_tx.py`·`eait_rx.py`)를 지우고 A1 기준으로 바꿨다(git 기록).
 
 ## 준비 (1회)
@@ -10,7 +10,7 @@ sudo apt install -y can-utils                       # candump / cansend / cansni
 python3 -m pip install --user cantools python-can   # 설치 확인: python3 -c "import can, cantools"
 ```
 
-**DBC**: `DBC/A1_dbc_fixed.dbc` (업체 원본 `A1_dbc.dbc` 에서 0x200 `steer_is_auto` 오타 1곳만 고친 사본 — 0x210 조향 ×0.1 은 10-07 실차로 확정, 근거는
+**DBC**: `DBC/A1_dbc_2_fixed.dbc` (대회 배포 `A1_dbc_2.dbc` 의 오타만 고친 사본 — 0x210 조향 ×0.1 은 10-07 실차로 확정, 근거는
 `docs/2026-10-06_a1_dbc_update_and_lift_plan.md` §0). 이 DBC 에도 `GenMsgCycleTime` 이 없어 주기는 10-07 실차 녹화
 실측값(0x200·0x201·0x210 ≈ 20 ms)을 쓴다.
 
@@ -26,7 +26,7 @@ python3 -m pip install --user cantools python-can   # 설치 확인: python3 -c 
 sudo bash sil/vcan/vcan_up.sh                       # 1회(이미 enabled 면 불필요)
 bash sil/vcan/roundtrip_check.sh
 python3 sil/vcan/fake_a1_vehicle.py --channel vcan0 &
-candump vcan0 | python3 -m cantools decode --single-line DBC/A1_dbc_fixed.dbc
+candump vcan0 | python3 -m cantools decode --single-line DBC/A1_dbc_2_fixed.dbc
 ```
 
 이 도구들을 쓰는 자동 리허설: `tools/race_day/rehearse_lift_guard.sh`(can_guard + lift_cmd, C0~C7 재현),

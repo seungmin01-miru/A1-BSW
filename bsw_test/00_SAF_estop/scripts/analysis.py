@@ -14,7 +14,7 @@
   guard_tx_ms          t0 → 우리 0x210 의 첫 보호 프레임(가속 0·브레이크 ≥ 30 %)
   app_en_s             앱 enable 지속 시간, app_acc_min / app_acc_le_m1_s(ACC_Cmd ≤ −1 이 유지된 시간)
   decel_start_ms       t0 → 속도가 v0 보다 0.5 km/h 떨어진 첫 시각 ("제동 시작"의 차속 기준 — 문턱 통과 시간 포함)
-  brake_pos_rise_ms    t0 → 0x200 break_postion 이 t0 값보다 0.5 오른 첫 시각(안 오르면 빈칸 — 원격 우선이면 안 오름)
+  brake_pos_rise_ms    t0 → 0x200 break_postion 이 t0 값보다 5 %(옛 표기 0.5) 오른 첫 시각(안 오르면 빈칸 — 원격 우선이면 안 오름)
   stop_s / stop_m      t0 → 속도 < 0.3 km/h 시간·거리, mean_decel = v0 / stop_s
   wheel_lock           감속 중 후륜 속도 감소율 > 10 m/s² 가 0.1 s 넘게 이어지면 1
   steer_jump_deg       t0 −0.1 s 와 +0.5 s 사이 0x200 핸들각 변화(원격 우선이면 앱 EPS_Cmd 쪽으로 튐)
@@ -81,9 +81,9 @@ class Series:
 
 
 def decode(frames, wheel_scale):
-    db = dbc_lite.load(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
+    db = dbc_lite.load(os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc'))
     db.update(dbc_lite.remote_messages())
-    s = {k: Series() for k in ('v', 'steer_pos', 'brake_pos', 'cmd', 'en', 'acc_cmd', 'eps_cmd')}
+    s = {k: Series() for k in ('v', 'steer_pos', 'brake_pos_pct', 'cmd', 'en', 'acc_cmd', 'eps_cmd')}
     for t, i, d in frames:
         m = db.get(i)
         if m is None:
@@ -93,7 +93,7 @@ def decode(frames, wheel_scale):
             s['v'].add(t, (x['left_speed'] + x['right_speed']) / 2 / wheel_scale)
         elif i == 0x200:
             s['steer_pos'].add(t, x['steer_postion'])
-            s['brake_pos'].add(t, x['break_postion'])
+            s['brake_pos_pct'].add(t, x['break_postion'])
         elif i == 0x210:
             auto = (int(x['steer_is_auto_command']), int(x['break_is_auto_command']), int(x['acc_is_auto_command']))
             s['cmd'].add(t, (x['steer_command'], x['break_command'], x['acc_command'], auto))
@@ -211,9 +211,9 @@ def analyse(s, t0, srcs, ev_rows, t_end):
         r['wheel_lock'] = int(lock)
     else:
         r.update(decel_start_ms=None, stop_s=None, stop_m=None, mean_decel=None, wheel_lock=None)
-    b0 = s['brake_pos'].at(t0)
-    tb = first(s['brake_pos'].window(t0, t0 + 2), lambda b: b0 is not None and b >= b0 + 0.5)
-    r['brake_pos0'] = None if b0 is None else round(b0, 1)
+    b0 = s['brake_pos_pct'].at(t0)
+    tb = first(s['brake_pos_pct'].window(t0, t0 + 2), lambda b: b0 is not None and b >= b0 + 5)
+    r['brake_pos0_pct'] = None if b0 is None else round(b0, 1)
     r['brake_pos_rise_ms'] = round((tb - t0) * 1e3) if tb else None
     sa, sb = s['steer_pos'].at(t0 - 0.1), s['steer_pos'].at(t0 + 0.5)
     r['steer_jump_deg'] = round(sb - sa, 1) if sa is not None and sb is not None else None
@@ -276,8 +276,8 @@ def plot(s, t0, r, path):
     ax[1].legend(loc='lower right', fontsize=8)
     cw = s['cmd'].window(*rng)
     ax[2].plot([t - t0 for t, _ in cw], [c[1] for _, c in cw], 'C0', lw=1.2, label='우리 0x210 브레이크 [%]')
-    bw = s['brake_pos'].window(*rng)
-    ax[2].plot([t - t0 for t, _ in bw], [b * 10 for _, b in bw], 'C1', lw=1.2, label='0x200 브레이크 위치 ×10')
+    bw = s['brake_pos_pct'].window(*rng)
+    ax[2].plot([t - t0 for t, _ in bw], [b for _, b in bw], 'C1', lw=1.2, label='0x200 브레이크 위치 [%]')
     ax[2].legend(loc='upper right', fontsize=8)
     ax[3].plot([t - t0 for t, _ in cw], [c[0] for _, c in cw], 'C0', lw=1.2, label='우리 0x210 핸들 °')
     ax[3].plot(*rel(s['steer_pos'].window(*rng)), 'C2', lw=1.2, label='0x200 핸들 °')

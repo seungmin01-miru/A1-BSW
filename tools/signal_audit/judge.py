@@ -33,7 +33,7 @@ import audit_data  # noqa: E402
 import limits  # noqa: E402
 from audit_data import load_lift_cmd  # noqa: E402
 
-DEFAULT_DBC = os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc')
+DEFAULT_DBC = os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc')
 SETTLE_S = 1.0        # 계단 뒤 이 시간의 위치를 정착값으로 본다(10-07 63 % 응답 약 0.2 s)
 ACC_WINDOW_S = 3.0    # 가속 명령 시작부터 이 시간 안의 바퀴 최대 속도
 MIN_HOLD_S = 0.3      # 이보다 짧게 유지된 명령 값은 계단으로 보지 않는다(송신자 둘일 때의 깜빡임)
@@ -165,24 +165,24 @@ def section_response(by, msgs, w):
         r = (p1['steer_postion'] - p0['steer_postion']) / (b - a) if b != a else float('nan')
         w(f'| {hms(t)} | {a:+.1f} → {b:+.1f} | {p0["steer_postion"]:+.1f} → {p1["steer_postion"]:+.1f} | {r:.2f} |')
 
-    w(f'\n### 4-2. 브레이크 계단 → 0x200 break_postion ({SETTLE_S:g} s 뒤, 기대 = 명령 ÷ 10)\n')
-    w('| 시각 | 명령 이전 → 이후 (%) | 위치 시작 → 정착 | 정착 × 10 / 명령 |')
+    w(f'\n### 4-2. 브레이크 계단 → 0x200 break_postion ({SETTLE_S:g} s 뒤, 기대 = 명령 %)\n')
+    w('| 시각 | 명령 이전 → 이후 (%) | 위치 % 시작 → 정착 | 정착 / 명령 |')
     w('|---|---|---|---|')
     for t, a, b in steps(cmd, 'break_command', 'break_is_auto_command'):
         p0, p1 = info.at(t), info.at(t + SETTLE_S)
         if p0 is None or p1 is None:
             continue
-        r = f'{p1["break_postion"] * 10 / b:.2f}' if b else '—'
-        w(f'| {hms(t)} | {a:g} → {b:g} | {p0["break_postion"]:.1f} → {p1["break_postion"]:.1f} | {r} |')
+        r = f'{p1["break_postion"] / b:.2f}' if b else '—'
+        w(f'| {hms(t)} | {a:g} → {b:g} | {p0["break_postion"]:.0f} → {p1["break_postion"]:.0f} | {r} |')
 
     w(f'\n### 4-3. 가속 명령 → 0x201 바퀴 ({ACC_WINDOW_S:g} s 안 최대)\n')
-    w('| 시각 | 가속 (%) | 그때 break_postion | 좌 / 우 최대 km/h | 좌 / 우 최대 rpm |')
+    w('| 시각 | 가속 (%) | 그때 break_postion (%) | 좌 / 우 최대 km/h | 좌 / 우 최대 rpm |')
     w('|---|---|---|---|---|')
     for t, a, b in steps(cmd, 'acc_command', 'acc_is_auto_command'):
         if b <= 0:
             continue
         br = info.at(t)
-        brs = f'{br["break_postion"]:.1f}' if br else '?'
+        brs = f'{br["break_postion"]:.0f}' if br else '?'
         if wheel:
             win = [v for _, v in wheel.window(t, t + ACC_WINDOW_S)]
             ls = max((v['left_speed'] for v in win), default=0)

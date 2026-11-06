@@ -1,10 +1,10 @@
 # A1-BSW
 
 A1 CHALLENGE 자율주행 차량의 BSW(기본 소프트웨어) 계층 — 메인 PC 한 대가 안전 MCU 없이 "상위 제어기(AI) ↔ 차량 CAN"
-사이의 실시간성·통신·안전을 맡는다. **기준 프로토콜: 실차 A1 DBC `DBC/A1_dbc_fixed.dbc`**(업체 `A1_dbc.dbc` 에서
-0x200 `steer_is_auto` 오타 1곳만 고친 사본, 2026-10-06~07 전환. 9월의 EAIT DBC 는 삭제). 0x210 조향은 업체 DBC 그대로
+사이의 실시간성·통신·안전을 맡는다. **기준 프로토콜: 실차 A1 DBC `DBC/A1_dbc_2_fixed.dbc`**(대회 배포 `A1_dbc_2.dbc` 의
+오타만 고친 사본, 2026-11-06 전환. 이전 기준은 `archive/dbc_2026-10/`). 0x210 조향은 업체 DBC 그대로
 **×0.1°/raw**(2026-10-07 실차 확정). 대회측 원격조종(핸드폰 앱)은 0x156/0x157 로 0x210 보다 우선한다 — 앱 비상정지는 원격 인수다(`bsw_test/00_SAF_estop/docs/goal.md` 0절).
-DBC 밖 0x128·0x710~0x712 는 대회측이 심은 프레임으로 자율주행과 무관하다(2026-11-05 확인).
+0x128 은 RES 응답(기록만), 0x710~0x712 는 관제용 피드백이다(제어에 안 씀).
 
 ```
 ROS2 제어 노드 ──공유메모리──▶ can_guard ──0x210 20 ms──▶ CAN(PEAK can0 / Kvaser) ──▶ 차량
@@ -61,7 +61,7 @@ bash tools/bsw/bsw_down.sh                     # 차가 선 뒤: ESTOP 브레이
 ```
 A1-BSW/
 ├─ README.md · CLAUDE.md            안내 · Claude 작업 규칙
-├─ DBC/                             기준 DBC (A1_dbc_fixed.dbc)
+├─ DBC/                             기준 DBC (A1_dbc_2_fixed.dbc)
 │
 ├─ ── 코드 ───────────────────────────────────────────────
 ├─ safety/can_guard/                0x210 유일 송신자 (상태기계·ESTOP·클램프) + 단위/SIL 시험
@@ -93,7 +93,7 @@ A1-BSW/
 
 | 디렉터리 | 내용 | 안내 |
 |---|---|---|
-| `DBC/` | `A1_dbc.dbc`(업체 원본), `A1_dbc_fixed.dbc`(기준 — 0x200 `steer_is_auto` 오타만 수정) | 근거: `docs/2026-10-06_a1_dbc_update_and_lift_plan.md` §0 |
+| `DBC/` | `A1_dbc.dbc`(10-06 업체 원본), `A1_dbc_2_fixed.dbc`(기준 — 대회 배포본의 오타 수정, 고친 곳은 파일 안 `CM_`) | 근거: `docs/2026-11-06_race_flag_dev_plan.md` WP0 |
 | `safety/can_guard/` | 차량 명령(0x210)의 유일한 송신자, `lift_cmd.py` | `safety/can_guard/README.md` |
 | `ros2_ws/` | ROS2 상태 브리지·제어기 출력 어댑터(`a1_control_adapter`) | `ros2_ws/README.md` |
 | `sil/vcan/` | 가상 버스 SIL(가짜 실차 `fake_a1_vehicle.py`) | `sil/vcan/README.md` |

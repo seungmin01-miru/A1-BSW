@@ -1,4 +1,4 @@
-"""0x200/0x201 디코더 — cantools + DBC/A1_dbc_fixed.dbc + 2026-10-07 실차 프레임과 대조."""
+"""0x200/0x201 디코더 — cantools + DBC/A1_dbc_2_fixed.dbc + 2026-10-07 실차 프레임과 대조."""
 import csv
 import os
 
@@ -9,7 +9,7 @@ from rx_decode import (FRAME_ID_CONTROL_INFO, FRAME_ID_WHEEL_INFO, decode_contro
                        decode_vehicle_speed_kph, decode_wheel_speeds_kph)
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
+DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc'))
 SAMPLES = os.path.join(REPO, 'tools', 'race_day', 'testdata', 'a1_20261007_samples.csv')
 
 
@@ -47,6 +47,6 @@ def test_control_info_matches_dbc_on_real_frames():
         ref = DB.decode_message(0x200, raw, decode_choices=False)
         mine = decode_control_info(raw)
         assert mine['steer_pos_deg'] == pytest.approx(ref['steer_postion'])
-        assert mine['brake_pos'] == pytest.approx(ref['break_postion'])
+        assert mine['brake_pos_pct'] == pytest.approx(ref['break_postion'])
         assert (mine['steer_auto'], mine['brake_auto'], mine['acc_auto']) == \
             (ref['steer_is_auto'], ref['break_is_auto'], ref['acc_is_auto'])

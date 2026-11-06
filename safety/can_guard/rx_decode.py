@@ -1,9 +1,9 @@
 """can_guard 가 읽는 RX 신호 — tx_encode.py 와 같은 원칙: 런타임에 DBC 를 읽지 않고 다른 디렉터리에 기대지
-않는다(§5.D "최소 의존"). 정확성은 test/test_rx_decode.py 가 cantools + `DBC/A1_dbc_fixed.dbc` + 10-07 실차
+않는다(§5.D "최소 의존"). 정확성은 test/test_rx_decode.py 가 cantools + `DBC/A1_dbc_2_fixed.dbc` + 10-07 실차
 프레임과 대조한다.
 
 2026-10-06 실차 프로토콜로 전환(이전: EAIT 0x711 VS).
-  - 0x201 USER_right_wheel_info → 차속(좌우 바퀴 속도 평균) — STOPPED 차속 조기 판정용(이전 VS 의 대체)
+  - 0x201 USER_wheel_info → 차속(좌우 바퀴 속도 평균) — STOPPED 차속 조기 판정용(이전 VS 의 대체)
   - 0x200 USER_control_info     → 조향·브레이크 위치, 축별 auto — 판단에는 안 쓰고 로그·상태 표시용
   - 0x210 이 **수신**되면 그건 다른 송신자다(우리 소켓은 자기 송신을 받지 않음) — can_guard 가 경고한다
 """
@@ -28,11 +28,11 @@ def decode_vehicle_speed_kph(data):
 
 
 def decode_control_info(data):
-    """0x200 → dict(조향 위치 deg, 브레이크 위치, 축별 auto). 브레이크 위치 단위는 DBC 에 없음(10-07: 명령 % ÷ 10, 0~10)."""
+    """0x200 → dict(조향 위치 deg, 브레이크 위치 %, 축별 auto). 브레이크 위치는 raw = % (A1_dbc_2, D13). ROS 쪽 0~10 표기와 섞지 않는다."""
     d = bytes(data[:8])
     return {
         'steer_pos_deg': int.from_bytes(d[0:2], 'little', signed=True) * 0.1,
-        'brake_pos': int.from_bytes(d[2:4], 'little', signed=True) * 0.1,
+        'brake_pos_pct': int.from_bytes(d[2:4], 'little', signed=True),
         'steer_auto': d[4] & 1, 'brake_auto': (d[4] >> 1) & 1, 'acc_auto': (d[4] >> 2) & 1,
     }
 

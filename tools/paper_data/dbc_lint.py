@@ -4,7 +4,7 @@
 표준 라이브러리 + matplotlib(그림만). cantools 없이 DBC 문법(Vector DBC File Format 1.0.x 기준)을
 정규식으로 줄마다 대조하고, 의미 점검(비트 범위·겹침·배율·범위 표현 가능성·VAL_ 참조 등)을 붙인다.
 
-    python3 tools/paper_data/dbc_lint.py DBC/A1_dbc.dbc DBC/A1_dbc_fixed.dbc --out reports/2026-11-03_paper_data
+    python3 tools/paper_data/dbc_lint.py DBC/A1_dbc_2.dbc DBC/A1_dbc_2_fixed.dbc --out reports/2026-11-03_paper_data
 """
 import argparse
 import os

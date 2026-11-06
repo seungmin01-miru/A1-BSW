@@ -1,5 +1,5 @@
 import sys, numpy as np; sys.path.insert(0,'/home/ailab/git/A1-BSW/tools/signal_audit'); sys.path.insert(0,'.'); import dbc_lite, minidf as pd
-db=dbc_lite.load('/home/ailab/git/A1-BSW/DBC/A1_dbc_fixed.dbc')
+db=dbc_lite.load('/home/ailab/git/A1-BSW/DBC/A1_dbc_2_fixed.dbc')
 R='/home/ailab/a1_race_capture/a1drive_20261104_164006_run'
 def readcan(f):
     rows={0x200:[],0x201:[],0x210:[]}

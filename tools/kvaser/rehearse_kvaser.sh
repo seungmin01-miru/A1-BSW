@@ -71,7 +71,7 @@ T_KILL=$(date +%s.%N); kill -9 $G; wait $G 2>/dev/null; sleep 0.8
 exec 5>&-; wait $L 2>/dev/null
 grep -q 'INIT → ACTIVE' "$W/guard.log" && ok "can_guard(kvaser) INIT → ACTIVE" || bad "ACTIVE 전이 없음"
 grep -q "can_guard 가 보낸 0x210" "$W/lcmd.log" && ok "lift_cmd 가 can_guard 송신값을 봄(로컬 TX 에코)" || bad "lift_cmd 에 can_guard 송신값 없음"
-python3 - "$REPO/DBC/A1_dbc_fixed.dbc" "$W/c.candump" "$T_KILL" <<'EOF' | while IFS= read -r l; do case "$l" in OK*) echo "  ✅ PASS  ${l#OK }";; NG*) echo "  ❌ FAIL  ${l#NG }";; esac; done
+python3 - "$REPO/DBC/A1_dbc_2_fixed.dbc" "$W/c.candump" "$T_KILL" <<'EOF' | while IFS= read -r l; do case "$l" in OK*) echo "  ✅ PASS  ${l#OK }";; NG*) echo "  ❌ FAIL  ${l#NG }";; esac; done
 import sys, re, statistics, cantools
 db = cantools.database.load_file(sys.argv[1]); tk = float(sys.argv[3])
 c210, c200 = [], []

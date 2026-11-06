@@ -90,7 +90,7 @@ class State:
             v['speed'] = ((r + lft) / 2 / WHEEL_SCALE, lft, r)
         if 0x200 in last:
             b = last[0x200][1]
-            v['veh'] = (s16(b, 0) * 0.1, s16(b, 2) * 0.1, bits3(b[4]))      # 핸들 °, 브레이크 위치 0~10, auto
+            v['veh'] = (s16(b, 0) * 0.1, s16(b, 2), bits3(b[4]))      # 핸들 °, 브레이크 위치 %, auto
         if 0x210 in last:
             b = last[0x210][1]
             v['cmd'] = (s16(b, 0) * 0.1, u16(b, 2), b[4], bits3(b[5]), rate[0x210])
@@ -234,7 +234,7 @@ def render_text(v, st, ev, d, src):
     if v['speed']:
         w(f'차량 속도   {v["speed"][0]:6.1f} km/h   (좌 {v["speed"][1]:.1f} 우 {v["speed"][2]:.1f}, ÷{WHEEL_SCALE})')
     if v['veh']:
-        w(f'차량 상태   핸들 {v["veh"][0]:+7.1f}°  브레이크 위치 {v["veh"][1]:4.1f}  auto {v["veh"][2]}')
+        w(f'차량 상태   핸들 {v["veh"][0]:+7.1f}°  브레이크 위치 {v["veh"][1]:3.0f} %  auto {v["veh"][2]}')
     if v['cmd']:
         c = v['cmd']
         w(f'우리 0x210  핸들 {c[0]:+7.1f}°  브레이크 {c[1]:3d} %  가속 {c[2]:3d} %  auto {c[3]}  {c[4]} Hz')
@@ -391,7 +391,7 @@ def run_gui(a, s, g, d, src):
             put(wbox, 'w', text='✅ 경고 없음', bg=C['okbg'], fg=C['ok'])
         c, vh = v['cmd'], v['veh']
         vals = {(1, 1): f'{c[0]:+.1f}' if c else '—', (1, 2): f'{vh[0]:+.1f}' if vh else '—',
-                (2, 1): f'{c[1]}' if c else '—', (2, 2): f'{vh[1] * 10:.0f}' if vh else '—',
+                (2, 1): f'{c[1]}' if c else '—', (2, 2): f'{vh[1]:.0f}' if vh else '—',
                 (3, 1): f'{c[2]}' if c else '—', (3, 2): '',
                 (4, 1): c[3] if c else '—', (4, 2): vh[2] if vh else '—'}
         for k, txt in vals.items():

@@ -69,11 +69,11 @@ def main():
                 w.writerow([c, side, d, t, s, p, round(p - c, 1), round(0.9 * c / (t - d), 0)])
     with open(os.path.join(a.out, 'data', 'brake_map_S2.csv'), 'w', newline='') as f:
         w = csv.writer(f)
-        w.writerow(['cmd_pct', 'direction', 'prev_pct', 'delay_s', 't90_s', 'position'])
+        w.writerow(['cmd_pct', 'direction', 'prev_pct', 'delay_s', 't90_s', 'position_pct'])
         for r in BRAKE_DOWN:
-            w.writerow([r[0], 'release', r[1], r[2], r[3], r[4]])
+            w.writerow([r[0], 'release', r[1], r[2], r[3], round(r[4] * 10, 1)])
         for r in BRAKE_UP:
-            w.writerow([r[0], 'apply', '', r[2], r[3], r[4]])
+            w.writerow([r[0], 'apply', '', r[2], r[3], round(r[4] * 10, 1)])
     with open(os.path.join(a.out, 'data', 'longitudinal_EP.csv'), 'w', newline='') as f:
         w = csv.writer(f)
         w.writerow(['time', 'direction', 'acc100_mps2', 'coast_mps2', 'brake_v0_mps', 'brake100_mps2'])
@@ -105,14 +105,14 @@ def main():
     # 그림 3b: 브레이크 맵
     fig, ax = plt.subplots(1, 2, figsize=(10, 3.4))
     xd = [r[0] for r in BRAKE_DOWN]
-    ax[0].plot(xd, [r[4] for r in BRAKE_DOWN], 'o-', color=C['rx'], label='해제 방향(100→10)')
-    ax[0].plot([r[0] for r in BRAKE_UP], [r[4] for r in BRAKE_UP], 's', color=C['tx'], ms=7, mfc='none', label='거는 방향')
+    ax[0].plot(xd, [r[4] * 10 for r in BRAKE_DOWN], 'o-', color=C['rx'], label='해제 방향(100→10)')
+    ax[0].plot([r[0] for r in BRAKE_UP], [r[4] * 10 for r in BRAKE_UP], 's', color=C['tx'], ms=7, mfc='none', label='거는 방향')
     xx = np.linspace(0, 100, 101)
-    ax[0].plot(xx, np.minimum(xx / 10, 8.2), '--', color=C['ref'], lw=0.8, label='위치 = min(% ÷ 10, 8.2)')
+    ax[0].plot(xx, np.minimum(xx, 82), '--', color=C['ref'], lw=0.8, label='위치 = min(명령 %, 82 %)')
     ax[0].axvline(82, color=C['other'], ls=':')
-    ax[0].text(83, 1, '포화 ≈ 82 %', fontsize=8)
+    ax[0].text(83, 10, '포화 ≈ 82 %', fontsize=8)
     ax[0].set_xlabel('break_command (%)')
-    ax[0].set_ylabel('break_postion (0x200)')
+    ax[0].set_ylabel('break_postion (0x200, %)')
     ax[0].set_title('(a) 정적 맵', fontsize=9, loc='left')
     ax[0].legend(fontsize=7)
     rd = [r for r in BRAKE_DOWN if r[2] is not None]

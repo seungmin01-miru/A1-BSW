@@ -1,7 +1,7 @@
 # __DATE__ 실차 신호 검증
 
 > 만든 명령: `tools/signal_audit/new_session.sh __DATE__` · 직전 기록: `measurements/2026-10-07_vehicle_lift/`
-> 기준 DBC: `DBC/A1_dbc_fixed.dbc`
+> 기준 DBC: `DBC/A1_dbc_2_fixed.dbc`
 
 ## 파일
 

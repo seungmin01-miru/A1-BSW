@@ -12,7 +12,7 @@
   events.md      시각순 사건 일지 — 메모 + lift_cmd 입력 + 0x210 내용 변화 + 0x200 auto/위치 변화 + 버스 공백 + 새 ID 등장
   timeline.csv   100 ms 간격 표 — 명령(0x210)·상태(0x200)·바퀴(0x201)·메모 (제어 모델·그래프용)
 
-해석은 DBC/A1_dbc_fixed.dbc 와 같은 규칙(tools/race_day/a1_proto.py). 0x210 은 송신자를 구분할 수 없으므로(우리 can_guard 의
+해석은 DBC/A1_dbc_2_fixed.dbc 와 같은 규칙(tools/race_day/a1_proto.py). 0x210 은 송신자를 구분할 수 없으므로(우리 can_guard 의
 에코와 외부 송신자가 같은 ID) 내용 변화로만 보여 주고, lift_cmd 입력 이력과 나란히 놓아 사람이 대조하게 한다.
 
 0x156/0x157 = 대회측 원격조종 메시지(EAIT_Control_01/02 형식, 2026-10-07 대회측 확인). 0x210 보다 낮은 ID 라 버스 중재에서
@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from a1_proto import decode_0x200, decode_0x201, decode_0x210  # noqa: E402
 
 LINE = re.compile(r'\((\d+\.\d+)\) \S+ ([0-9A-Fa-f]+)#([0-9A-Fa-f]*)')
-A1_IDS = {0x200: 'USER_control_info', 0x201: 'USER_right_wheel_info', 0x210: 'USER_control_command'}
+A1_IDS = {0x200: 'USER_control_info', 0x201: 'USER_wheel_info', 0x210: 'USER_control_command'}
 KNOWN_OTHER = {0x156: '원격조종 Control_01(EPS/ACC/AEB En)', 0x157: '원격조종 Control_02(조향·가감속 명령)',
                0x004: '미확인(DBC 에 없음)', 0x204: '미확인(DBC 에 없음)'}
 
@@ -182,7 +182,7 @@ def main():
         dec = [decode_0x200(d) for _, d in by_id[0x200]]
         S.append("## 차량 상태(0x200) 범위\n")
         S.append(f"- 조향 위치: {min(x['steer_pos_deg'] for x in dec):+.1f} ~ {max(x['steer_pos_deg'] for x in dec):+.1f} °")
-        S.append(f"- 브레이크 위치: {min(x['brake_pos'] for x in dec):.1f} ~ {max(x['brake_pos'] for x in dec):.1f}")
+        S.append(f"- 브레이크 위치: {min(x['brake_pos_pct'] for x in dec):.0f} ~ {max(x['brake_pos_pct'] for x in dec):.0f} %")
         autos = Counter(f"{x['steer_auto']}{x['brake_auto']}{x['acc_auto']}" for x in dec)
         S.append("- auto 비트(S/B/A) 분포: " + ', '.join(f"{k}: {v:,}" for k, v in autos.most_common()))
         S.append("")
@@ -253,12 +253,12 @@ def main():
         if prev is not None and key != prev:
             ev.append((t, '0x200', f"차량 auto 비트 {prev[0]}{prev[1]}{prev[2]} → {key[0]}{key[1]}{key[2]}"))
         prev = key
-    # 브레이크/조향 위치 큰 변화(1.0 이상)
+    # 브레이크 위치 큰 변화(10 % 이상)·조향 위치 큰 변화(1.0° 이상)
     last = None
     for t, d in by_id.get(0x200, []):
         x = decode_0x200(d)
-        if last and abs(x['brake_pos'] - last['brake_pos']) >= 1.0:
-            ev.append((t, '0x200', f"브레이크 위치 {last['brake_pos']:.1f} → {x['brake_pos']:.1f}"))
+        if last and abs(x['brake_pos_pct'] - last['brake_pos_pct']) >= 10:
+            ev.append((t, '0x200', f"브레이크 위치 {last['brake_pos_pct']:.0f} → {x['brake_pos_pct']:.0f} %"))
         if last and abs(x['steer_pos_deg'] - last['steer_pos_deg']) >= 1.0:
             ev.append((t, '0x200', f"조향 위치 {last['steer_pos_deg']:+.1f} → {x['steer_pos_deg']:+.1f} °"))
         last = x
@@ -292,7 +292,7 @@ def main():
         note_at[int((t - t0) / step)].append(f"[{src}] {txt}")
     cols = ['time', 'clock', 'cmd_steer_deg', 'cmd_brake_pct', 'cmd_acc_pct', 'cmd_auto_sba',
             'remote_en_eps_acc_aeb', 'remote_steer_deg', 'remote_acc_mps2',
-            'veh_steer_pos_deg', 'veh_brake_pos', 'veh_auto_sba', 'veh_brake_cnt_moving',
+            'veh_steer_pos_deg', 'veh_brake_pos_pct', 'veh_auto_sba', 'veh_brake_cnt_moving',
             'wheel_r_kph', 'wheel_r_rpm', 'wheel_l_kph', 'wheel_l_rpm', 'notes']
     with open(os.path.join(out_dir, 'timeline.csv'), 'w', newline='') as f:
         w = csv.writer(f)
@@ -315,7 +315,7 @@ def main():
                             f"{c210['steer_auto']}{c210['brake_auto']}{c210['acc_auto']}" if c210 else '',
                             f"{c156['eps_en']}{c156['acc_en']}{c156['aeb_en']}" if c156 else '',
                             c157.get('eps_cmd_deg', ''), c157.get('acc_cmd_mps2', ''),
-                            c200.get('steer_pos_deg', ''), c200.get('brake_pos', ''),
+                            c200.get('steer_pos_deg', ''), c200.get('brake_pos_pct', ''),
                             f"{c200['steer_auto']}{c200['brake_auto']}{c200['acc_auto']}" if c200 else '', bcnt_moving,
                             c201.get('right_kph', ''), c201.get('right_rpm', ''), c201.get('left_kph', ''), c201.get('left_rpm', ''),
                             ' ; '.join(note_at.get(bucket, []))])

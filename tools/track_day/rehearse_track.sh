@@ -102,7 +102,7 @@ stop_guard
 for p in $A_PID $B_PID $D_PID; do kill $p 2>/dev/null; done; wait $A_PID $B_PID $D_PID 2>/dev/null; A_PID=""; B_PID=""; D_PID=""
 kill $REC_PID 2>/dev/null; wait $REC_PID 2>/dev/null; REC_PID=""
 
-report < <(python3 - "$REPO/DBC/A1_dbc_fixed.dbc" "$W/bus.candump" "$W/guard1.log" "$W/guard2.log" \
+report < <(python3 - "$REPO/DBC/A1_dbc_2_fixed.dbc" "$W/bus.candump" "$W/guard1.log" "$W/guard2.log" \
   $M_DIS0 $M_DIS1 $M_ARM_S $M_ARM $M_ACC0 $M_ACC $M_KILL $M_RESTART $M_RE1 $M_NAN <<'PY'
 import re, sys, statistics, cantools
 db = cantools.database.load_file(sys.argv[1]); guard = open(sys.argv[3]).read(); guard2 = open(sys.argv[4]).read()

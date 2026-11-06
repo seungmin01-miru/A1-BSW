@@ -36,7 +36,7 @@ start_foreign() { ( while :; do cansend $CH 210#4D00000000070000; sleep 0.02; do
 stop_foreign()  { kill $FS_PID 2>/dev/null; wait $FS_PID 2>/dev/null; FS_PID=""; }
 
 # 분석기: candump 파일 → 조건 확인 (수정본 DBC 로 디코드)
-analyze() { python3 - "$REPO/DBC/A1_dbc_fixed.dbc" "$@" <<'EOF'
+analyze() { python3 - "$REPO/DBC/A1_dbc_2_fixed.dbc" "$@" <<'EOF'
 import sys, re, statistics, cantools
 db = cantools.database.load_file(sys.argv[1]); mode = sys.argv[2]; path = sys.argv[3]
 ours, info, foreign = [], [], []

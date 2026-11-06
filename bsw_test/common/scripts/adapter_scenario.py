@@ -34,8 +34,8 @@ def main():
     a = ap.parse_args()
     segs = [(float(x.split(':')[0]), float(x.split(':')[1])) for x in a.segments.split(',')]
 
-    db = dbc_lite.load(os.path.expanduser('~/git/A1-BSW/DBC/A1_dbc_fixed.dbc'))
-    st = {'v': 0.0, 'steer_pos': None, 'brake_pos': None, 'acc_cmd': None, 'brk_cmd': None, 'steer_cmd': None}
+    db = dbc_lite.load(os.path.expanduser('~/git/A1-BSW/DBC/A1_dbc_2_fixed.dbc'))
+    st = {'v': 0.0, 'steer_pos': None, 'brake_pos_pct': None, 'acc_cmd': None, 'brk_cmd': None, 'steer_cmd': None}
 
     def rx():
         bus = can.Bus(channel=a.channel, interface='socketcan')
@@ -48,7 +48,7 @@ def main():
                 st['v'] = (d['left_speed'] + d['right_speed']) / 2
             elif m.arbitration_id == 0x200:
                 d = db[0x200].decode(m.data)
-                st['brake_pos'], st['steer_pos'] = d['break_postion'], d['steer_postion']
+                st['brake_pos_pct'], st['steer_pos'] = d['break_postion'], d['steer_postion']
             elif m.arbitration_id == 0x210:
                 d = db[0x210].decode(m.data)
                 st['acc_cmd'], st['brk_cmd'], st['steer_cmd'] = d['acc_command'], d['break_command'], d['steer_command']
@@ -65,7 +65,7 @@ def main():
         d = {'t': time.time(), 'event': kind, 'phase': tgt['phase'], 'v_kph': round(st['v'], 2), 'v_ref_kph': tgt['v_ref'],
              'target_accel': round(tgt['a'], 3), 'target_tire_deg': tgt['steer'], 'steer_pos_wheel_deg': st['steer_pos'],
              'steer_cmd_0x210': st['steer_cmd'], 'acc_cmd_0x210': st['acc_cmd'], 'brake_cmd_0x210': st['brk_cmd'],
-             'brake_pos': st['brake_pos'], **kw}
+             'brake_pos_pct': st['brake_pos_pct'], **kw}
         ev_pub.publish(String(data=json.dumps(d, ensure_ascii=False)))
         if kind != 'sample':
             print(json.dumps(d, ensure_ascii=False), flush=True)

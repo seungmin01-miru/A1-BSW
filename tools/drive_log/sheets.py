@@ -227,10 +227,10 @@ rr = [r for r in bpos if r['cmd_pct'] == '95-101' and r['state'] == 'stopped'] +
 names = [r['source'].replace('quick_', '').replace('auto_', '자율 ') + f" ({r['cmd_mean']:.0f}%)" for r in rr]
 yy = np.arange(len(rr))
 ax.barh(yy, [r['pos_mean'] for r in rr], color=C1, height=0.6)
-for y, r in zip(yy, rr): ax.text(r['pos_mean'] + 0.1, y, f"{r['pos_mean']:.1f}", va='center', fontsize=8.5, color=INK)
-ax.axvline(8.2, color=INK2, ls='--', lw=1.2); ax.text(8.25, len(rr) - 0.5, '기대 8.2', fontsize=8.5, color=INK2)
-ax.set_yticks(yy); ax.set_yticklabels(names, fontsize=8); ax.set_xlim(0, 9.5); ax.invert_yaxis()
-ax.set_xlabel('0x200 break_postion (정지, 1.5 s 유지)')
+for y, r in zip(yy, rr): ax.text(r['pos_mean'] + 1, y, f"{r['pos_mean']:.0f}", va='center', fontsize=8.5, color=INK)
+ax.axvline(82, color=INK2, ls='--', lw=1.2); ax.text(82.5, len(rr) - 0.5, '기대 82 %', fontsize=8.5, color=INK2)
+ax.set_yticks(yy); ax.set_yticklabels(names, fontsize=8); ax.set_xlim(0, 95); ax.invert_yaxis()
+ax.set_xlabel('0x200 break_postion [%] (정지, 1.5 s 유지)')
 ax.set_title('② 높은 명령에서 위치 포화값 (세션별)', loc='left', fontsize=11, fontweight='bold', color=INK)
 
 ax = fig.add_subplot(gs[1, :])
@@ -238,9 +238,9 @@ t0, s0, t1, s1, t2, s2 = frames('quick_QUICK-LON_s6')
 rel = [r for r in bsteps if r['source'] == 'quick_QUICK-LON_s6']
 for r, col, lab in [(rel[0], C1, '100 → 0 % (해제)'), (rel[2], C2, '0 → 100 % (적용, 3 km/h)')]:
     ts = r['t_unix']; m2 = (t2 >= ts - 0.3) & (t2 <= ts + 2.0); m0 = (t0 >= ts - 0.3) & (t0 <= ts + 2.0)
-    ax.step(t2[m2] - ts, s2['break_command'][m2] / 10, where='post', color=col, ls='--', lw=1.3)
-    ax.plot(t0[m0] - ts, s0['break_postion'][m0], color=col, lw=2.2, label=f'{lab}: 명령÷10 점선 / 위치 실선')
-ax.set_xlabel('계단 후 시간 [s]'); ax.set_ylabel('브레이크 (명령 % ÷ 10, 위치 0~10)'); ax.legend(fontsize=9, loc='center right')
+    ax.step(t2[m2] - ts, s2['break_command'][m2], where='post', color=col, ls='--', lw=1.3)
+    ax.plot(t0[m0] - ts, s0['break_postion'][m0], color=col, lw=2.2, label=f'{lab}: 명령 점선 / 위치 실선')
+ax.set_xlabel('계단 후 시간 [s]'); ax.set_ylabel('브레이크 (명령 %, 위치 %)'); ax.legend(fontsize=9, loc='center right')
 ax.set_title('③ 계단 응답 예 (QUICK-LON_s6, 11-04 15:4x)', loc='left', fontsize=11, fontweight='bold', color=INK)
 
 app = [r for r in bsteps if r['cmd_to'] > r['cmd_from']]; rls = [r for r in bsteps if r['cmd_to'] < r['cmd_from'] and r['cmd_to'] == 0]
@@ -248,13 +248,13 @@ g = lambda rows, k: [r[k] for r in rows if r[k] == r[k]]
 pick_b = lambda b, s: [r for r in bm if r['group'] == 'all' and r['brake_pct'] == b and r['speed_kph(true)'] == s]
 ax = fig.add_subplot(gs[2, :])
 ktable(ax, '④ 브레이크 인터페이스 수치 (brake_map · 정지 유지 · ESTOP 램프 근거)', [
-    ('적용 무반응', f"중앙값 {med(g(app, 'dead_ms(>0.2)')):.0f} ms (n={len(g(app, 'dead_ms(>0.2)'))})", '0x210 증가 계단 → 0x200 위치 +0.2. 10-07 리프트 56~112 ms 와 일치'),
-    ('해제 무반응 / 90 %', f"{med(g(rls, 'dead_ms(>0.2)')):.0f} ms / {med(g(rls, 't90_ms')):.0f} ms", f'→ 0 % 계단(n={len(rls)}). 해제가 적용보다 약 3배 느리다 → 출발 지연의 일부'),
-    ('적용 90 % 도달', f"{med(g(app, 't90_ms')):.0f} ms", '100 % 적용은 위치가 기대 8.2 에 못 미쳐 90 % 미도달 사례 다수(nan)'),
+    ('적용 무반응', f"중앙값 {med(g(app, 'dead_ms(>2%)')):.0f} ms (n={len(g(app, 'dead_ms(>2%)'))})", '0x210 증가 계단 → 0x200 위치 +2 %. 10-07 리프트 56~112 ms 와 일치'),
+    ('해제 무반응 / 90 %', f"{med(g(rls, 'dead_ms(>2%)')):.0f} ms / {med(g(rls, 't90_ms')):.0f} ms", f'→ 0 % 계단(n={len(rls)}). 해제가 적용보다 약 3배 느리다 → 출발 지연의 일부'),
+    ('적용 90 % 도달', f"{med(g(app, 't90_ms')):.0f} ms", '100 % 적용은 위치가 기대 82 % 에 못 미쳐 90 % 미도달 사례 다수(nan)'),
     ('감속: 10~50 %', '0.25~0.87 m/s² (타행 포함)', '자율 속도 제어 구간(10~20 km/h). 현재 표는 40 % = 1.0, 거의 맞음'),
     ('감속: 50~60 %', f"{-pick_b('50-60', '2-10')[0]['a_p50_mps2']:.2f} m/s²", '현재 표 55 % ≈ 1.5 → 실제 더 셈(11-04 오후 ADAPTER-LON_s2 1.92 와 같음)'),
     ('감속: 95~100 %', f"{-pick_b('95-101', '10-20')[0]['a_p50_mps2']:.2f}~{-pick_b('95-101', '20-35')[0]['a_p50_mps2']:.2f} m/s²", '원격 주행. 현재 표 100 % = 4.0 → 실측 약 3.0. 휠락 없이 약 3 m/s² 가 상한'),
-    ('위치 포화값', '정지·≥ 90 % 에서 5.0~8.3 (세션별)', '명령 ÷ 10 관계는 82 % 이하에서만 성립. 위치로 제동력 판단 금지(압력 신호 없음)'),
+    ('위치 포화값', '정지·≥ 90 % 에서 50~83 % (세션별)', '위치 = 명령 관계는 82 % 이하에서만 성립. 위치로 제동력 판단 금지(압력 신호 없음)'),
 ])
 footer(fig, '근거 CSV: long_brake_map.csv · brake_steps.csv · brake_position_static.csv · brake_position_by_session.csv   |   앱 원격 개입 구간(0x156 EPS_En/ACC_En = 1 ± 2 s) 제외')
 fig.savefig(os.path.join(OUT, 'sheet3_brake.png')); plt.close(fig); print('sheet3')

@@ -1,6 +1,6 @@
 """USER_control_command(0x210) 인코더 — can_guard 가 클램프를 통과한 `Command` 를 차량으로 낼 마지막 단계.
 런타임에 DBC 를 읽지 않는다(RX 디코더들과 같은 원칙) — 정확성은 test/test_tx_encode.py 가 cantools +
-`DBC/A1_dbc_fixed.dbc` + 2026-10-07 실차 리프트 녹화의 0x210 프레임과 비트 단위로 대조해 보장한다.
+`DBC/A1_dbc_2_fixed.dbc` + 2026-10-07 실차 리프트 녹화의 0x210 프레임과 비트 단위로 대조해 보장한다.
 
 2026-10-06 실차 프로토콜로 전환(이전: EAIT 0x156/0x157 — git 기록에 남아 있음).
 

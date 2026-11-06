@@ -1,0 +1,204 @@
+VERSION ""
+
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_:
+
+
+BO_ 256 SYS_control_command: 8 Vector__XXX
+ SG_ steer_command : 0|16@1- (0.1,0) [-150|150] "deg" Vector__XXX
+ SG_ steer_is_auto_command : 40|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ break_command : 16|16@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ break_is_auto_command : 41|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ acc_command : 32|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ acc_is_auto_command : 42|1@1+ (1,0) [0|1] "" Vector__XXX
+
+BO_ 272 SYS_steer_info: 8 Vector__XXX
+ SG_ steer_postion : 0|16@1- (0.1,0) [-200|200] "" Vector__XXX
+ SG_ is_auto : 16|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 273 SYS_break_info: 8 Vector__XXX
+ SG_ break_postion : 0|16@1- (1,0) [0|100] "%" Vector__XXX
+ SG_ is_auto : 16|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 274 SYS_right_wheel_info: 8 Vector__XXX
+ SG_ right_speed : 0|12@1+ (0.1,0) [0|409.5] "km/h" Vector__XXX
+ SG_ right_rpm : 12|12@1+ (1,0) [0|4095] "rpm" Vector__XXX
+ SG_ enc_right_side : 40|2@1+ (1,0) [0|3] "" Vector__XXX
+ SG_ wheel_right_size : 48|8@1+ (1,0) [0|255] "cm" Vector__XXX
+ SG_ live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 275 SYS_left_wheel_info: 8 Vector__XXX
+ SG_ left_speed : 0|12@1+ (0.1,0) [0|409.5] "km/h" Vector__XXX
+ SG_ left_rpm : 12|12@1+ (1,0) [0|4095] "rpm" Vector__XXX
+ SG_ enc_left_side : 40|2@1+ (1,0) [0|3] "" Vector__XXX
+ SG_ wheel_right_size : 48|8@1+ (1,0) [0|255] "cm" Vector__XXX
+ SG_ live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 276 SYS_acc_info: 2 Vector__XXX
+ SG_ live_counter : 8|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ is_auto : 0|1@1+ (1,0) [0|1] "" Vector__XXX
+
+BO_ 769 SYS_ENCODER_SETTINGS: 2 Vector__XXX
+ SG_ set_wheel_size : 8|8@1+ (1,0) [0|255] "cm" Vector__XXX
+ SG_ set_left_right_side : 0|2@1+ (1,0) [0|3] "" Vector__XXX
+
+BO_ 512 USER_control_info: 8 Vector__XXX
+ SG_ steer_postion : 0|16@1- (0.1,0) [-200|200] "" Vector__XXX
+ SG_ break_postion : 16|16@1- (1,0) [0|100] "%" Vector__XXX
+ SG_ steer_is_auto : 32|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ break_is_auto : 33|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ acc_is_auto : 34|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ steer_live_counter : 40|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ break_live_counter : 48|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ acc_live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 513 USER_wheel_info: 8 Vector__XXX
+ SG_ right_speed : 0|12@1+ (0.1,0) [0|409.5] "km/h" Vector__XXX
+ SG_ right_rpm : 12|12@1+ (1,0) [0|4095] "rpm" Vector__XXX
+ SG_ left_speed : 24|12@1+ (0.1,0) [0|409.5] "km/h" Vector__XXX
+ SG_ left_rpm : 36|12@1+ (1,0) [0|4095] "rpm" Vector__XXX
+ SG_ right_live_counter : 48|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ left_live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 528 USER_control_command: 8 Vector__XXX
+ SG_ steer_command : 0|16@1- (0.1,0) [-150|150] "degree" Vector__XXX
+ SG_ steer_is_auto_command : 40|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ break_command : 16|16@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ break_is_auto_command : 41|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ acc_command : 32|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ acc_is_auto_command : 42|1@1+ (1,0) [0|1] "" Vector__XXX
+
+BO_ 688 SYS_angle_sensor: 5 Vector__XXX
+ SG_ angle : 0|16@1- (0.1,0) [-3276.8|3276.7] "" Vector__XXX
+
+BO_ 288 SYS_hub_info: 8 Vector__XXX
+ SG_ live_counter : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 342 KIAPI_Control_01: 8 Vector__XXX
+ SG_ EPS_En : 0|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ ACC_En : 16|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Aliv_Cnt : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ AEB_En : 22|1@1+ (1,0) [0|1] "" Vector__XXX
+
+BO_ 343 KIAPI_Control_02: 8 Vector__XXX
+ SG_ EPS_Cmd : 0|16@1- (0.1,0) [-500|500] "" Vector__XXX
+ SG_ ACC_Cmd : 24|16@1+ (1,-1023) [-300|200] "" Vector__XXX
+
+BO_ 514 USER_service_info: 8 Vector__XXX
+ SG_ speed_limit_info : 0|10@1+ (0.1,0) [0|100] "km/h" Vector__XXX
+
+BO_ 515 USER_service_command: 8 Vector__XXX
+ SG_ speed_limit : 0|10@1+ (0.1,0) [0|100] "km/h" Vector__XXX
+
+BO_ 292 KIAPI_Race_Signal: 8 Vector__XXX
+ SG_ SIG_SLOW_OFF : 3|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ SIG_SLOW_ON : 4|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ SIG_FINISH : 5|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ SIG_STOP : 6|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ SIG_GO : 7|1@1+ (1,0) [0|1] "" Vector__XXX
+
+BO_ 293 KIAPI_PIT_ZONE: 8 Vector__XXX
+ SG_ PITZONE_LAT : 0|32@1+ (1E-07,0) [0|429.4967295] "deg" Vector__XXX
+ SG_ PITZONE_LONG : 32|32@1+ (1E-07,0) [0|429.4967295] "deg" Vector__XXX
+
+BO_ 294 KIAPI_REPAIR: 8 Vector__XXX
+ SG_ SIG_REPAIR : 0|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 295 KIAPI_RES: 8 Vector__XXX
+ SG_ RES_START : 7|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ alive_count : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 296 KIAPI_RES_FB: 8 Vector__XXX
+ SG_ RES_END : 7|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ RES_ERROR : 0|3@1+ (1,0) [0|7] "" Vector__XXX
+
+BO_ 1808 KIAPI_FB_Steer: 8 Vector__XXX
+ SG_ acc_mode : 1|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ brake_mode : 2|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ steer_mode : 3|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ EPS_USER_CAN_ERR : 4|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ EPS_ERR : 5|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ EPS_SAS_ERR : 7|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ StrAng : 16|16@1- (0.1,0) [-150|150] "" Vector__XXX
+ SG_ EPS_Alive_Cnt : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 1809 KIAPI_FB_Acc: 8 Vector__XXX
+ SG_ acc_mode : 1|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ brake_mode : 2|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ steer_mode : 3|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ ACC_USER_CAN_ERR : 4|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ ACC_ERR : 7|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ VS : 16|12@1+ (0.1,0) [0|409.5] "" Vector__XXX
+ SG_ ACC_Alive_Cnt : 56|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 1810 KIAPI_FB_Wheel: 8 Vector__XXX
+ SG_ WHEEL_SPD_RR : 32|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ WHEEL_SPD_RL : 48|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+
+
+
+CM_ SG_ 256 steer_command "A1-BSW fix 2026-11-06: unit was corrupted bytes, set to deg.";
+CM_ SG_ 512 steer_is_auto "A1-BSW fix 2026-11-06: 1-bit flag, factor 0.1 -> 1, range [0|0.1] -> [0|1] (same typo as the previous fixed DBC).";
+CM_ SG_ 288 live_counter "A1-BSW fix 2026-11-06: 8-bit counter, range [0|1] -> [0|255].";
+CM_ SG_ 1808 EPS_Alive_Cnt "A1-BSW fix 2026-11-06: 8-bit counter, range [0|1] -> [0|255].";
+CM_ SG_ 1809 ACC_Alive_Cnt "A1-BSW fix 2026-11-06: 8-bit counter, range [0|1] -> [0|255].";
+CM_ SG_ 292 SIG_GO "A1-BSW fix 2026-11-06: VAL_ entry was missing, added like the other SIG_ flags.";
+CM_ SG_ 293 PITZONE_LONG "A1-BSW fix 2026-11-06: unit was empty, set to deg like PITZONE_LAT.";
+BA_DEF_  "BusType" STRING ;
+BA_DEF_DEF_  "BusType" "CAN";
+BA_ "BusType" "CAN";
+VAL_ 256 steer_is_auto_command 0 "Manual" 1 "Auto" ;
+VAL_ 256 break_is_auto_command 0 "Manual" 1 "Auto" ;
+VAL_ 256 acc_is_auto_command 0 "Manual" 1 "Auto" ;
+VAL_ 272 is_auto 0 "Manual" 1 "Auto" ;
+VAL_ 273 is_auto 0 "Manual" 1 "Auto" ;
+VAL_ 274 enc_right_side 1 "Right" 2 "Left" ;
+VAL_ 275 enc_left_side 1 "Right" 2 "Left" ;
+VAL_ 276 is_auto 0 "Manual" 1 "Auto" ;
+VAL_ 769 set_left_right_side 1 "Right" 2 "Left" ;
+VAL_ 512 steer_is_auto 0 "Manual" 1 "Auto" ;
+VAL_ 512 break_is_auto 0 "Manual" 1 "Auto" ;
+VAL_ 512 acc_is_auto 0 "Manual" 1 "Auto" ;
+VAL_ 528 steer_is_auto_command 0 "Manual" 1 "Auto" ;
+VAL_ 528 break_is_auto_command 0 "Manual" 1 "Auto" ;
+VAL_ 528 acc_is_auto_command 0 "Manual" 1 "Auto" ;
+VAL_ 292 SIG_SLOW_OFF 0 "Disabled" 1 "Enabled" ;
+VAL_ 292 SIG_SLOW_ON 0 "Disabled" 1 "Enabled" ;
+VAL_ 292 SIG_FINISH 0 "Disabled" 1 "Enabled" ;
+VAL_ 292 SIG_STOP 0 "Disabled" 1 "Enabled" ;
+VAL_ 292 SIG_GO 0 "Disabled" 1 "Enabled" ;
+

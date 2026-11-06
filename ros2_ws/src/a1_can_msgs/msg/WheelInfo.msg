@@ -1,4 +1,4 @@
-# USER_right_wheel_info (0x201, 차량 → PC) — 이름과 달리 좌우 바퀴 둘 다. DBC/A1_dbc_fixed.dbc.
+# USER_wheel_info (0x201, 차량 → PC) — 이름과 달리 좌우 바퀴 둘 다. DBC/A1_dbc_2_fixed.dbc.
 std_msgs/Header header
 float32 right_speed_kph       # 12비트 ×0.1 km/h
 uint16 right_rpm              # 12비트

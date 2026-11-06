@@ -3,7 +3,7 @@ Cross-check the generic bit extractor against cantools' DBC decode for every A1 
 
 §3 V-model "상세설계 → 컴포넌트 시험" 행: 파서 단위 테스트. dbc_bits.unpack/unpack_raw 는
 이 프로젝트의 모든 비트필드 메시지가 공유하는 코드라 여기서 한 번 제대로 검증해 두면 각 메시지
-디코더는 신호표만 맞으면 된다. 기준 DBC: DBC/A1_dbc_fixed.dbc (2026-10-07 EAIT DBC 에서 전환).
+디코더는 신호표만 맞으면 된다. 기준 DBC: DBC/A1_dbc_2_fixed.dbc (2026-10-07 EAIT DBC 에서 전환).
 """
 import os
 
@@ -13,7 +13,7 @@ import pytest
 from a1_can_bridge.dbc_bits import unpack
 
 DBC = os.path.join(
-    os.path.dirname(__file__), '..', '..', '..', '..', 'DBC', 'A1_dbc_fixed.dbc'
+    os.path.dirname(__file__), '..', '..', '..', '..', 'DBC', 'A1_dbc_2_fixed.dbc'
 )
 DB = cantools.database.load_file(DBC)
 

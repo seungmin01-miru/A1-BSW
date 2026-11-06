@@ -20,7 +20,7 @@ REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
 sys.path.insert(0, HERE)
 import dbc_lite  # noqa: E402
 
-DEFAULT_DBC = os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc')
+DEFAULT_DBC = os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc')
 
 # 단계: P0 듣기만(송신 없음) / P1 리프트 송신(can_guard+lift_cmd) / P2 업체 입회·허락 필요(설정 송신, 안전 시험, 다른 단자)
 # 상태: ✅ 확인 / ⚠️ 일부 / ❌ 미확인 / — 해당 없음
@@ -38,8 +38,8 @@ CARDS = {
         prior='✅ 축별 독립, 약 17 ms'),
     (0x210, 'break_command'): dict(
         phase='P1', stim='`auto brake on` → `brake 5/10/20/40/60` → `brake 0`',
-        expect='0x200 break_postion ≈ 명령 ÷ 10', rule='위치×10 / 명령 0.9~1.1, 저값(5%) 불감대 확인',
-        safety='한계 60 %', prior='⚠️ 20/30/50 % → 1.9/3.0/5.0. 저값·60 % 미시험'),
+        expect='0x200 break_postion(%) ≈ 명령 %', rule='위치 / 명령 0.9~1.1, 저값(5%) 불감대 확인',
+        safety='한계 60 %', prior='⚠️ 20/30/50 % → 19/30/50 %. 저값·60 % 미시험'),
     (0x210, 'break_is_auto_command'): dict(
         phase='P1', stim='`auto brake on` / `auto brake off`', expect='0x200 break_is_auto 같은 값으로',
         rule='수락 지연 ≤ 50 ms', safety='브레이크 0 % 에서 켬', prior='✅ 축별 독립, 약 17 ms'),
@@ -48,7 +48,7 @@ CARDS = {
         expect='0x201 바퀴 rpm 상승, 0 되면 하강', rule='limits.md 5절: 불감대(처음 도는 %)·지연·모양(정착/계속 증가). '
         'm/s² 는 11-04 주행',
         safety='뒷바퀴 띄움·받침·출입 통제, 바퀴 속도 상한(V18), break_postion 0 확인 후',
-        prior='❌ 2~60 % 전부 바퀴 0 — 11:00~11:07 은 break_postion 10.0, 11:19~11:33 은 브레이크 0 인데도 0. '
+        prior='❌ 2~60 % 전부 바퀴 0 — 11:00~11:07 은 break_postion 100 %, 11:19~11:33 은 브레이크 0 인데도 0. '
               '구동 enable 조건부터 업체에 확인'),
     (0x210, 'acc_is_auto_command'): dict(
         phase='P1', stim='`auto acc on` / `auto acc off`', expect='0x200 acc_is_auto 같은 값으로',
@@ -61,8 +61,8 @@ CARDS = {
         safety='수동 시험은 auto 000 상태에서', prior='⚠️ 단위 확인. **+가 좌/우인지 미기록**, 0 근처 약 +1° 오프셋'),
     (0x200, 'break_postion'): dict(
         phase='P1', stim='브레이크 명령 시험 + (수동) 페달 밟기',
-        expect='명령 ÷ 10, 최대 10.0', rule='DBC 범위 0~30 중 실제 최대가 10.0 인지, 페달 밟으면 변하는지',
-        safety='—', prior='⚠️ 명령 관계 확인. 원인 모를 10.0 고정 구간 있었음(10:58)'),
+        expect='명령 %, 최대 100 %', rule='실제 최대가 100 % 인지, 페달 밟으면 변하는지',
+        safety='—', prior='⚠️ 명령 관계 확인. 원인 모를 100 % 고정 구간 있었음(10:58)'),
     (0x200, 'steer_is_auto'): dict(phase='P1', stim='`auto steer on/off`', expect='명령 비트 따라감',
                                    rule='0x210 비트와 일치', safety='—', prior='✅'),
     (0x200, 'break_is_auto'): dict(phase='P1', stim='`auto brake on/off`', expect='명령 비트 따라감',
@@ -77,7 +77,7 @@ CARDS = {
     (0x200, 'acc_live_counter'): dict(phase='P0', stim='없음(듣기만)', expect='+1 씩 증가',
                                       rule='반복·건너뜀 비율, 정지 0', safety='—', prior='✅'),
 
-    # ── 0x201 USER_right_wheel_info (차량 → PC, 이름과 달리 좌우 둘 다) ──
+    # ── 0x201 USER_wheel_info (차량 → PC, 이름과 달리 좌우 둘 다) ──
     (0x201, 'right_speed'): dict(
         phase='P1', stim='공회전(L3·L4-4). 엔코더 = 뒷바퀴(11-02 확인)', expect='> 0 km/h, rpm 과 비례',
         rule='limits.md 5절 바퀴 지름 역산 ≈ 줄자 실측, 좌우 차 작음', safety='acc_command 카드와 같음',
@@ -114,7 +114,23 @@ CARDS = {
         expect='엔코더 설정(바퀴 지름 cm, 좌우)', rule='현재 설정값을 먼저 받아 기록 — 바꾸면 0x201 속도 계산이 달라짐',
         safety='업체 입회·원래 값 확보 전 송신 금지', prior='❌ 미확인'),
 
-    # ── 원격 0x156/0x157 (DBC 밖, 대회측 원격 유닛 — 듣기·분석만) ──
+    # ── A1_dbc_2 추가 메시지 (2026-11-06) — 경기 깃발 대응은 docs/2026-11-06_race_flag_dev_plan.md ──
+    (0x2B0, '*'): dict(phase='P2', stim='다른 단자에서 듣기만', expect='각도 센서', rule='0x200 steer_postion 과 비교', safety='—', prior='미확인'),
+    (0x120, '*'): dict(phase='P2', stim='다른 단자에서 듣기만', expect='허브 카운터', rule='증가 여부', safety='—', prior='미확인'),
+    (0x202, '*'): dict(phase='P0', stim='없음', expect='현재 차량 속도 제한 표시', rule='값 기록(11-04 30.0, 자율 상한 아님)',
+                       safety='—', prior='11-04 전 세션 30.0'),
+    (0x203, '*'): dict(phase='P2', stim='**송신 금지**(KIAPI 허용 전)', expect='0x202 에 반영', rule='0x202 일치',
+                       safety='허용 전 송신 금지', prior='미시험'),
+    (0x124, '*'): dict(phase='P0', stim='대회 서버 깃발', expect='깃발 비트', rule='깃발과 비트 일치', safety='—', prior='11-04 버스에 없음'),
+    (0x125, '*'): dict(phase='P0', stim='대회 서버', expect='피트존 좌표', rule='기록만', safety='—', prior='11-04 버스에 없음'),
+    (0x126, '*'): dict(phase='P0', stim='대회 서버', expect='뜻 미정의', rule='기록만', safety='—', prior='11-04 버스에 없음'),
+    (0x127, '*'): dict(phase='P0', stim='대회 서버 원격비상제동', expect='RES_START, alive_count', rule='alive 증가, 제동 일치',
+                       safety='—', prior='11-04 버스에 없음'),
+    (0x128, '*'): dict(phase='P0', stim='없음', expect='RES 응답', rule='기록만', safety='—', prior='11-04 항상 0'),
+    (0x710, '*'): dict(phase='P0', stim='없음', expect='관제용 조향 피드백', rule='기록만', safety='—', prior='버스에 보임'),
+    (0x711, '*'): dict(phase='P0', stim='없음', expect='관제용 가속 피드백', rule='기록만', safety='—', prior='버스에 보임'),
+    (0x712, '*'): dict(phase='P0', stim='없음', expect='관제용 휠속', rule='기록만', safety='—', prior='버스에 보임'),
+    # ── 원격 0x156/0x157 (대회측 원격 유닛 — 듣기·분석만, 정의는 dbc_lite.remote_messages) ──
     (0x156, 'EPS_En'): dict(phase='P3', stim='원격으로 조향 활성 켬·끔', expect='1 이면 차량 auto 조향 1 (약 20 ms)',
                             rule='0x200 steer_is_auto 와 일치', safety='—', prior='✅ En=1 → auto 111 약 20 ms'),
     (0x156, 'EPS_Speed'): dict(phase='P3', stim='원격 조향 속도 설정을 바꿔 봄', expect='조향 속도 제한값?',

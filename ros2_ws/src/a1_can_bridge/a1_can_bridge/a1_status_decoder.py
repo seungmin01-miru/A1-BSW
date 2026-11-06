@@ -2,7 +2,7 @@
 """
 Decode the real-vehicle USER_ protocol (0x200 / 0x201 / 0x210) into ROS2 topics + per-axis E2E 진단.
 
-2026-10-06 실차 DBC(DBC/A1_dbc_fixed.dbc) 로 전환 — 이전 EAIT 디코더(spd/eps/acc/imu, 0x710~0x713)를 대체한다.
+2026-10-06 실차 DBC(DBC/A1_dbc_2_fixed.dbc) 로 전환 — 이전 EAIT 디코더(spd/eps/acc/imu, 0x710~0x713)를 대체한다.
 메시지마다 노드를 따로 두던 이전 구조와 달리 **노드 하나**가 /interface/can/read/raw 를 한 번만 구독해 세 토픽으로
 나눈다 — §5.C 실측에서 이 경로의 지연은 DDS 구독·디스패치가 지배했으므로 구독 수를 줄이는 쪽이 낫다.
 
@@ -50,7 +50,7 @@ def decode_control_info(data8):
 
 
 def decode_wheel_info(data8):
-    """8바이트 USER_right_wheel_info → WheelInfo(header·alive_ok 미설정). 바퀴당 12비트 속도 + 12비트 rpm."""
+    """8바이트 USER_wheel_info → WheelInfo(header·alive_ok 미설정). 바퀴당 12비트 속도 + 12비트 rpm."""
     d = data8
     return WheelInfo(
         right_speed_kph=unpack(d, 0, 12, scale=0.1),

@@ -1,6 +1,6 @@
 # ros2_ws — Phase C (ROS2 상태 브리지)
 
-실차 A1 프로토콜(`DBC/A1_dbc_fixed.dbc`) 상태 메시지를 ROS2 토픽으로 내보낸다. 2026-10-07 EAIT DBC 시절 디코더
+실차 A1 프로토콜(`DBC/A1_dbc_2_fixed.dbc`) 상태 메시지를 ROS2 토픽으로 내보낸다. 2026-10-07 EAIT DBC 시절 디코더
 (spd/eps/acc/imu, 0x710~0x713)와 그 메시지·launch 를 지우고 A1 기준 하나로 정리했다(git 기록).
 
 **이 토픽들은 감시 등급**(§5.C 설계 규칙): 10 ms 대 제어 루프가 직접 구독하지 말 것. 차량으로 명령을 보내는 건

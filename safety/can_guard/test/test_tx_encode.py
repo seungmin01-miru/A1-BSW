@@ -1,4 +1,4 @@
-"""0x210 인코더 — cantools + DBC/A1_dbc_fixed.dbc + 2026-10-07 실차 리프트 녹화의 0x210 프레임과 대조."""
+"""0x210 인코더 — cantools + DBC/A1_dbc_2_fixed.dbc + 2026-10-07 실차 리프트 녹화의 0x210 프레임과 대조."""
 import csv
 import os
 
@@ -9,7 +9,7 @@ from protocol import Command
 from tx_encode import FRAME_ID_CONTROL_COMMAND, encode_0x210
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_fixed.dbc'))
+DB = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc'))
 DB_VENDOR = cantools.database.load_file(os.path.join(REPO, 'DBC', 'A1_dbc.dbc'), strict=False)
 SAMPLES = os.path.join(REPO, 'tools', 'race_day', 'testdata', 'a1_20261007_samples.csv')
 

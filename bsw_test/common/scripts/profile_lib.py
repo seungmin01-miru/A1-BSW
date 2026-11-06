@@ -69,7 +69,7 @@ SPEED_CTRL_DEFAULTS = {
     'accel_mps2': [0.1, 1.3], 'accel_pct': [0.0, 30.0],     # track.yaml accel_map (가속 피드포워드)
     'decel_mps2': [0.1, 1.0, 2.0, 3.0, 4.0], 'brake_pct': [0.0, 40.0, 70.0, 90.0, 100.0],   # track.yaml brake_map
     'acc_max_pct': 30.0,      # 제어기 상한(limits.acc_pct 와 작은 쪽)
-    'brake_max_pct': 82.0,    # 82 % 이상은 위치 8.2 포화(CLAUDE.md 2절)
+    'brake_max_pct': 82.0,    # 82 % 이상은 위치 포화(CLAUDE.md 2절)
     'acc_slew_pct_s': 50.0,   # 가속 % 올림 변화율(내림은 즉시)
     'brake_slew_pct_s': 60.0, # 브레이크 % 올림 변화율(휠락 방지). 내림은 즉시
     'filter_s': 0.1,          # 차속 1차 저역통과 시정수
