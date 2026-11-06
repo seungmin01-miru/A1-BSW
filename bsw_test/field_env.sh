@@ -25,6 +25,8 @@ gen()  { local y=$1 r=${2:?회차 예: LON-ACC-01_r1}; shift 2
          echo "gen: 조향 오프셋 ${OFS}° (핸들)"
          python3 "$R/bsw_test/common/scripts/profile_gen.py" run "$P/$y" --run "${DAY}_$r" $KV --out "$CAP/track_latest" \
                  --steer-offset "$OFS" "$@"; }
+# circ <회차 이름> [circle_test 옵션]   원 돌기 — 예) circ ER-CIRCLE-01 --dry-run
+circ() { local r=${1:?회차 이름}; shift; python3 "$R/bsw_test/common/scripts/circle_test.py" --run "${DAY}_$r" $KV --out "$CAP/track_latest" "$@"; }
 # ofs <핸들°>  — 01 오프셋을 이 터미널에 설정(그 뒤 gen 전부 적용).   예) ofs 1.2   / 끄기: ofs 0
 ofs()  { OFS=${1:?핸들 °}; echo "조향 오프셋 = ${OFS}° (핸들) — 이 터미널의 gen 에 적용"; }
 # es / esr — 비상 정지 / 해제(정지 상태에서만)
@@ -35,4 +37,4 @@ m()    { echo "$(date +%s.%N) $(date +%H:%M:%S) $*" >> "$CAP/track_latest/notes.
 # app — 앱 프레임 보기(00-0)
 app()  { candump -ta kv0,156:7FF,157:7FF | tee "$CAP/track_latest/app_frames.txt"; }
 
-echo "field_env: up down lc chk gen ofs es esr m app  \$CTRL  (저장소 $R, 날짜 $DAY, 오프셋 ${OFS}°)"
+echo "field_env: up down lc chk gen circ ofs es esr m app  \$CTRL  (저장소 $R, 날짜 $DAY, 오프셋 ${OFS}°)"

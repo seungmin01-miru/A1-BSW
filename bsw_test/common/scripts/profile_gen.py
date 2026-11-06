@@ -204,6 +204,14 @@ def plan_items(a, ctrl):
             ov = dict(base_over)
             ov.update(dict(combo))
             overs.append(ov)
+    if getattr(a, 'items', ''):
+        if a.sweep or a.reps != 1:
+            raise pl.ProfileError('--items 는 --sweep·--reps 와 같이 쓰지 않는다')
+        overs = []
+        for part in a.items.split(';'):
+            ov = dict(base_over)
+            ov.update(pl.parse_var_overrides(part.split(',')))
+            overs.append(ov)
     multi = len(overs) > 1 or a.first_rep is not None
     first = a.first_rep if a.first_rep is not None else 1
     cfg = load_yaml(a.profile)
@@ -640,6 +648,7 @@ def main():
     r.add_argument('--reps', type=int, default=1, help='같은 설정 반복 횟수(한 세션). 회차 이름 = --run + _r<번호>')
     r.add_argument('--sweep', action='append', default=[],
                    help='이름=값1,값2,… — 값마다 --reps 번(여러 개면 모든 조합). 예 --sweep brake=20,40,60')
+    r.add_argument('--items', default='', help='회차별 vars 를 직접: "deg=75,t=60;deg=-75,t=60" (--sweep·--reps 대신, circle_test 가 쓴다)')
     r.add_argument('--first-rep', type=int, default=None, help='첫 회차 번호(기본 1) — 세션을 나눠 이어갈 때')
     r.add_argument('--steer-offset', type=float, default=0.0, help='조향 오프셋(핸들 °, 01 결과) — 모든 조향 명령에 더함')
     r.add_argument('--ctrl', default='', help='속도 제어기 파라미터 yaml(현장에서 맞춘 값). 없으면 기본값(잠정)')

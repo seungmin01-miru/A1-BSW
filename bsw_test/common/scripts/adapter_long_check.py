@@ -8,6 +8,8 @@
 
   source /opt/ros/humble/setup.bash && source ~/git/A1-BSW/ros2_ws/install/setup.bash
   python3 adapter_long_check.py --accels 0.3,0.6 [--channel kv0]
+  python3 adapter_long_check.py --plan 15:0.13:3,15:-1:2,15:0.57:3 --channel vcan0   # 표 측정: 속도 구간 대기 → 계단(2026-11-06)
+      --plan 항목 = 목표속도 km/h:목표가감속 m/s²:유지 s. 그 속도 ±1 km/h 에 들면 계단을 넣고, 항목 사이는 끊지 않는다. 끝나면 제동.
 """
 import argparse, json, os, sys, threading, time
 import can
@@ -17,7 +19,8 @@ from std_msgs.msg import String
 from std_srvs.srv import SetBool
 from a1_can_msgs.msg import ControllerOutput
 
-sys.path.insert(0, os.path.expanduser('~/git/A1-BSW/tools/signal_audit'))
+REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))
+sys.path.insert(0, os.path.join(REPO, 'tools', 'signal_audit'))
 import dbc_lite  # noqa: E402
 
 BRAKE_A, ESTOP_A = -3.0, -4.0
@@ -33,11 +36,13 @@ def main():
     ap.add_argument('--hold-end-s', type=float, default=20.0)
     ap.add_argument('--move-max-s', type=float, default=2.0, help='출발 후 이 시간 지나면 제동')
     ap.add_argument('--brake-a', type=float, default=-3.0, help='단계 끝 목표 감속(m/s², 음수)')
+    ap.add_argument('--plan', default='', help='속도 구간별 계단: V:A:T,V:A:T,… (이때 --accels 는 안 씀)')
+    ap.add_argument('--approach-a', type=float, default=0.57, help='--plan: 목표 속도까지 갈 때 목표 가속')
     ap.add_argument('--steer-tire-deg', type=float, default=0.0, help='시험 내내 줄 타이어각(+좌). 정지·제동 중에 먼저 돌려 둔다')
     a = ap.parse_args()
     accels = [float(x) for x in a.accels.split(',')]
 
-    db = dbc_lite.load(os.path.expanduser('~/git/A1-BSW/DBC/A1_dbc_2_fixed.dbc'))
+    db = dbc_lite.load(os.path.join(REPO, 'DBC', 'A1_dbc_2_fixed.dbc'))
     st = {'v': 0.0, 'steer_pos': None, 'brake_pos_pct': None, 'acc_cmd': None, 'brk_cmd': None}
 
     def rx():
@@ -103,7 +108,23 @@ def main():
         call('/control/adapter/arm_long')
         time.sleep(3.0 if a.steer_tire_deg else 1.5)   # 조향 120 °/s 로 먼저 돌림
         event('armed_braking')
-        for acc in accels:
+        for k, item in enumerate(x for x in a.plan.split(',') if x):
+            v_t, acc_t, hold_s = (float(y) for y in item.split(':'))
+            t_lim = time.monotonic() + 40.0
+            while abs(st['v'] - v_t) > 1.0:          # 목표 속도 구간 대기
+                guard()
+                target['a'] = a.approach_a if st['v'] < v_t else -1.0
+                if time.monotonic() > t_lim:
+                    raise SystemExit(f'{v_t} km/h 에 못 감')
+                time.sleep(0.02)
+            target['a'] = acc_t
+            event('step_start', item=k, v_target=v_t, accel=acc_t)
+            t_e = time.monotonic() + hold_s
+            while time.monotonic() < t_e:
+                guard()
+                time.sleep(0.02)
+            event('step_end', item=k)
+        for acc in (accels if not a.plan else []):
             target['a'] = 0.0
             time.sleep(1.5)   # 데드밴드 → 가속 0·브레이크 0(브레이크 풀림)
             event('release', step=acc)

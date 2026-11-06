@@ -1,0 +1,24 @@
+# 원 돌기·저속 유지 전용 속도 제어기 파라미터(BSW 시험용) — 02 의 speed_ctrl.yaml(SIL 가짜 차량 값)과 다르게 실차 불감대를 반영.
+# 전부 **잠정**: 11-04 불감대 70~80 %, 20 km/h 순항 75~85 %, 표 0.1→75·0.13→80·0.57→100 %. 11-14 첫 회차에서 확인.
+speed_ctrl:
+  kp: 2.0
+  ki: 0.6
+  i_max_pct: 8.0
+  i_band_kph: 2.0
+  kp_brake: 6.0
+  brake_on_kph: 1.5
+  brake_off_kph: 0.3
+  coast_decel_mps2: 0.3
+  stop_brake_pct: 40.0
+  hold_kph: [0.0, 5.0, 10.0, 20.0, 30.0]
+  hold_pct: [0.0, 76.0, 78.0, 82.0, 88.0]
+  start_pct: 80.0
+  accel_mps2: [0.1, 0.13, 0.57]
+  accel_pct: [75.0, 80.0, 100.0]
+  decel_mps2: [0.1, 1.0, 2.0, 3.0, 4.0]
+  brake_pct: [0.0, 40.0, 70.0, 90.0, 100.0]
+  acc_max_pct: 100.0
+  brake_max_pct: 82.0
+  acc_slew_pct_s: 200.0
+  brake_slew_pct_s: 60.0
+  filter_s: 0.1
