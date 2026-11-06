@@ -1,0 +1,13 @@
+# 시나리오 형식(전체 설명은 sil/vcan/fake_race_server.py 머리말):
+#   name, desc, period_ms(기본 20), duration_s(필수), initial{race_signal: run|stop, res: run|stop|freeze}
+#   events: {t, flag: go|stop|finish|slow_on|slow_off|res (또는 목록), mode: level|pulse|flicker, until, frames, on_frames, off_frames, repeat}
+#           {t, stream: race_signal|res, action: run|stop|freeze}   {t, pit_zone: {lat_deg, long_deg}|off}   {t, repair: 값|off}
+#   harness: r_race.py 용 자유 형식(재생기는 읽지 않음). vehicle = FakeVehicle 인자, guard_args = can_guard 인자, expect = 계획서 합격 기준
+name: S01_pre_go_model_full_accel
+desc: Go 신호 없이 대기. 0x124·0x127 은 모두 0 으로 흐른다
+duration_s: 6.0
+events: []
+harness:
+  vehicle: {physics: true}
+  model: {note: 처음부터 최대 가속 명령을 계속 발행}
+  expect: 0x210 가속 0, 차속 0, 래치 없음

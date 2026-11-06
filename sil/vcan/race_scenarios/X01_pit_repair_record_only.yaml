@@ -1,0 +1,13 @@
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+name: X01_pit_repair_record_only
+desc: 계획서 번호 없음(1.2절 기록 전용 신호) — 0x125·0x126 이 나타났다 사라짐. 좌표는 시험용 값
+duration_s: 8.0
+events:
+  - {t: 1.0, flag: go, mode: level}
+  - {t: 2.0, pit_zone: {lat_deg: 37.0, long_deg: 127.0}}
+  - {t: 3.0, repair: 1}
+  - {t: 5.0, pit_zone: off}
+  - {t: 5.0, repair: off}
+harness:
+  vehicle: {physics: true}
+  expect: 기록만, 상태 변화 없음

@@ -1,0 +1,10 @@
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+name: S03_go_pulse_1frame
+desc: Go 가 정확히 1 프레임만 켜짐
+duration_s: 5.0
+events:
+  - {t: 2.0, flag: go, mode: pulse, frames: 1}
+harness:
+  vehicle: {physics: true}
+  model: {note: 계속 가속 명령}
+  expect: 무시(2프레임 확인), 이벤트 기록
