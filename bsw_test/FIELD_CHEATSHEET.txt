@@ -58,7 +58,7 @@ A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)         
 =============================================================================================
 ★ 11-14 순서 (2026-11-06 지시서 4절) — 자율 U턴·v2 왕복 폐기. 전체 날짜표는 docs/2026-11-06_engine_room_dev_plan.md 4절
 =============================================================================================
-  ⚠️ WP3 도구(circle_test.py, fit_circle.py, fit_long_map.py)는 아직 없다 — ②·⑤ 는 구현 뒤에만.
+  점검표: bsw_test/09_ENGINE_ROOM/docs/checklist.md. 표는 사람이 보고 고친다(자동 반영 없음).
   방향 바꾸기·시작선 복귀 = 세션 끝내고 사람이 직접(자율은 전진만).
   조향 표는 잠정: 타이어 ±11.5° = 핸들 ±150°, 직진 = 핸들 −9° (track.yaml). 되돌림: steer_map_v0_20261104.yaml
 
@@ -68,19 +68,24 @@ A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)         
   lift> auto steer on
   lift> steer 30          # 앞바퀴가 **왼쪽**인지 눈으로 → 아니면 중단(부호, track.yaml steer_sign)
 
--- ② 원 돌기 (WP3 circle_test.py 필요) 핸들 ±37/75/112/150°, 각 2바퀴, ≤ 8 km/h, 좌우 → 영점·실효 조향비
-     필요 공간 지름 ★(새 표): 37° 약 63 m / 75° 약 37 m / 112° 약 28 m / 150° 약 23 m
+-- ② 원 돌기 핸들 ±37/75/112/150°, 각 2바퀴, ≤ 8 km/h (어댑터 없이 up — 위 lc 세션 끝낸 뒤)
+  [T1] up ER-CIRCLE-01_s1 100
+  [T2] circ ER-CIRCLE-01 --dry-run          # 필요 공간(지름 약 23~80 m ★)·시간(약 26 분) 확인
+  [T2] circ ER-CIRCLE-01                    # 회차마다 안전 "비었음" → Enter. 첫 회차는 출발·유지를 지켜볼 것(값 잠정)
+       끝: q → [T1] down.  분석: python3 $R/tools/engine_room/fit_circle.py --run-dir <세션> --bag <세션>/bag --out <폴더>
 
 -- ③ 조향 최대각 (정지)  같은 lc 세션
   lift> steer 150 → 상태줄 조향 위치 기록 → lift> steer -150 → 기록 → lift> steer 0 → brake 100 → q → [T1] down
 
 -- ④ 직선 계단 (0→20 km/h, 편도마다 세션 끝 → 사람이 시작선 복귀)
   [T1] up LON-ACC-01_s1 100
-  [T2] gen acc_step.yaml LON-ACC-01 --sweep acc=75,85,100 --reps 2 --var vmax=20 --var t=15
-  [T2] gen brake_step.yaml LON-DEC-01 --var acc=85 --var v=20 --var vmax=25 --sweep brake=50,80,100 --reps 2
-       # 회차마다 대기 화면에서 안전 "비었음" → Enter. 코스 길이가 모자라면 --var course=<m>. 끝: q → down
+  [T2] gen acc_step.yaml LON-ACC-01 --sweep acc=75,85,100 --reps 3 --var vmax=20 --var t=15
+  [T2] gen brake_step.yaml LON-DEC-01 --var acc=85 --var v=20 --var vmax=25 --sweep brake=50,80,100 --reps 3
+       # 칸당 3회(표본 < 3 칸은 표에 안 들어감). 회차마다 안전 "비었음" → Enter. 코스 길이가 모자라면 --var course=<m>. 끝: q → down
 
--- ⑤ 현장 1차 표 (WP3 fit_long_map.py 필요. 자동 반영 금지 — 사람이 보고 track.yaml 고치고 커밋)
+-- ⑤ 현장 1차 표 (1 분 안에. 자동 반영 금지 — 사람이 보고 long_map.yaml 고치고 커밋, 이력 기록)
+  python3 $R/tools/engine_room/fit_long_map.py --can <세션> --bag <세션>/bag --out $R/reports/engine_room/${DAY}_fit
+       # 0 = report.md 확인 → 반영 / 3 = UPDATE_BLOCKED.md 원인 해결, 표 안 바꿈
 
 -- ⑥ 서킷 15 → 20 km/h (모델 + bsw_up): 직선 50 m 횡편차 ≤ 0.125 m 목표, +0.33 m 보다 나빠지면 steer_map_v0 복귀
        가속 전환 수 기록(히스테리시스 효과는 여기서 처음 확인)

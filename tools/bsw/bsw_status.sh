@@ -27,6 +27,7 @@ set +u; source /opt/ros/humble/setup.bash 2>/dev/null; source "$REPO/ros2_ws/ins
 if command -v ros2 >/dev/null 2>&1; then
   st=$(timeout 3 ros2 topic echo --once /control/adapter/status 2>/dev/null | grep -E "^(steer_armed|long_armed|writing|input_age_s|note)" | tr '\n' ' ')
   [ -n "$st" ] && echo "     어댑터: $st" || warn "어댑터 상태 토픽 응답 없음"
+  python3 "$HERE/race_up_check.py" "$REPO" --timeout 2 | sed 's/^/   /'
 fi
 for f in "$D"/kvaser_ch*.log "$D"/candump_*.log; do
   [ -f "$f" ] || continue

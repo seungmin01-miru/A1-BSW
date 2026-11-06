@@ -15,6 +15,7 @@ bash tools/bsw/bsw_down.sh                 # 끄기 (차가 선 뒤) — 상태�
 |---|---|---|
 | `bsw_up.sh` | 전부 켜기 + 상태판 창 | 주행 시작 |
 | `bsw_down.sh` | 정지 확인 → ESTOP → 정리 → CAN 로그 압축 | 주행 끝 |
+| `race_up_check.py` | 시작 점검: `/race/state` 발행, 0x202 값, 표 버전·source(`bsw_up`·`bsw_status` 가 부름, 읽기만) | 자동 |
 | `bsw_monitor.py` | **상태판 창(실시간 UI)** — 속도·명령 vs 실제·앱·수신·can_guard 상태·경기 신호(표시만)·경고 | 연습 주행 내내(자동으로 뜸) |
 | `bsw_status.sh` | **점검표(한 번 출력)** — 프로세스가 살았나, RT 인가, 녹화되나 | `bsw_up` 끝에 자동 1회, 이상할 때 |
 | `bsw.env` | 기본값 | — |

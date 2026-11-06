@@ -5,6 +5,7 @@
 | 00 | 비상 정지 fallback | 선행 | 대기 |  |  |  | [results](../00_SAF_estop/docs/results.md) |  |
 | 01 | 타이어 정렬 및 보정 | 1 | 대기 |  |  |  | [results](../01_LAT_align/docs/results.md) |  |
 | 02 | 목표 프로파일 생성기 | 2 | 구현(11-04) + 세션·속도 제어기(자율 U턴은 2026-11-06 폐기, 개발 PC SIL), 대회 PC SIL·실차 대기 |  |  |  | [results](../02_LON_profile/docs/results.md) |  |
+| 09 | 엔진룸 표 측정·갱신 | 0 | 도구 구현(2026-11-06), 개발 PC SIL 참고값. 실차 11-14 부터 |  |  |  | [checklist](../09_ENGINE_ROOM/docs/checklist.md) |  |
 | 03 | 가속 추종 성능 | - | 대기 |  |  |  | [results](../03_LON_accel/docs/results.md) |  |
 | 04 | 감속 추종 성능 | - | 대기 |  |  |  | [results](../04_LON_decel/docs/results.md) |  |
 | 05 | 최대 조향 정속 주행 | 3 | 대기 |  |  |  | [results](../05_LAT_maxsteer/docs/results.md) |  |

@@ -268,19 +268,19 @@ steer_map:                      # 2026-11-04 bsw5 GNSS 요레이트 역산 (★ 
 **관문:** 지연 ≤ 5 ms, 3방식 시나리오 통과, 기존 시험 전부 통과, `--race` 옵션 없이 can_guard 동작 변화 없음(E1~E7·P1·P2 동일).
 
 ### WP2. 엔진룸 코드 (11-08~11) — **WP0·1 결과 확인 후 별도 지시로 시작**
-- [ ] `cmd_adapter.py`: `long_map` 2차원 지원(이중선형, null→extrapolated, 끝값 고정), 0x201 속도 구독, `launch_min_acc_pct`, `AdapterStatus` 새 필드. 조향 코드 **무변경**.
-- [ ] `track.yaml`: `long_map` 추가(초기값 = 기존 1차원 표를 모든 속도 행에 복사 + null 표시), 기존 키 유지.
-- [ ] 단위 시험: 보간 경계, null 처리, 회귀(기존 1차원 표와 같은 입력 → 같은 출력), 속도 stale.
-- [ ] SIL: `fake_a1_vehicle.py` 에 속도별 가속 응답 흉내(간단 1차 모델) → 표 변환이 속도에 따라 바뀌는지 확인.
+- [x] (2026-11-06) `cmd_adapter.py`: `long_map` 2차원 지원(이중선형, null→extrapolated, 끝값 고정), 0x201 속도 구독, `launch_min_acc_pct`, `AdapterStatus` 새 필드. 조향 코드 **무변경**.
+- [x] (2026-11-06) `track.yaml`: `long_map` 추가(초기값 = 기존 1차원 표를 모든 속도 행에 복사 + null 표시), 기존 키 유지.
+- [x] (2026-11-06) 단위 시험: 보간 경계, null 처리, 회귀(기존 1차원 표와 같은 입력 → 같은 출력), 속도 stale.
+- [x] (2026-11-06) SIL: `fake_a1_vehicle.py` 에 속도별 가속 응답 흉내(간단 1차 모델) → 표 변환이 속도에 따라 바뀌는지 확인.
 
 **관문:** 회귀 시험 통과(기존 동작과 동일), 보간 시험 통과, `adapter_long_check.py` SIL 통과.
 
 ### WP3. 측정·갱신 도구 (11-09~13) — WP2 와 함께 지시
-- [ ] `bsw_test/common/scripts/circle_test.py`: 타이어각 단계 입력 + 저속 유지(≤ 8 km/h, 간단 PI — BSW 시험용) + 이벤트 기록. `tools/engine_room/fit_circle.py`: GNSS 궤적 → 원 맞춤 → 반경·0점·실효 조향비(좌/우), 보고서.
-- [ ] `adapter_long_check.py` 확장: 목표 속도 구간 대기 → 계단 입력 → GNSS·0x201 기록, 여러 계단 연속.
-- [ ] `tools/engine_room/fit_long_map.py`(2.3절) + README + `docs/engine_room_map_history.md`(표 버전 이력).
-- [ ] 시운전: 11-04 로그(정상 처리), 11-03 앱 조작 섞인 로그(**차단, 종료 코드 3**).
-- [ ] 현장 점검표 `bsw_test/09_ENGINE_ROOM/docs/checklist.md`: 날짜별 순서(4절), 각 항목 스크립트·합격 기준·결과 파일.
+- [x] (2026-11-06) `bsw_test/common/scripts/circle_test.py`: 타이어각 단계 입력 + 저속 유지(≤ 8 km/h, 간단 PI — BSW 시험용) + 이벤트 기록. `tools/engine_room/fit_circle.py`: GNSS 궤적 → 원 맞춤 → 반경·0점·실효 조향비(좌/우), 보고서.
+- [x] (2026-11-06) `adapter_long_check.py` 확장: 목표 속도 구간 대기 → 계단 입력 → GNSS·0x201 기록, 여러 계단 연속.
+- [x] (2026-11-06) `tools/engine_room/fit_long_map.py`(2.3절) + README + `docs/engine_room_map_history.md`(표 버전 이력).
+- [x] (2026-11-06) 시운전: 11-04 로그(정상 처리), 11-03 앱 조작 섞인 로그(**차단, 종료 코드 3**).
+- [x] (2026-11-06) 현장 점검표 `bsw_test/09_ENGINE_ROOM/docs/checklist.md`: 날짜별 순서(4절), 각 항목 스크립트·합격 기준·결과 파일.
 
 **관문:** 오염 로그 차단 확인, 정상 로그에서 표·그래프 생성 1분 이내, 점검표 완성.
 
@@ -288,8 +288,8 @@ steer_map:                      # 2026-11-04 bsw5 GNSS 요레이트 역산 (★ 
 - [ ] 4절 계획. 각 날 끝에 `reports/engine_room/<날짜>_fit/` + 표 버전 커밋 + `engine_room_map_history.md` 갱신.
 
 ### WP7. 운영 (11-16~20)
-- [ ] `bsw_up.sh`: 시작 점검에 `/race/state` 발행 확인, 0x202 현재값 표시(송신 없음), `long_map` 버전·source 출력.
-- [ ] `bsw_test/FIELD_MANUAL.md`: 경기 날 절차, **브리핑 확인 항목**(일정 시간, 신호 방식, 점검 중 재시작, 속도 판정), 중단→재개(can_guard 재시작 절차), 데이터시트 최종본 모델 팀 전달.
+- [x] (2026-11-06) `bsw_up.sh`: 시작 점검에 `/race/state` 발행 확인, 0x202 현재값 표시(송신 없음), `long_map` 버전·source 출력.
+- [x] (2026-11-06) `bsw_test/FIELD_MANUAL.md`: 경기 날 절차, **브리핑 확인 항목**(일정 시간, 신호 방식, 점검 중 재시작, 속도 판정), 중단→재개(can_guard 재시작 절차), 데이터시트 최종본 모델 팀 전달.
 
 **관문:** 리허설 통과, 데이터시트 v1.0.
 
@@ -299,7 +299,7 @@ steer_map:                      # 2026-11-04 bsw5 GNSS 요레이트 역산 (★ 
 
 | 필요한 것 | 누구 | 언제까지 |
 |---|---|---|
-| `/control/target` 발행 주기, anti-windup·출력 상한 여부 | 모델 | 11-13 (WP2 `speed_stale`·끊김 기준) |
+| `/control/target` 발행 주기 [x] **20 Hz**(2026-11-06), anti-windup·출력 상한 여부 | 모델 | 11-13 (WP2 `speed_stale`·끊김 기준) |
 | 11-14 서킷 주행 가능 여부(없으면 BSW 단독 항목만) | 모델 | 11-12 |
 | `/race/state` 필드 확인, 2프레임 확인 여부(데이터시트 07 시트 4-5) | 모델 | 11-09 |
 | M-01~M-11 책임 목록 이의 | 모델 | 11-09 |

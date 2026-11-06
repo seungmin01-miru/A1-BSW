@@ -132,6 +132,7 @@ BSW = ① 모델 가감속 → 페달 % 변환 ② 모델 입력 끊김 → 정�
 | 03 LON-ACC / 04 LON-DEC | **(a) 개루프 % 계단 → % ↔ m/s² 변환표(`fit_maps.py` → `track.yaml`) 먼저**, (b) 폐루프 속도 추종은 그다음. 지연·오버슈트 합격 기준은 (b)에 적용 |
 | 05 LAT-MAXSTEER | 좌(+150, 반시계)·우(−150, 시계) 각각, 저속, GNSS 궤적 + 요레이트. 07 나선이 있어도 유지(11-04) |
 | 06 LAT-ACK | 05 데이터로 1차 분석, 07(원) 이후 갱신. 오차 기준 타이어각 1~2° |
+| 09 ENGINE-ROOM | 표 갱신 `tools/engine_room/fit_long_map.py`(자동 반영 금지, 종료 3 = 차단), 원 돌기 `circle_test.py`(핸들각 직접) + `fit_circle.py`. 점검표 `bsw_test/09_ENGINE_ROOM/docs/checklist.md`, 이력 `docs/engine_room_map_history.md`. 모델 `/control/target` = **20 Hz** |
 | 07 LAT-PROF | 02 생성기 재사용, 명령·실제 조향각 동시 기록. 결과로 핸들↔타이어 변환표 갱신 |
 
 ## 7. 문서 기록 규칙

@@ -68,9 +68,12 @@ ln -sfn "$D" "$BSW_CAPTURE/bsw_latest"
   echo "- CAN: $MODE $( [ "$MODE" = kvaser ] && echo "ch$BSW_KV_CH")  RT: $BSW_RT  자동 arm: $BSW_AUTO_ARM  앱 필수: $BSW_APP_REQUIRED  상태판: $BSW_UI"
   echo "- can_guard 한계: --steer-limit-deg 150 --brake-limit-pct 100 --acc-limit-pct $BSW_ACC_LIMIT"
   echo "- 어댑터 표: track_params.yaml(사본)"
+  python3 "$HERE/race_up_check.py" --map-only "$REPO" 2>/dev/null | sed 's/^/- /'
 } > "$D/SESSION.md"
 
 bash "$HERE/bsw_status.sh" "$D"
+# 경기 신호 시작 점검(WP7): /race/state 발행, 0x202 현재값(송신 없음), long_map 버전·source. 못 받으면 모델이 깃발을 못 본다
+python3 "$HERE/race_up_check.py" "$REPO" || echo "❌ 경기 신호 점검 실패 — 위 내용을 확인(모델 팀 M-01·M-06 이 동작하지 않는다)"
 
 # ── 3. 상태판 창(읽기 전용) ──────────────────────────────
 case $MODE in kvaser) MCH=kv0;; peak) MCH=$PEAK;; sil) MCH=vcan0;; esac
