@@ -161,5 +161,5 @@ pick() { grep -hE "$1" "$2" 2>/dev/null | sort -u | cut -c1-150 | sed 's/^/    /
 } > "$V"
 cat "$V"
 echo
-echo "결과 기록: git -C $REPO add $OUT && git -C $REPO commit -m '대회 PC 판정 $COMMIT'"
+echo "결과 기록: git -C $REPO add $OUT/VERDICT.md $OUT/*.log && git -C $REPO commit -m '대회 PC 판정 $COMMIT'   # 나머지 CSV·로그는 폴더에만"
 [ $FAILS = 0 ]
