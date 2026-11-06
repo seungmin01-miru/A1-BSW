@@ -9,7 +9,7 @@ a1_cmd_adapter:
     stale_timeout_s: 0.15       # arm 중 제어기 입력이 이보다 오래 끊기면 고장 래치 → can_guard HOLDING
     perception_heartbeat: true  # 인지 프로세스가 생기면 false
 
-    map_version: "steer-v1-bsw5-7pt / long-1d-hyst"   # 표 버전. /control/adapter/status 의 note 에 나온다
+    map_version: "steer-v1-bsw5-7pt"   # 표 버전. /control/adapter/status 의 note 에 나온다
 
     # ── 조향: 타이어각 → 핸들각. 좌우 비대칭이면 점을 더 넣는다. x 는 오름차순.
     # 2026-11-04 bsw5 GNSS 요레이트 역산(★ 그래프 판독 — reports(log)/20261104_track/1_조향/P1_steer_ratio.png, 11-14 원 돌기로 교체).
@@ -22,7 +22,12 @@ a1_cmd_adapter:
     steer_wheel_limit_deg: 150.0     # DBC 명령 한계. can_guard --steer-limit-deg 와 같게
     steer_rate_limit_deg_s: 120.0    # 핸들각 속도. 10-07 실측 액추에이터 최대 약 125 °/s
 
-    # ── 종방향: 목표 가감속 → 가속 % / 브레이크 % (T3·T4 에서 실측)
+    # ── 종방향 2차원 표(속도 구간별, 2026-11-06). 상대 경로 = 저장소 루트 기준. 빈 값이면 아래 1차원 표를 쓴다.
+    #    못 읽으면 어댑터가 시작하지 않는다. 표 파일: 지시서 2.2절 형식, 갱신은 tools/engine_room/fit_long_map.py + 사람 확인
+    long_map_file: ros2_ws/src/a1_control_adapter/config/long_map.yaml
+    speed_stale_s: 0.1
+
+    # ── 종방향: 목표 가감속 → 가속 % / 브레이크 % (T3·T4 에서 실측). long_map_file 이 비었을 때만 씀, 상한 acc_max_pct·brake_max_pct 는 2차원 표에도 적용
     long_deadband_mps2: 0.1          # 진입: |a| 가 이보다 크면 가속/브레이크 모드
     long_deadband_off_mps2: 0.03     # 이탈: |a| 가 이보다 작으면 0. 그 사이는 이전 모드 유지(11-04 on/off 161회/분 해소, 지시서 2.6.2 b)
     # 가속: 2026-11-04 실차 평지 저속 1회씩(잠정, measurements/2026-11-04_signal_audit/quick_lon.md) —

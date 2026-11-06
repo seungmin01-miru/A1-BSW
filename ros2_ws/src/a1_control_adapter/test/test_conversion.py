@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from a1_control_adapter.conversion import (  # noqa: E402
-    InputLimits, LongMap, SlewLimiter, SteerMap, interp, validate)
+    InputLimits, LongMap, LongMap2D, SlewLimiter, SteerMap, interp, resolve_map_path, validate)
 
 import yaml  # noqa: E402
 
@@ -200,3 +200,114 @@ def test_step_inputs_same_with_or_without_hysteresis_outside_band():
 def test_bad_off_value_rejected():
     with pytest.raises(ValueError):
         LongMap([0.1, 1.0], [75.0, 100.0], [0.1, 4.0], [0.0, 100.0], deadband_mps2=0.1, deadband_off_mps2=0.2)
+
+
+# ── WP2: 2차원 표 ────────────────────────────────────────────────
+MAP_FILE = os.path.join(os.path.dirname(CFG), 'long_map.yaml')
+
+
+def real_map():
+    with open(MAP_FILE) as f:
+        return LongMap2D(yaml.safe_load(f)['long_map'], acc_max_pct=100.0, brake_max_pct=100.0)
+
+
+def mini(**kw):
+    cfg = dict(version=9, source='시험', speed_bins_kph=[0, 10, 20], accel_bins_mps2=[-2, -1, 0, 0.5, 1.0],
+               pedal_pct={0: [-80, -40, 0, 70, 80], 10: [-90, -50, 0, 80, 90], 20: [None, None, 0, None, None]},
+               deadband_mps2=0.1, deadband_off_mps2=0.03)
+    cfg.update(kw)
+    return LongMap2D(cfg)
+
+
+def test_regression_same_as_1d_table_everywhere():
+    """지시서: 기존 1차원 표와 같은 입력 → 같은 출력(모든 속도, 히스테리시스 포함한 순서)."""
+    p = track_params()
+    seq = [x / 50 for x in range(-260, 80)] + [0.05, 0.15, 0.02, 0.0, -0.05, -0.2, -0.02]
+    for speed in (3.0, 7.0, 15.0, 25.0, 70.0, 120.0):
+        old = hyst_map()
+        new = real_map()
+        for a in seq:
+            o = old.to_pedals(a)
+            n = new.to_pedals(a, speed)
+            assert n[0] == pytest.approx(o[0], abs=0.01) and n[1] == pytest.approx(o[1], abs=0.01), (a, speed)
+    assert p['long_map_file'].endswith('long_map.yaml')
+
+
+def test_bilinear_inside_and_at_cells():
+    m = mini()
+    assert m.to_pedals(0.5, 0.0)[0] == pytest.approx(70)
+    assert m.to_pedals(1.0, 10.0)[0] == pytest.approx(90)
+    assert m.to_pedals(0.75, 5.0)[0] == pytest.approx((75 + 85) / 2)
+    assert m.to_pedals(-1.5, 5.0)[1] == pytest.approx((60 + 70) / 2)
+    assert not m.last_clamped and not m.last_extrapolated
+
+
+def test_between_deadband_and_first_cell_saturates_not_mixed_with_zero():
+    assert mini().to_pedals(0.2, 0.0)[0] == pytest.approx(70)
+
+
+def test_outside_table_clamps_and_flags():
+    m = mini()
+    assert m.to_pedals(3.0, 5.0)[0] == pytest.approx(85)
+    assert m.last_clamped
+    assert m.to_pedals(-9.0, 0.0)[1] == pytest.approx(80)
+    assert m.last_clamped
+
+
+def test_null_cell_uses_nearest_measured_and_flags():
+    m = mini()
+    assert m.to_pedals(1.0, 20.0)[0] == pytest.approx(90)
+    assert m.last_extrapolated
+    assert not m.last_clamped
+    m.to_pedals(1.0, 10.0)
+    assert not m.last_extrapolated
+    assert m.to_pedals(1.0, 15.0)[0] == pytest.approx(90)   # 측정 10 km/h 와 미측정 20 km/h 사이
+    assert m.last_extrapolated
+
+
+def test_launch_floor_only_below_launch_speed():
+    m = mini(launch_min_acc_pct=75, launch_speed_kph=3.0)
+    assert m.to_pedals(0.5, 1.0)[0] == pytest.approx(75)
+    m.launch_min = 90.0
+    assert m.to_pedals(0.5, 3.5)[0] == pytest.approx(73.5)
+    m.reset()
+    assert m.to_pedals(0.05, 1.0) == (0.0, 0.0)             # 불감대 안이면 하한도 없음
+
+
+def test_2d_hysteresis_and_reset():
+    m = mini()
+    out = [m.to_pedals(0.05 if i % 2 else 0.15, 5.0)[0] for i in range(200)]
+    assert sum(1 for a, b in zip(out, out[1:]) if (a > 0) != (b > 0)) <= 1
+    m.reset()
+    assert m.to_pedals(0.05, 5.0) == (0.0, 0.0)
+
+
+def test_caps_never_both():
+    m = LongMap2D(dict(version=1, source='s', speed_bins_kph=[0, 10], accel_bins_mps2=[-1, 0, 1],
+                       pedal_pct={0: [-80, 0, 90], 10: [-80, 0, 90]}), acc_max_pct=50.0, brake_max_pct=60.0)
+    assert m.to_pedals(1.0, 5.0) == (50.0, 0.0)
+    assert m.to_pedals(-1.0, 5.0) == (0.0, 60.0)
+    for a in [x / 10 for x in range(-30, 30)]:
+        acc, brk = m.to_pedals(a, 5.0)
+        assert not (acc > 0 and brk > 0)
+
+
+@pytest.mark.parametrize('bad', [
+    dict(version=None), dict(source=''), dict(speed_bins_kph=[0, 10]),
+    dict(pedal_pct={0: [-80, -40, 0, 70, 80], 10: [-90, -50, 0, 80], 20: [None] * 5}),      # 행 길이
+    dict(pedal_pct={0: [-80, -40, 0, 80, 70], 10: [-90, -50, 0, 80, 90], 20: [None] * 5}),  # 단조 아님
+    dict(pedal_pct={0: [-80, 40, 0, 70, 80], 10: [-90, -50, 0, 80, 90], 20: [None] * 5}),   # 부호
+    dict(pedal_pct={0: [-80, -40, 5, 70, 80], 10: [-90, -50, 0, 80, 90], 20: [None] * 5}),  # 0 열
+    dict(pedal_pct={0: [-180, -40, 0, 70, 80], 10: [-90, -50, 0, 80, 90], 20: [None] * 5}), # 범위
+    dict(pedal_pct={0: [None, None, 0, 70, 80], 10: [None, None, 0, 80, 90], 20: [None] * 5}),   # 브레이크 쪽 전부 미측정
+    dict(deadband_off_mps2=0.5),
+])
+def test_bad_tables_rejected(bad):
+    with pytest.raises((ValueError, TypeError)):
+        mini(**bad)
+
+
+def test_resolve_map_path():
+    assert resolve_map_path('', '/r/safety/can_guard') == ''
+    assert resolve_map_path('a/b.yaml', '/r/safety/can_guard') == '/r/a/b.yaml'
+    assert resolve_map_path('/x/b.yaml', '/r/safety/can_guard') == '/x/b.yaml'

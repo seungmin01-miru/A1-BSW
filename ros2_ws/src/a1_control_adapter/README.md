@@ -34,6 +34,7 @@
 |---|---|---|
 | `steer_map` | 7점 비선형: 타이어 ±11.5° ↔ 핸들 ±150°, 타이어 0 ↔ 핸들 −9°, `steer_sign: 1`. 옛 표 `steer_map_v0_20261104.yaml` | 11-04 bsw5 역산 ★ / 11-14 원 돌기 |
 | `brake_map` | 0.1·1·2·3·4 m/s² → 0·40·70·90·100 % | 10-08 브레이크 이벤트 / T3 |
+| `long_map_file` | `config/long_map.yaml` — 속도 구간별 2차원 표(우선), 없으면 아래 1차원 표. v1 = 1차원 복사, 30 km/h 이상 미측정(`extrapolated`) | 지시서 2.2절 / `tools/engine_room/fit_long_map.py` + 사람 확인 |
 | `accel_map` | 0.1 → 75 %, 0.13 → 80 %, 0.57 → 100 % + 히스테리시스(`long_deadband_mps2` 0.10 진입, `long_deadband_off_mps2` 0.03 이탈) | 11-04 실차 / 03 |
 
 `tools/track_day/fit_maps.py` 가 녹화에서 이 조각을 만들어 준다.

@@ -5,7 +5,7 @@
 #   bash tools/track_day/rehearse_track.sh
 #
 # 확인하는 것: disarm 중 0x210 침묵(auto 000 안 보냄) / 입력 없을 때 arm 거부 / 타이어각→핸들각(track.yaml 7점 표: 타이어 4° = 핸들 33.9°, 2026-11-06)·가감속→% 변환이 0x210 raw 로 /
-# arm 순간 핸들 속도 제한 / 10 Hz 느린 제어기에서도 can_guard 워치독 미발동 / 제어기 kill → 고장 래치 → HOLDING →
+# arm 순간 핸들 속도 제한 / 20 Hz 제어기(모델 실제 주기, 2026-11-06)에서 can_guard 워치독 미발동 / 제어기 kill → 고장 래치 → HOLDING →
 # STOPPED(조향 고정·가속 0·브레이크) / 래치 중 arm 거부·disarm 해제 / can_guard 재시작 후 자동 재연결 /
 # NaN 입력 → 고장 래치.
 set -u
@@ -59,8 +59,8 @@ echo; echo "[1] 입력 없음 → arm 거부, disarm 중 0x210 침묵"
 r=$(svc arm_steer SetBool "{data: true}")
 echo "$r" | grep -q "success=False" && ok "제어기 입력 없을 때 arm_steer 거부" || bad "arm 거부 안 됨: $r"
 
-echo; echo "[2] 10 Hz 제어기(타이어 4°, −1.0 m/s²) — disarm shadow → arm → 변환값 송신"
-start_pub -p rate_hz:=10.0 -p steer_tire_deg:=4.0 -p accel_mps2:=-1.0
+echo; echo "[2] 20 Hz 제어기(타이어 4°, −1.0 m/s²) — disarm shadow → arm → 변환값 송신"
+start_pub -p rate_hz:=20.0 -p steer_tire_deg:=4.0 -p accel_mps2:=-1.0
 sleep 3
 M_DIS0=$(mark); sleep 1.5; M_DIS1=$(mark)
 st=$(timeout 5 ros2 topic echo --once /control/adapter/status 2>/dev/null | tr '\n' ' ')
@@ -130,7 +130,7 @@ b = win(acc + 0.4, kill)
 out(bool(b) and all(x['acc_command'] == 100 and x['break_command'] == 0 for x in b),
     f'+0.7 m/s² → 가속 100 % (11-04 표: 0.57 이상 포화), 브레이크 0 ({sorted({x["acc_command"] for x in b})})')
 out('INIT → ACTIVE' in guard and guard.count('→ HOLDING') == 1,
-    f'10 Hz 입력 구간 워치독 미발동(HOLDING 전이는 kill 때 1번뿐: {guard.count("→ HOLDING")}회)')
+    f'20 Hz 입력 구간 워치독 미발동(HOLDING 전이는 kill 때 1번뿐: {guard.count("→ HOLDING")}회)')
 h = win(kill + 0.35, kill + 3.0)
 out(bool(h) and all(abs(x['steer_command'] - 33.9) < 0.06 and x['acc_command'] == 0 for x in h)
     and max(x['break_command'] for x in h) > 0,

@@ -10,6 +10,7 @@
 표 밖 입력은 표 끝값으로 포화한다(외삽 안 함).
 """
 import math
+import os
 from bisect import bisect_right
 from dataclasses import dataclass, field
 
@@ -58,6 +59,17 @@ class SteerMap:
         return self.sign * interp(wheel_deg, self.wheel_deg, self.tire_deg)
 
 
+def _next_mode(mode, a, on, off):
+    """가감속 모드 전이(+1 가속, −1 브레이크, 0 없음). off 가 None 이면 상태 없는 불감대."""
+    if a > on:
+        return 1
+    if a < -on:
+        return -1
+    if off is None or abs(a) < off or a * mode < 0:
+        return 0                            # 이탈값 안쪽, 또는 모드 반대쪽 값
+    return mode
+
+
 @dataclass
 class LongMap:
     """목표 가감속 → (가속 %, 브레이크 %). 감속 표는 감속 **크기**(양수 m/s²)로 쓴다.
@@ -93,19 +105,139 @@ class LongMap:
         self._mode = 0
 
     def to_pedals(self, accel_mps2):
-        on = self.deadband_mps2
-        off = on if self.deadband_off_mps2 is None else self.deadband_off_mps2
-        if accel_mps2 > on:
-            self._mode = 1
-        elif accel_mps2 < -on:
-            self._mode = -1
-        elif self.deadband_off_mps2 is None or abs(accel_mps2) < off or accel_mps2 * self._mode < 0:
-            self._mode = 0                  # 이탈값 안쪽, 또는 모드 반대쪽 값
+        self._mode = _next_mode(self._mode, accel_mps2, self.deadband_mps2, self.deadband_off_mps2)
         if self._mode > 0:
             return min(interp(accel_mps2, self.accel_mps2, self.acc_pct), self.acc_max_pct), 0.0
         if self._mode < 0:
             return 0.0, min(interp(-accel_mps2, self.decel_mps2, self.brake_pct), self.brake_max_pct)
         return 0.0, 0.0
+
+
+class LongMap2D:
+    """속도 구간별 목표 가감속 → 페달 %. 지시서 2.2절 `long_map`(config/long_map.yaml).
+
+    표: 행 = 속도(km/h), 열 = 가감속(m/s²), 값 = 페달 %(양수 가속, 음수 브레이크, None = 미측정).
+    - 이중선형 보간. 표 밖은 끝값 고정 + `last_clamped`.
+    - None 칸은 같은 쪽(가속/브레이크)의 가장 가까운 측정 칸 값을 쓰고, 그 칸이 보간에 쓰이면 `last_extrapolated`.
+    - 보간은 가속 쪽·브레이크 쪽을 따로 한다. 가장 작은 |a| 칸 아래는 그 칸 값으로 포화한다(0 열과 섞지 않음) —
+      불감대 위 75 % 와 0 을 이으면 차가 안 움직이는 % 가 나오고, 1차원 표(LongMap)와도 달라진다.
+    - 불감대·히스테리시스는 LongMap 과 같다. 가속·브레이크는 동시에 0 이 아닐 수 없다.
+    - 차속 < launch_speed_kph 이고 가속 모드면 가속 % 하한 launch_min_acc_pct(출발 불감대).
+    """
+
+    def __init__(self, cfg, acc_max_pct=100.0, brake_max_pct=100.0):
+        self.version = cfg.get('version')
+        self.source = cfg.get('source')
+        if self.version is None or not self.source:
+            raise ValueError('long_map: version·source 는 필수')
+        self.speeds = [float(x) for x in cfg['speed_bins_kph']]
+        self.accels = [float(x) for x in cfg['accel_bins_mps2']]
+        _check_table('long_map.speed_bins', self.speeds, self.speeds)
+        _check_table('long_map.accel_bins', self.accels, self.accels)
+        self.deadband = float(cfg.get('deadband_mps2', 0.1))
+        off = cfg.get('deadband_off_mps2', 0.03)
+        self.deadband_off = None if off is None else float(off)
+        if self.deadband_off is not None and not 0 <= self.deadband_off <= self.deadband:
+            raise ValueError(f'long_map: deadband_off_mps2 는 0~deadband_mps2: {off}')
+        self.launch_min = float(cfg.get('launch_min_acc_pct', 0.0))
+        self.launch_speed = float(cfg.get('launch_speed_kph', 0.0))
+        self.acc_max = float(acc_max_pct)
+        self.brake_max = float(brake_max_pct)
+        table = cfg['pedal_pct']
+        if set(float(k) for k in table) != set(self.speeds):
+            raise ValueError('long_map: pedal_pct 행이 speed_bins_kph 와 다름')
+        rows = {float(k): v for k, v in table.items()}
+        self.raw = [self._check_row(sp, rows[sp]) for sp in self.speeds]
+        self.grid, self.filled = self._fill()
+        self._pos = [j for j, a in enumerate(self.accels) if a > 0]
+        self._neg = [j for j, a in reversed(list(enumerate(self.accels))) if a < 0]
+        self._mode = 0
+        self.last_clamped = self.last_extrapolated = False
+
+    def _check_row(self, speed, row):
+        if len(row) != len(self.accels):
+            raise ValueError(f'long_map: {speed:g} km/h 행 길이 {len(row)} ≠ 가속도 칸 {len(self.accels)}')
+        prev = None
+        for a, v in zip(self.accels, row):
+            if v is None:
+                continue
+            v = float(v)
+            if not (math.isfinite(v) and -100.0 <= v <= 100.0):
+                raise ValueError(f'long_map: {speed:g} km/h, {a:g} m/s²: 값 {v} 가 ±100 % 밖')
+            if (a > 0 and v < 0) or (a < 0 and v > 0) or (a == 0 and v != 0):
+                raise ValueError(f'long_map: {speed:g} km/h, {a:g} m/s²: 부호가 틀림 {v}')
+            if prev is not None and v < prev:
+                raise ValueError(f'long_map: {speed:g} km/h 행이 가속도에 대해 단조 증가가 아님({a:g} m/s²)')
+            prev = v
+        return [None if v is None else float(v) for v in row]
+
+    def _fill(self):
+        """None 칸 → 같은 쪽 가장 가까운 측정 칸. 한쪽에 측정이 하나도 없으면 표를 받지 않는다."""
+        grid = [list(r) for r in self.raw]
+        filled = [[False] * len(self.accels) for _ in self.speeds]
+        for side in (1, -1):
+            cols = [j for j, a in enumerate(self.accels) if a * side > 0]
+            known = [(i, j) for i in range(len(self.speeds)) for j in cols if self.raw[i][j] is not None]
+            if not known:
+                raise ValueError(f'long_map: {"가속" if side > 0 else "브레이크"} 쪽에 측정 칸이 없음')
+            for i in range(len(self.speeds)):
+                for j in cols:
+                    if self.raw[i][j] is None:
+                        ki, kj = min(known, key=lambda c: (abs(c[0] - i) + abs(c[1] - j), abs(c[0] - i), c[0]))
+                        grid[i][j] = self.raw[ki][kj]
+                        filled[i][j] = True
+        return grid, filled
+
+    def reset(self):
+        """히스테리시스 모드를 지운다(종방향 arm 순간)."""
+        self._mode = 0
+
+    def _bilinear(self, speed, mag, cols):
+        xs = self.speeds
+        clamped = speed < xs[0] or speed > xs[-1]
+        s = min(max(speed, xs[0]), xs[-1])
+        i1 = min(max(bisect_right(xs, s), 1), len(xs) - 1)
+        i0 = i1 - 1
+        w = (s - xs[i0]) / (xs[i1] - xs[i0])
+        mags = [abs(self.accels[j]) for j in cols]
+        clamped = clamped or mag > mags[-1]
+        m = min(max(mag, mags[0]), mags[-1])
+        k1 = min(max(bisect_right(mags, m), 1), len(mags) - 1)
+        k0 = max(k1 - 1, 0)
+        u = (m - mags[k0]) / (mags[k1] - mags[k0]) if k1 > k0 else 0.0
+        used = [(i0, k0, (1 - w) * (1 - u)), (i0, k1, (1 - w) * u), (i1, k0, w * (1 - u)), (i1, k1, w * u)]
+        val = sum(abs(self.grid[i][cols[k]]) * wt for i, k, wt in used)
+        extrap = any(wt > 1e-9 and self.filled[i][cols[k]] for i, k, wt in used)
+        return val, clamped, extrap
+
+    def to_pedals(self, accel_mps2, speed_kph=0.0):
+        """(가속 %, 브레이크 %). speed_kph = 현재 차속(0x201 평균)."""
+        self._mode = _next_mode(self._mode, accel_mps2, self.deadband, self.deadband_off)
+        self.last_clamped = self.last_extrapolated = False
+        if self._mode == 0:
+            return 0.0, 0.0
+        if self._mode > 0:
+            val, self.last_clamped, self.last_extrapolated = self._bilinear(speed_kph, abs(accel_mps2), self._pos)
+            if speed_kph < self.launch_speed:
+                val = max(val, self.launch_min)
+            return min(val, self.acc_max), 0.0
+        val, self.last_clamped, self.last_extrapolated = self._bilinear(speed_kph, abs(accel_mps2), self._neg)
+        return 0.0, min(val, self.brake_max)
+
+
+def resolve_map_path(path, can_guard_dir):
+    """long_map_file 경로. 상대 경로는 저장소 루트(can_guard_dir/../..) 기준. 빈 값 = 2차원 표 안 씀."""
+    if not path:
+        return ''
+    p = os.path.expanduser(path)
+    if os.path.isabs(p):
+        return p
+    return os.path.normpath(os.path.join(os.path.expanduser(can_guard_dir), '..', '..', p))
+
+
+def wheel_speed_kph(left_kph, right_kph):
+    """0x201 좌우 평균 — 후륜 엔코더, 부호 없음."""
+    return (float(left_kph) + float(right_kph)) / 2.0
 
 
 @dataclass

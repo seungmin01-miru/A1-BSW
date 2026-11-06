@@ -1,0 +1,25 @@
+# 종방향 2차원 표 — 지시서 2.2절. 행 = 차속 km/h, 열 = 목표 가감속 m/s². 양수 = 가속 %, 음수 = 브레이크 %, null = 미측정
+# v1: 기존 1차원 표를 0~20 km/h 행에 복사(속도 구분 없음, 잠정). 30 km/h 이상은 미측정 → 20 km/h 값 + AdapterStatus.extrapolated.
+# 열에 0.1·0.13·0.57 을 더한 것은 1차원 표의 꺾임점이라 그렇다 — 지금 동작과 같게 하려고(docs/engine_room_open_items.md E-10).
+# 자동으로 고치지 않는다. tools/engine_room/fit_long_map.py 추천을 사람이 보고 고친 뒤 커밋, docs/engine_room_map_history.md 에 적는다.
+long_map:
+  version: 1
+  source: track.yaml 1차원 표 복사 — measurements/2026-11-04_signal_audit/quick_lon.md(가속), 10-08 주행 이미지(브레이크)
+  speed_bins_kph: [0, 5, 10, 15, 20, 30, 40, 50, 60, 80, 100]
+  accel_bins_mps2: [-4, -3, -2, -1.5, -1, -0.5, -0.2, -0.1, 0, 0.1, 0.13, 0.2, 0.4, 0.57, 0.6, 0.8, 1, 1.3]
+  pedal_pct:
+    0: [-100, -90, -70, -55, -40, -17.7778, -4.4444, 0, 0, 75, 80, 83.1818, 92.2727, 100, 100, 100, 100, 100]
+    5: [-100, -90, -70, -55, -40, -17.7778, -4.4444, 0, 0, 75, 80, 83.1818, 92.2727, 100, 100, 100, 100, 100]
+    10: [-100, -90, -70, -55, -40, -17.7778, -4.4444, 0, 0, 75, 80, 83.1818, 92.2727, 100, 100, 100, 100, 100]
+    15: [-100, -90, -70, -55, -40, -17.7778, -4.4444, 0, 0, 75, 80, 83.1818, 92.2727, 100, 100, 100, 100, 100]
+    20: [-100, -90, -70, -55, -40, -17.7778, -4.4444, 0, 0, 75, 80, 83.1818, 92.2727, 100, 100, 100, 100, 100]
+    30: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+    40: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+    50: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+    60: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+    80: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+    100: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+  deadband_mps2: 0.1          # 진입 |a|
+  deadband_off_mps2: 0.03     # 이탈 |a|
+  launch_min_acc_pct: 75      # 차속 < launch_speed_kph 이고 가속 모드면 가속 % 하한(11-04 불감대 70~80 %)
+  launch_speed_kph: 3.0

@@ -11,3 +11,8 @@ float64 out_brake_pct
 float64 out_acc_pct
 uint32 rejected_count         # NaN·범위 밖이라 버린 입력 누적 개수
 string note                   # 마지막 이상 사유. 없으면 표 버전("map <track.yaml map_version>")
+string long_map_version       # 2차원 표 버전(config/long_map.yaml), 빈 문자열 = 1차원 표
+bool extrapolated             # 이번 변환에 미측정 칸(가장 가까운 측정 칸 값)을 썼다
+bool long_map_clamped         # 입력 속도·가감속이 표 밖이라 끝값으로 고정했다
+float64 speed_used_kph        # 변환에 쓴 차속(0x201 평균)
+bool speed_stale              # 차속 나이 > 0.1 s — 마지막 값을 쓰는 중(한 번도 못 받았으면 0 km/h)

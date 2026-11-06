@@ -29,12 +29,14 @@ import sys
 import time
 
 import rclpy
+import yaml
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_srvs.srv import SetBool, Trigger
 
-from a1_can_msgs.msg import AdapterStatus, ControlInfo, ControllerOutput
-from a1_control_adapter.conversion import InputLimits, LongMap, SlewLimiter, SteerMap, validate
+from a1_can_msgs.msg import AdapterStatus, ControlInfo, ControllerOutput, WheelInfo
+from a1_control_adapter.conversion import (
+    InputLimits, LongMap, LongMap2D, resolve_map_path, SlewLimiter, SteerMap, validate, wheel_speed_kph)
 
 
 def _import_protocol(can_guard_dir):
@@ -66,7 +68,8 @@ class CmdAdapter(Node):
             list(p('steer_map.wheel_deg', [-150.0, 0.0, 150.0]).value),
             sign=float(p('steer_sign', 1.0).value),
             wheel_limit_deg=p('steer_wheel_limit_deg', 150.0).value)
-        self.long = LongMap(
+        self.can_guard_dir = self.get_parameter('can_guard_dir').value
+        self.long = self.long1d = LongMap(
             list(p('accel_map.accel_mps2', [0.1, 1.3]).value),
             list(p('accel_map.acc_pct', [0.0, 30.0]).value),
             list(p('brake_map.decel_mps2', [0.1, 4.0]).value),
@@ -76,6 +79,17 @@ class CmdAdapter(Node):
             brake_max_pct=p('brake_max_pct', 100.0).value,
             deadband_off_mps2=p('long_deadband_off_mps2', 0.03).value)
         self.map_version = str(p('map_version', '').value)
+        self.long_map_path = resolve_map_path(p('long_map_file', '').value, self.can_guard_dir)
+        self.long2d = None
+        if self.long_map_path:      # 파일을 지정했는데 못 읽으면 시작하지 않는다(다른 표로 달리는 것보다 낫다)
+            with open(self.long_map_path, encoding='utf-8') as f:
+                self.long2d = LongMap2D(yaml.safe_load(f)['long_map'], self.long1d.acc_max_pct,
+                                        self.long1d.brake_max_pct)
+            self.long = self.long2d
+        self.speed_stale_s = float(p('speed_stale_s', 0.1).value)
+        self.speed_kph = 0.0
+        self.speed_rx = None
+        self.clamp_warned = -1e9
         self.lim = InputLimits(p('input_accel_abs_mps2', 15.0).value, p('input_steer_tire_abs_deg', 45.0).value)
         self.slew = SlewLimiter(p('steer_rate_limit_deg_s', 120.0).value)
         self.auto_arm = bool(p('auto_arm', False).value)
@@ -102,6 +116,8 @@ class CmdAdapter(Node):
         qos = QoSProfile(depth=1, history=HistoryPolicy.KEEP_LAST, reliability=ReliabilityPolicy.BEST_EFFORT)
         self.create_subscription(ControllerOutput, '/control/target', self.on_target, qos)
         self.create_subscription(ControlInfo, '/control/status/control_info', self.on_info, qos)
+        # 차속: 지시서는 raw 0x201 이지만 raw 는 약 545 프레임/s 라 어댑터 코어에 부담 → 같은 값을 47.6 Hz 로 받는다(E-11)
+        self.create_subscription(WheelInfo, '/control/status/wheel_info', self.on_wheel, qos)
         self.pub = self.create_publisher(AdapterStatus, '/control/adapter/status', 10)
         self.create_service(SetBool, '/control/adapter/arm_steer', lambda q, r: self.on_arm('steer', q, r))
         self.create_service(SetBool, '/control/adapter/arm_long', lambda q, r: self.on_arm('long', q, r))
@@ -110,7 +126,8 @@ class CmdAdapter(Node):
         self.get_logger().info(
             f'시작(disarm). shm={self.cmd_shm}, 주기 {self.period_s * 1000:.0f} ms, stale {self.stale_s * 1000:.0f} ms, '
             f'조향 표 {self.steer.tire_deg}→{self.steer.wheel_deg} sign {self.steer.sign:g}, '
-            f'가속 상한 {self.long.acc_max_pct:g} %, 하트비트 {"대신 보냄" if self.hb_enabled else "끔"}, '
+            f'종방향 표 {"2차원 v" + str(self.long2d.version) if self.long2d else "1차원"}, '
+            f'가속 상한 {self.long1d.acc_max_pct:g} %, 하트비트 {"대신 보냄" if self.hb_enabled else "끔"}, '
             f'자동 arm {"켬(첫 명령 " + format(self.auto_arm_fresh_s, "g") + " s 뒤 1회)" if self.auto_arm else "끔"}')
 
     # ── 입력 ───────────────────────────────────────────────
@@ -129,6 +146,10 @@ class CmdAdapter(Node):
     def on_info(self, msg):
         self.meas_wheel_deg = msg.steer_position_deg
         self.meas_rx = time.monotonic()
+
+    def on_wheel(self, msg):
+        self.speed_kph = wheel_speed_kph(msg.left_speed_kph, msg.right_speed_kph)
+        self.speed_rx = time.monotonic()
 
     def _age(self, now):
         return None if self.last_rx is None else now - self.last_rx
@@ -263,7 +284,14 @@ class CmdAdapter(Node):
 
         accel, tire = self.last if self.last is not None else (0.0, 0.0)
         wheel_target = self.steer.to_wheel(tire)
-        acc, brake = self.long.to_pedals(accel)
+        stale = self.speed_rx is None or now - self.speed_rx > self.speed_stale_s
+        if self.long2d is not None:
+            acc, brake = self.long2d.to_pedals(accel, self.speed_kph)
+            if self.long2d.last_clamped and now - self.clamp_warned >= 1.0:
+                self.clamp_warned = now
+                self.get_logger().warn(f'long_map_clamped: 표 밖 입력 a={accel:.2f} m/s², v={self.speed_kph:.1f} km/h')
+        else:
+            acc, brake = self.long.to_pedals(accel)
         if self.steer_armed:
             wheel = self.slew.step(wheel_target, dt)
         else:
@@ -298,6 +326,11 @@ class CmdAdapter(Node):
         st.out_steer_wheel_deg, st.out_brake_pct, st.out_acc_pct = float(wheel), float(brake), float(acc)
         st.rejected_count = self.rejected
         st.note = self.fault or self.note or (f'map {self.map_version}' if self.map_version else '')
+        st.speed_used_kph, st.speed_stale = float(self.speed_kph), stale
+        if self.long2d is not None:
+            st.long_map_version = str(self.long2d.version)
+            st.extrapolated = self.long2d.last_extrapolated
+            st.long_map_clamped = self.long2d.last_clamped
         self.pub.publish(st)
 
     def _close(self):
