@@ -19,6 +19,7 @@ import time
 from a1_can_msgs.msg import CanFrame, RaceState
 from builtin_interfaces.msg import Time
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 
@@ -109,10 +110,9 @@ def main(args=None):
     node = RaceStatePublisher()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.get_logger().info(f'종료 — 발행 {node.published}건')
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

@@ -57,6 +57,15 @@ def main():
         while time.time() < end:
             rclpy.spin_once(node, timeout_sec=0.02)
 
+    def wait_until(fn, sec):
+        """조건이 될 때까지. 새 노드가 서로 찾는 데 몇 초 걸린다(ROS_DOMAIN 분리 시 2 s 넘게 — 판정을 먼저 하면 가짜 실패)."""
+        end = time.time() + sec
+        while time.time() < end:
+            rclpy.spin_once(node, timeout_sec=0.02)
+            if fn():
+                return True
+        return False
+
     checks = []
 
     def check(what, ok, detail=''):
@@ -65,9 +74,13 @@ def main():
 
     threading.Thread(target=loop, daemon=True).start()
     try:
-        wait(2.0)
+        if not wait_until(lambda: 'm' in st and 'm' in race, 15.0):
+            check('어댑터·/race/state 수신', False, f'어댑터 {"m" in st}, race {"m" in race}')
+            return 1
+        armed = wait_until(lambda: st['m'].steer_armed and st['m'].long_armed, 10.0)
+        wait(1.0)
         m = st['m']
-        check('자동 arm(정지 목표 20 Hz)', m.steer_armed and m.long_armed and m.writing, f'입력 나이 {m.input_age_s * 1e3:.0f} ms')
+        check('자동 arm(정지 목표 20 Hz)', armed and m.writing, f'입력 나이 {m.input_age_s * 1e3:.0f} ms')
         check('입력 나이 < 끊김 기준 150 ms', 0 <= m.input_age_s < 0.15)
         check('−3 m/s² → 브레이크만', m.out_brake_pct > 0 and m.out_acc_pct == 0, f'브레이크 {m.out_brake_pct:.1f} %')
         check('타이어 0° → 표 영점', abs(m.out_steer_wheel_deg - (-9.0)) < 0.5, f'핸들 {m.out_steer_wheel_deg:.1f}°')
