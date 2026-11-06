@@ -364,7 +364,9 @@ def j_s06(run, j, res=None):
         _ros_latch_checks(run, j)
 
 
-def _ros_latch_checks(run, j, a=0.0, b=1e9):
+def _ros_latch_checks(run, j, a=0.0):
+    # 시나리오 안만 본다. 끝난 뒤 can_guard 가 먼저 내려가 생기는 "공유메모리 없음"은 시험 정리 때문이다
+    b = run.tx[-1][0] if run.tx else 1e9
     log = [x for x in run.ros.get('adapter', []) if a <= x[0] < b]
     j('어댑터 상태 수신', bool(log), f'{len(log)}개')
     faults = {x[4] for x in log if x[4] and '끊김' not in x[4] and 'D7' not in x[4]}
@@ -776,6 +778,13 @@ def ros_env(env=None):
     return env
 
 
+def _signal_group(proc, sig):
+    try:
+        os.killpg(proc.pid, sig)
+    except ProcessLookupError:
+        pass
+
+
 class RosLink:
     """모델 → /control/target → 실제 cmd_adapter. race_state_publisher 도 같이 띄워 /race/state·어댑터 상태를 기록한다."""
 
@@ -799,7 +808,8 @@ class RosLink:
             cmd = ['ros2', 'run', pkg, exe, '--ros-args', *extra] + [x for p in params for x in ('-p', p)]
             f = open(os.path.join(work, f'{tag}_{exe}.log'), 'w')
             self.files.append(f)
-            self.procs.append(subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT, env=env))
+            # 자기 프로세스 그룹으로 띄운다: `ros2 run` 은 SIGTERM 을 자식에게 넘기지 않아 래퍼만 죽이면 노드가 남는다(남은 노드가 다음 시나리오에 섞였다)
+            self.procs.append(subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT, env=env, start_new_session=True))
 
         launch('a1_can_bridge', 'race_state_publisher', common_p)
         launch('a1_control_adapter', 'cmd_adapter', [*common_p, f'cmd_shm:={names["cmd"]}', f'hb_shm:={names["hb"]}', 'auto_arm:=true'],
@@ -840,12 +850,13 @@ class RosLink:
 
     def close(self):
         for p in self.procs:
-            p.terminate()
+            _signal_group(p, signal.SIGINT)     # rclpy 정상 종료
         for p in self.procs:
             try:
                 p.wait(5)
             except subprocess.TimeoutExpired:
-                p.kill()
+                pass
+            _signal_group(p, signal.SIGKILL)    # 그룹에 남은 것까지
         for f in self.files:
             f.close()
         self.ex.shutdown()
@@ -1349,7 +1360,7 @@ def run_round(round_no, cases, a, work):
         env = dict(os.environ)
         if case.ros:
             env = ros_env(env)
-            env['ROS_DOMAIN_ID'] = str(random.randint(100, 200))
+            env['ROS_DOMAIN_ID'] = str(random.randint(201, 232))   # 100~200 은 e2e_race_nodes.py 가 쓴다
         t0 = time.monotonic()
         r = subprocess.run(child_cmd(case.id, a, rdir, out, csv_dir), env=env, capture_output=True, text=True, timeout=240)
         if r.returncode != 0 or not os.path.exists(out):

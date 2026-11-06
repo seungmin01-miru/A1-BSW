@@ -10,6 +10,7 @@ pytest 가 모으지 않는 이름이다(노드를 띄우고 약 25 s 걸림). �
 import argparse
 import os
 import random
+import signal
 import subprocess
 import sys
 import threading
@@ -142,7 +143,8 @@ def main():
             os.makedirs(a.log_dir, exist_ok=True)
             out = open(os.path.join(a.log_dir, f'{exe}.log'), 'w')
             logs.append(out)
-        procs.append(subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT))
+        # 자기 그룹으로: `ros2 run` 은 SIGTERM 을 자식에게 넘기지 않아 래퍼만 죽이면 노드가 남는다
+        procs.append(subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT, start_new_session=True))
 
     launch('a1_can_bridge', 'race_state_publisher', f'can_guard_dir:={cg}', f'status_shm:={names["status"]}')
     launch('a1_control_adapter', 'cmd_adapter', f'can_guard_dir:={cg}', f'status_shm:={names["status"]}',
@@ -157,12 +159,16 @@ def main():
         return scenario(protocol, guard, probe)
     finally:
         for p in procs:
-            p.terminate()
+            os.killpg(p.pid, signal.SIGINT)
         for p in procs:
             try:
                 p.wait(5)
             except subprocess.TimeoutExpired:
-                p.kill()
+                pass
+            try:
+                os.killpg(p.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
         for f in logs:
             f.close()
         ex.shutdown()
