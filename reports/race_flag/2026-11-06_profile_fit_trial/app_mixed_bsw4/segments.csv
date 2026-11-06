@@ -1,0 +1,5 @@
+log,kind,t0_unix,t1_unix,pct,value_mps2,speed_kph,peak_slip,rate_pct_s
+auto_bsw4/kvaser_ch0.log.zst,brake,1793779232.966,1793779234.046,40.0,0.442,17.976,,
+auto_bsw4/kvaser_ch0.log.zst,acc,1793779220.146,1793779224.226,100.0,1.374,9.198,,
+auto_bsw4/kvaser_ch0.log.zst,acc,1793779238.606,1793779240.526,100.0,0.793,15.794,,
+auto_bsw4/kvaser_ch0.log.zst,rise,1793779237.026,1793779237.206,84.0,,,,466.667
