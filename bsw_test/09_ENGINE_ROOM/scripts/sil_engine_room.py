@@ -233,7 +233,7 @@ def t_circle(a, out, ratio=10.7):
     runs = os.path.join(d, 'runs')
     try:
         lg = open(os.path.join(d, 'circle_test.log'), 'w')
-        rc = subprocess.call([sys.executable, CIRCLE, '--run', 'sil', '--handles', '75,150', '--laps', '1.1', '--kph', '6', '--out', runs, '--interface', 'socketcan',
+        rc = subprocess.call([sys.executable, CIRCLE, '--run', 'sil', '--handles', '75,150', '--laps', '1.1', '--kph', '5', '--out', runs, '--interface', 'socketcan',
                               '--channel', a.channel, '--cmd-shm', st.cmd_shm, '--hb-shm', st.hb_shm, '--sil'], stdout=lg, stderr=lg, timeout=600)
     finally:
         st.close()
@@ -246,7 +246,12 @@ def t_circle(a, out, ratio=10.7):
     res.append((f'가짜 차량 조향비 {ratio} 를 되찾음(±0.5)', len(rows) == 4 and max(errs) < 0.5, ', '.join(f"{float(x['ratio']):.2f}" for x in rows)))
     res.append(('좌우 부호(좌 +)', all((float(x['handle_cmd_deg']) > 0) == (float(x['tire_deg']) > 0) for x in rows) and bool(rows), ''))
     speeds = [float(x['speed_kph']) for x in rows]
-    res.append(('저속 유지(≤ 8 km/h)', bool(speeds) and max(speeds) <= 8.0, ', '.join(f'{v:.1f}' for v in speeds)))
+    res.append(('저속 유지 평균(≤ 8 km/h)', bool(speeds) and max(speeds) <= 8.0, ', '.join(f'{v:.1f}' for v in speeds)))
+    peak = 0.0
+    for f in os.listdir(runs):
+        if f.endswith('_cmd.csv'):
+            peak = max([peak] + [float(x['speed_kph']) for x in csv.DictReader(open(os.path.join(runs, f))) if x['speed_kph'] and x['phase'] == 'run'])
+    res.append(('순간 최고도 상한 8 km/h 아래(세션 중단 안 남)', peak < 8.0, f'{peak:.1f} km/h'))
     return res
 
 

@@ -35,7 +35,7 @@ def run(label, seconds, off, out, rng):
             '-p', f'can_guard_dir:={GUARD}', '-p', f'cmd_shm:=cc{tag}', '-p', f'hb_shm:=ch{tag}', '-p', 'auto_arm:=true',
             '--log-level', 'warn']
     if off is not None:
-        argv += ['-p', f'long_deadband_off_mps2:={off}', '-p', 'long_map_file:=']
+        argv += ['-p', f'long_deadband_off_mps2:={off}', '-p', "long_map_file:=''"]
     proc = subprocess.Popen(argv, stderr=subprocess.DEVNULL)
     node = rclpy.create_node('cruise_check_' + tag)
     pub_t = node.create_publisher(ControllerOutput, '/control/target', 10)

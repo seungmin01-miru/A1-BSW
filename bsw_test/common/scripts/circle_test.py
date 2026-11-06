@@ -48,7 +48,7 @@ def main(argv=None):
     ap.add_argument('--handles', default='37,75,112,150', help='핸들 ° 크기')
     ap.add_argument('--sides', default='left,right')
     ap.add_argument('--laps', type=float, default=2.0)
-    ap.add_argument('--kph', type=float, default=6.0)
+    ap.add_argument('--kph', type=float, default=5.0, help='목표 차속. 저속 유지가 약 ±1 km/h 흔들리므로(SIL) 상한 8 km/h 에 여유를 둔다')
     ap.add_argument('--out', default='~/a1_race_capture/track_latest')
     ap.add_argument('--interface', default='socketcan')
     ap.add_argument('--channel', default='')

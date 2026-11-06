@@ -70,7 +70,7 @@ A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)         
 
 -- ② 원 돌기 핸들 ±37/75/112/150°, 각 2바퀴, ≤ 8 km/h (어댑터 없이 up — 위 lc 세션 끝낸 뒤)
   [T1] up ER-CIRCLE-01_s1 100
-  [T2] circ ER-CIRCLE-01 --dry-run          # 필요 공간(지름 약 23~80 m ★)·시간(약 26 분) 확인
+  [T2] circ ER-CIRCLE-01 --dry-run          # 필요 공간(지름 약 23~80 m ★)·시간(5 km/h 약 31 분) 확인
   [T2] circ ER-CIRCLE-01                    # 회차마다 안전 "비었음" → Enter. 첫 회차는 출발·유지를 지켜볼 것(값 잠정)
        끝: q → [T1] down.  분석: python3 $R/tools/engine_room/fit_circle.py --run-dir <세션> --bag <세션>/bag --out <폴더>
 
