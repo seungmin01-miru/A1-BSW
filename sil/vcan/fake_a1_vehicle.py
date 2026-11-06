@@ -23,6 +23,9 @@
   - 0x127 RES_START=1 동안: 0x210 무시 + 자체 감속(--res-decel). 해제 뒤 다시 0x210 을 따른다.
   - 0x128: 주기마다 송신(11-04 버스에도 늘 있었음). RES_END = RES 중 정지 완료, RES_ERROR = --res-error.
 같은 프로세스에서 쓸 때(vcan 없는 PC): FakeVehicle(can.Bus(channel='r1', interface='virtual'), physics=True).step(now)
+
+r_race.py 조건(2026-11-06, WP7): --physics 표는 실측(75 % ≈ 0 m/s²)보다 훨씬 강하다(75 % 에서 2.4 m/s²) → --accel-map·--brake-map·--drag·--drive-delay 로
+표를 바꿔 돌릴 수 있다(생략하면 예전 값 그대로). --cmd-file = r_race.py 프로세스 모드의 값 바꾸기 창구(파일 한 줄 "force_limit 100" / "set_kph 30", 읽으면 지움).
 """
 import csv
 import math
@@ -46,6 +49,9 @@ LIMIT_RAW_MAX = 1000           # DBC 범위 0~100 km/h
 DEFAULT_REPORTED_LIMIT_KPH = 30.0   # 11-04 실측 0x202 = 2C01 (원격 조종 제한, 자율 상한 아님 — 2026-11-06 사용자 확인)
 DEFAULT_RES_DECEL_MPS2 = 0.87  # ★ 잠정: 11-04 앱 인수 15 km/h → 정지 4.85 s 를 빌려 씀(RES 실측 아님)
 DEFAULT_RES_BRAKE_PCT = 82.0   # 잠정: RES 중 브레이크 보고값(포화점), 실물 미확인
+DEFAULT_ACCEL_MAP = ((0, 5, 30, 100), (0, 0, 1.3, 3.0))       # --physics 가속 % → m/s² (실측보다 강함)
+DEFAULT_BRAKE_MAP = ((0, 40, 70, 82), (0, 1.0, 2.0, 2.8))     # --physics 브레이크 % → m/s²
+DEFAULT_DRAG = (0.15, 0.01, 0.0)                              # 주행 저항 c0 + c1·v + c2·v² (m/s²)
 
 _stop = False
 
@@ -94,11 +100,16 @@ class FakeVehicle:
     def __init__(self, bus, period_s=0.021, cmd_timeout_s=0.0, physics=False, steer_ratio=7.5, pose_writer=None,
                  speed_limit_kph=None, speed_limit_latency_s=0.0, initial_kph=0.0,
                  res_decel_mps2=DEFAULT_RES_DECEL_MPS2, res_brake_pct=DEFAULT_RES_BRAKE_PCT, res_error=0,
-                 res_steer_deg=None, send_service_info=True, ignore_speed_limit_cmd=False):
+                 res_steer_deg=None, send_service_info=True, ignore_speed_limit_cmd=False,
+                 accel_map=DEFAULT_ACCEL_MAP, brake_map=DEFAULT_BRAKE_MAP, drag=DEFAULT_DRAG, drive_delay_s=0.0):
         self.bus = bus
         self.dt = period_s
         self.cmd_timeout_s = cmd_timeout_s
         self.physics = physics
+        self.accel_map, self.brake_map, self.drag = accel_map, brake_map, drag
+        self.drive_delay_s = drive_delay_s      # 가속 % → 구동 반응 무응답 시간(s). 0 = 없음(예전 동작)
+        self._acc_fifo = []
+        self._acc_out = 0
         self.steer_ratio = steer_ratio
         self.pose_writer = pose_writer
         self.steer = self._brake_cmd = 0.0
@@ -147,6 +158,12 @@ class FakeVehicle:
         self.limit_raw = self._kph_to_raw(kph)
         self.limit_enforced = True
 
+    def set_ignore_speed_limit(self, ignore):
+        """0x203 를 안 받아들임(S16 어긋남이 어긋난 채 남는 상황). 켜는 순간 대기 중인 반영도 버린다."""
+        self.ignore_speed_limit_cmd = ignore
+        if ignore:
+            self._limit_pending.clear()
+
     def _drain(self, now):
         while True:
             m = self.bus.recv(timeout=0)
@@ -166,6 +183,19 @@ class FakeVehicle:
             elif m.arbitration_id == FRAME_RES:
                 self.res_active = bool(m.data[0] & 0x80)   # 프레임이 끊기면 마지막 값 유지(끊김 동작 정의 없음)
 
+    def _resistance(self, v):
+        c0, c1, c2 = self.drag
+        return (c0 + c1 * v + c2 * v * v) if v > 0 else 0.0
+
+    def _delayed_acc(self, acc, now):
+        """구동 무응답 시간. 브레이크·RES 에는 걸지 않는다(가속 출발 지연 실측만 있음)."""
+        if self.drive_delay_s <= 0:
+            return acc
+        self._acc_fifo.append((now + self.drive_delay_s, acc))
+        while self._acc_fifo and self._acc_fifo[0][0] <= now + 1e-9:
+            self._acc_out = self._acc_fifo.pop(0)[1]
+        return self._acc_out
+
     def _apply_limit(self, now):
         while self._limit_pending and self._limit_pending[0][0] <= now + 1e-9:
             self.limit_raw = self._limit_pending.pop(0)[1]
@@ -179,8 +209,7 @@ class FakeVehicle:
         cap = self.limit_raw * 0.1 / 3.6
         if v_prev <= cap:
             return min(v_new, cap)
-        res = (0.15 + 0.01 * v_prev) if v_prev > 0 else 0.0
-        return max(0.0, min(v_new, v_prev - (self.a_brake + res) * self.dt))
+        return max(0.0, min(v_new, v_prev - (self.a_brake + self._resistance(v_prev)) * self.dt))
 
     def step(self, now):
         if self._t0 is None:
@@ -225,11 +254,10 @@ class FakeVehicle:
                 if ba and live:
                     self._brake_cmd = min(self._brake_cmd, 82.0)
                 k = min(1.0, dt / 0.15)
-                self.a_drive += (_interp(acc, [0, 5, 30, 100], [0, 0, 1.3, 3.0]) - self.a_drive) * k
-                self.a_brake += (_interp(min(bpct, 82), [0, 40, 70, 82], [0, 1.0, 2.0, 2.8]) - self.a_brake) * k
+                self.a_drive += (_interp(self._delayed_acc(acc, now), *self.accel_map) - self.a_drive) * k
+                self.a_brake += (_interp(min(bpct, 82), *self.brake_map) - self.a_brake) * k
                 v_prev = v = self.kph / 3.6
-                res = (0.15 + 0.01 * v) if v > 0 else 0.0
-                v = max(0.0, v + (self.a_drive - self.a_brake - res) * dt)
+                v = max(0.0, v + (self.a_drive - self.a_brake - self._resistance(v)) * dt)
                 v = self._cap_speed(v_prev, v)
                 self.kph = v * 3.6
             v = self.kph / 3.6
@@ -288,7 +316,38 @@ def build_parser():
                     help='RES 중 0x200 브레이크 보고값 %% (잠정)')
     ap.add_argument('--res-error', type=int, default=0, help='0이 아니면 RES 제동 실패 흉내(RES_ERROR 값, 1~7)')
     ap.add_argument('--res-steer-deg', type=float, default=None, help='RES 중 핸들각 목표 (기본: 그 자리 유지)')
+    ap.add_argument('--accel-map', default='', help='--physics 가속 표 "x,x,..:y,y,.." (%% → m/s²). 생략 = 예전 값')
+    ap.add_argument('--brake-map', default='', help='--physics 브레이크 표 "x,x,..:y,y,.." (%% → m/s²). 생략 = 예전 값')
+    ap.add_argument('--drag', default='', help='주행 저항 "c0,c1,c2" (m/s², v 는 m/s). 생략 = 예전 값')
+    ap.add_argument('--drive-delay', type=float, default=0.0, help='가속 %% → 구동 무응답 시간 s')
+    ap.add_argument('--cmd-file', default='', help='이 파일이 나타나면 읽고 지움: "force_limit kph", "set_kph kph", "ignore_limit 0|1"(r_race.py 프로세스 모드)')
     return ap
+
+
+def parse_map(text, default):
+    if not text:
+        return default
+    xs, ys = text.split(':')
+    return tuple(float(v) for v in xs.split(',')), tuple(float(v) for v in ys.split(','))
+
+
+def apply_cmd_file(veh, path):
+    """시험 창구. 쓰는 쪽은 임시 파일을 rename 해서 넣으므로 반쪽 줄을 읽지 않는다."""
+    if not path or not os.path.exists(path):
+        return
+    with open(path, encoding='utf-8') as f:
+        lines = f.read().splitlines()
+    os.remove(path)
+    for line in lines:
+        kind, val = line.split()
+        if kind == 'force_limit':
+            veh.force_speed_limit(float(val))
+        elif kind == 'set_kph':
+            veh.kph = float(val)
+        elif kind == 'ignore_limit':
+            veh.set_ignore_speed_limit(bool(float(val)))
+        else:
+            raise ValueError(f'--cmd-file 줄을 모름: {line}')
 
 
 def main():
@@ -312,10 +371,14 @@ def main():
                       pose_writer=pose_w, speed_limit_kph=a.speed_limit_kph,
                       speed_limit_latency_s=a.speed_limit_latency, initial_kph=a.initial_kph,
                       res_decel_mps2=a.res_decel, res_brake_pct=a.res_brake_pct, res_error=a.res_error,
-                      res_steer_deg=a.res_steer_deg)
+                      res_steer_deg=a.res_steer_deg, accel_map=parse_map(a.accel_map, DEFAULT_ACCEL_MAP),
+                      brake_map=parse_map(a.brake_map, DEFAULT_BRAKE_MAP),
+                      drag=tuple(float(v) for v in a.drag.split(',')) if a.drag else DEFAULT_DRAG,
+                      drive_delay_s=a.drive_delay)
     next_t = time.monotonic()
     print(f'[fake_a1_vehicle] {a.channel} 송신 시작(0x200/0x201 {a.period_ms:g} ms)', file=sys.stderr, flush=True)
     while not _stop:
+        apply_cmd_file(veh, a.cmd_file)
         veh.tick(time.monotonic())
         next_t += dt
         d = next_t - time.monotonic()

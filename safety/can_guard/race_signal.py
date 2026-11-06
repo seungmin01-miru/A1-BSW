@@ -101,6 +101,9 @@ def _is_undefined_pattern(data):
     return bin(d[0] & 0xF8).count('1') > 1 or d[0] & 0x07 != 0 or any(d[1:])
 
 
+IGNORED_LOG_PERIOD_S = 1.0     # race_signal_ignored 기록 간격(깜빡임이 이어져도 로그가 쏟아지지 않게)
+
+
 class _FlagDebounce:
     """한 깃발의 연속 프레임 수 + 확인된 level."""
 
@@ -111,12 +114,14 @@ class _FlagDebounce:
         self.armed = armed
         self.trigger_t = None
         self.start_recorded = False
+        self.ignored_t = None       # 마지막 race_signal_ignored 기록 시각
+        self.ignored_n = 0          # 그 뒤 기록 안 하고 버린 수
 
 
 class RaceSignalDecoder:
     """0x124 프레임 → 깃발 이벤트(올라가는 순간)·level·나이. 계획서 4.1·4.2절, D12, A1.
 
-    - 깃발은 `confirm_frames` 프레임 연속 1 이어야 인정한다(1 프레임만 켜진 신호는 이벤트가 아니다).
+    - 깃발은 `confirm_frames` 프레임 연속 1 이어야 인정한다(1 프레임만 켜진 신호는 이벤트가 아니다). 못 채우고 꺼지면 기록 `race_signal_ignored`(S3).
     - level 은 `confirm_frames` 프레임 연속 0 이어야 내려간다. 사이의 단발 0 은 새 이벤트를 만들지 않는다.
     - A1 비대칭: 해제 방향(go, slow_off)은 **0 을 확인한 뒤의 상승만** 이벤트다. 시작 때 이미 켜져 있으면 이벤트 없이
       `race_signal` 기록(`go_level_at_start` 등)만 남긴다 — 재시작 직후 옛 Go 로 출발하면 R-01 위반.
@@ -173,11 +178,22 @@ class RaceSignalDecoder:
                     f.start_recorded = True
                     self._records.append(('race_signal', f'{name}_level_at_start'))
         else:
+            self._note_ignored(name, f, t)
             f.off_run += 1
             f.on_run = 0
             if f.off_run >= self.confirm_frames:
                 f.level = False
                 f.armed = True
+
+    def _note_ignored(self, name, f, t):
+        """확인 프레임 수를 못 채우고 꺼진 깃발(계획서 S3 "무시, 이벤트 기록"). 깜빡임이 이어져도 1 초에 한 줄만."""
+        if not 0 < f.on_run < self.confirm_frames or f.level:
+            return
+        if f.ignored_t is not None and t - f.ignored_t < IGNORED_LOG_PERIOD_S:
+            f.ignored_n += 1
+            return
+        self._records.append(('race_signal_ignored', f'{name} frames={f.on_run} suppressed={f.ignored_n}'))
+        f.ignored_t, f.ignored_n = t, 0
 
     def note_silence(self, now):
         """A12. 매 주기 호출(프레임이 없어도). 조용한 구간이 `silence_arm_s` 를 넘으면 한 번 무장한다. ≤ 0 이면 끔."""
@@ -193,6 +209,7 @@ class RaceSignalDecoder:
         for name, f in self._flags.items():
             if not f.armed:
                 newly.append(name)
+            self._note_ignored(name, f, now)
             f.armed = True
             f.on_run = f.off_run = 0
             f.level = False

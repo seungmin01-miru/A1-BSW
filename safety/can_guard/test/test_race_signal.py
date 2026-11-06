@@ -454,3 +454,52 @@ def test_restrict_flag_can_fire_again_after_silence():
     dec.note_silence(1.0)
     feed_n(dec, f124('slow_on'), 2, t0=1.1)
     assert dec.take_events() == ('slow_on',)
+
+
+# === 계획서 S3 "무시, 이벤트 기록" (WP7 에서 발견: 1프레임 Go 가 흔적 없이 사라졌다) =====================================
+
+def _ignored(dec):
+    return [r for r in dec.take_records() if r[0] == 'race_signal_ignored']
+
+
+def test_single_frame_flag_is_recorded_as_ignored():
+    dec = rs.RaceSignalDecoder(2)
+    dec.feed(f124('go'), 0.0)
+    dec.feed(f124(), 0.02)
+    assert dec.take_events() == ()
+    ignored = _ignored(dec)
+    assert len(ignored) == 1 and 'go' in ignored[0][1] and 'frames=1' in ignored[0][1]
+
+
+def test_confirmed_flag_is_not_recorded_as_ignored():
+    dec = rs.RaceSignalDecoder(2)
+    feed_n(dec, f124(), 2)
+    feed_n(dec, f124('go'), 2, t0=0.04)
+    dec.feed(f124(), 0.08)
+    assert dec.take_events() == ('go',)
+    assert _ignored(dec) == []
+
+
+def test_ignored_flicker_is_rate_limited_and_counts_suppressed():
+    """깜빡임이 계속돼도 이벤트 로그가 쏟아지지 않는다(1 초에 한 줄, 그동안 버린 수를 적음)."""
+    dec = rs.RaceSignalDecoder(2)
+    t = 0.0
+    for _ in range(40):     # 1.6 s, 40 펄스
+        dec.feed(f124('go'), t)
+        dec.feed(f124(), t + 0.02)
+        t += 0.04
+    ignored = _ignored(dec)
+    assert len(ignored) == 2
+    assert 'suppressed=0' in ignored[0][1] and 'suppressed=24' in ignored[1][1]
+
+
+def test_single_frame_then_silence_is_recorded():
+    """깃발 있을 때만 송신하는 방식: 1프레임 뒤 조용해져도 기록된다."""
+    dec = rs.RaceSignalDecoder(2)
+    dec.note_silence(0.0)
+    dec.note_silence(0.6)       # 무장
+    dec.take_records()
+    dec.feed(f124('go'), 0.7)
+    dec.note_silence(1.3)
+    assert dec.take_events() == ()
+    assert len(_ignored(dec)) == 1

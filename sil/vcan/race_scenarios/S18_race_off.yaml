@@ -1,0 +1,13 @@
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+name: S18_race_off
+desc: --race 없이 can_guard 실행. 깃발·RES 가 와도 예전처럼 무시하고 모델 명령을 그대로 내야 한다
+duration_s: 5.0
+events:
+  - {t: 1.0, flag: stop, mode: level, until: 2.0}
+  - {t: 2.5, flag: res, mode: level, until: 3.0}
+  - {t: 3.5, flag: slow_on, mode: level}
+harness:
+  vehicle: {physics: true, speed_limit_kph: 9.3}
+  race: false
+  model: {note: 가속 40 %, 조향 10°}
+  expect: 0x210 그대로, 0x203 없음, 경기 이벤트 없음. E1~E7·P1·P2 는 대회 PC 에서 프로세스로

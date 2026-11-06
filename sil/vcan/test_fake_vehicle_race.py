@@ -471,3 +471,77 @@ if __name__ == '__main__':
         print('wrote', GOLDEN)
     else:
         sys.exit(pytest.main([__file__, '-q']))
+
+
+# === r_race.py 조건(WP7): 표·지연·값 바꾸기 창구 =====================================================================
+
+def _cmd_210(acc=0, brake=0):
+    d = bytearray(8)
+    d[2:4] = int(brake).to_bytes(2, 'little')
+    d[4] = int(acc)
+    d[5] = 7
+    return bytes(d)
+
+
+def _drive(car, tx, acc, seconds, dt=0.021):
+    now = getattr(car, '_test_now', 0.0)
+    for _ in range(int(seconds / dt)):
+        tx.send(can.Message(arbitration_id=0x210, data=_cmd_210(acc=acc), is_extended_id=False))
+        now += dt
+        car.tick(now)
+    car._test_now = now
+
+
+def _pair(**kw):
+    ch = 'tv' + uuid.uuid4().hex[:8]
+    return fv.FakeVehicle(can.Bus(channel=ch, interface='virtual'), physics=True, **kw), can.Bus(channel=ch, interface='virtual')
+
+
+def test_measured_accel_map_is_weaker_than_default():
+    meas = (((0, 75, 100), (0, 0.55, 1.14)))
+    base, tx0 = _pair()
+    weak, tx1 = _pair(accel_map=meas, drag=(0.57, 0.0, 0.001))
+    _drive(base, tx0, 75, 2.0)
+    _drive(weak, tx1, 75, 2.0)
+    assert base.kph > 10.0      # 기본 표는 75 % 에서 2.4 m/s²
+    assert weak.kph < 1.0       # 실측은 75 % 에서 거의 안 움직임
+
+
+def test_drive_delay_holds_back_acceleration():
+    car, tx = _pair(drive_delay_s=0.7)
+    _drive(car, tx, 100, 0.6)
+    assert car.kph == 0.0
+    _drive(car, tx, 100, 0.6)
+    assert car.kph > 0.0
+
+
+def test_ignore_speed_limit_drops_pending_and_later_commands():
+    car, tx = _pair(speed_limit_kph=100.0, speed_limit_latency_s=0.05)
+    tx.send(can.Message(arbitration_id=0x203, data=(93).to_bytes(2, 'little') + bytes(6), is_extended_id=False))
+    car.tick(0.0)
+    car.set_ignore_speed_limit(True)
+    car.tick(0.1)
+    assert car.speed_limit_kph == pytest.approx(100.0)
+    tx.send(can.Message(arbitration_id=0x203, data=(93).to_bytes(2, 'little') + bytes(6), is_extended_id=False))
+    car.tick(0.2)
+    car.tick(0.3)
+    assert car.speed_limit_kph == pytest.approx(100.0)
+    car.set_ignore_speed_limit(False)
+    tx.send(can.Message(arbitration_id=0x203, data=(93).to_bytes(2, 'little') + bytes(6), is_extended_id=False))
+    car.tick(0.4)
+    car.tick(0.5)
+    assert car.speed_limit_kph == pytest.approx(9.3)
+
+
+def test_cmd_file_applies_once_and_is_removed(tmp_path):
+    car, _ = _pair(speed_limit_kph=100.0)
+    p = tmp_path / 'cmd'
+    p.write_text('set_kph 30\nforce_limit 50\nignore_limit 1\n', encoding='utf-8')
+    fv.apply_cmd_file(car, str(p))
+    assert car.kph == 30.0 and car.speed_limit_kph == pytest.approx(50.0) and car.ignore_speed_limit_cmd
+    assert not p.exists()
+    fv.apply_cmd_file(car, str(p))      # 없으면 아무 일 없음
+    assert car.kph == 30.0
+    p.write_text('nope 1\n', encoding='utf-8')
+    with pytest.raises(ValueError):
+        fv.apply_cmd_file(car, str(p))

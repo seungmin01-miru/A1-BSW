@@ -37,8 +37,9 @@ candump vcan0 | python3 -m cantools decode --single-line DBC/A1_dbc_2_fixed.dbc
 | 파일 | 역할 |
 |---|---|
 | `fake_race_server.py` | **가짜 대회 서버** — yaml 시나리오대로 0x124(깃발)·0x127(RES, alive)·0x125·0x126 재생. 신호 방식 level / pulse / flicker, 0x124·0x127 끊김, alive 고정. 형식은 파일 머리말 |
-| `race_scenarios/*.yaml` | 계획서 S1~S13·S16·S17(변형 b 포함) + X01(기록 전용 0x125·0x126). `harness:` 는 다음 단계 `r_race.py` 용(차량 인자·can_guard 인자·합격 기준) |
+| `race_scenarios/*.yaml` | 계획서 S1~S18(변형 포함) + X01(기록 전용 0x125·0x126). `harness:` 는 `safety/can_guard/sil_tests/r_race.py` 용(차량 인자·can_guard 인자·합격 기준·S14 조합) |
 | `fake_a1_vehicle.py` | 기존 기능 + 0x202 보고·0x203 반영·RES 중 0x210 무시와 자체 감속·0x128 |
+| `safety/can_guard/sil_tests/r_race.py` | **S1~S18 자동 판정.** 기본 `virtual`(같은 프로세스), `--interface socketcan --channel vcan0`(대회 PC, 프로세스), `--with-ros`(실제 어댑터·/race/state). 결과 `reports/race_flag/2026-11-06_sil/` |
 | `test_fake_race_server.py`, `test_fake_vehicle_race.py` | vcan 없이 도는 시험(가상 시계·`virtual` 버스). `testdata/fake_vehicle_golden.json` = 확장 전 코드의 프레임 스냅샷 |
 
 ```bash
@@ -63,6 +64,7 @@ server.step(now); car.step(now)      # now 는 호출자가 준다. car.kph, car
 - RES 감속 0.87 m/s²·브레이크 보고 82 % 는 **잠정**(앱 인수 11-04 실측을 빌린 값, RES 실측 아님). 0x127 이 끊기면 마지막 값을 유지한다(끊김 동작 정의 없음).
 - yaml 의 `off`(따옴표 없음)는 False 로 읽히며, 로더가 같은 뜻으로 받는다.
 - 확장 뒤 가짜 차량은 0x202·0x128 도 보낸다(11-04 실차 버스와 같음). 0x200·0x201 은 프레임 내용·순서 그대로다.
+- `--physics` 기본 표는 실측보다 강하다(75 % 에서 2.4 m/s², 실측은 약 0). 실측에 맞춘 조건은 `--accel-map`·`--brake-map`·`--drag`·`--drive-delay`, 값은 `r_race.py` 의 `MEASURED`(★ 잠정).
 
 ## RT 실행 조건 실측 (2026-09-12, EAIT 시절 기록 — 레시피는 지금도 유효)
 
