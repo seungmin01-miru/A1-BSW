@@ -71,7 +71,7 @@ pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height:
 <li><b>Go 전에 가속을 내면 차가 움직인다.</b> BSW 는 전달만 한다. Go 잠금·서행·Finish 정차·RES 뒤 정지 유지는 전부 모델 책임이다(데이터시트 v0.5, 06 시트).</li>
 <li><b>가속 히스테리시스의 실제 효과는 아직 모른다.</b> 고정 입력 시험은 통과했지만(전환 0 회/분), 11-04 목표 가속도는 약 1.8 s 주기로 이탈값(0.03) 근처까지 내려간다. 실차에서는 전환이 남을 수 있다(4.2절).</li>
 <li><b>11-04 자율 U턴 시험은 폐기했다(사용자 결정, 2026-11-06).</b> 코드(<code>uturn</code>, <code>until_heading</code>, <code>--turn</code>)를 지우고 현장 문서를 지시서 4절 절차로 바꿨다. 다만 그 절차의 원 돌기·표 갱신 도구(WP3)는 아직 없다(7장)</li>
-<li><b>vcan0 시험을 아직 못 돌렸다.</b> 이 PC 에 vcan0·can-utils 가 없고 sudo 가 필요해서 <span class="mono">rehearse_lift_guard</span>(31 항목)·E1~E7·P1·P2·브리지 프로세스 분리 지연 측정은 미실행이다(7장).</li>
+<li><b>vcan0 시험은 개발 PC 에서 통과했고, 대회 PC 판정은 남았다.</b> <span class="mono">rehearse_lift_guard</span> 31/31, E1~E7·P1·P2, 세션 SIL, 트랙 리허설 통과. 단, 트랙 리허설 4 회 중 1 회는 10 Hz 입력이 159 ms 끊겨 고장 래치가 걸렸다(7장)</li>
 </ol></div>
 
 <h2>1. 역할과 현재 상태</h2>
@@ -86,9 +86,9 @@ pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height:
 
 <div class="tbl keep"><div class="tno">TABLE II</div><div class="ttl">오늘 작업 결과와 검증 수준</div>
 <table><thead><tr><th style="width:9%">WP</th><th style="width:43%">내용</th><th style="width:30%">확인한 것</th><th>못 한 것</th></tr></thead><tbody>
-<tr><td>WP-1</td><td>폐기 설계 제거, d702f63 기준 복원. 삭제 전 상태는 태그 <code>race-flag-full-3309cd1</code></td><td>11-05 8개 시나리오가 복원 기준과 같음, can_guard 30,925 byte</td><td class="st-w">rehearse_lift_guard 31/31</td></tr>
+<tr><td>WP-1</td><td>폐기 설계 제거, d702f63 기준 복원. 삭제 전 상태는 태그 <code>race-flag-full-3309cd1</code></td><td>11-05 8개 시나리오가 복원 기준과 같음, can_guard 30,925 byte</td><td>rehearse_lift_guard 31/31(개발 PC)</td></tr>
 <tr><td>WP0</td><td>조향 7점 표·영점, 가속 히스테리시스, 데이터시트 v0.5</td><td>단위 시험 23 통과, 실제 어댑터 고정 입력 0 회/분</td><td class="st-w">폐루프·실차 효과</td></tr>
-<tr><td>WP1</td><td><code>/race/state</code>, can_guard 이벤트 로그, 상태판 칸, 자동 판정</td><td>시나리오 10 개 ×3 회 통과, 지연 중앙 0.94 ms, 대회 신호 유무로 0x210 동일</td><td class="st-w">E1~E7·P1·P2, 대회 PC 지연, 실물 프레임(11-23)</td></tr>
+<tr><td>WP1</td><td><code>/race/state</code>, can_guard 이벤트 로그, 상태판 칸, 자동 판정</td><td>시나리오 10 개 ×3 회 통과, 지연 중앙 0.94 ms, 대회 신호 유무로 0x210 동일</td><td class="st-w">대회 PC 지연, 실물 프레임(11-23)</td></tr>
 <tr><td>WP2 이후</td><td>2차원 표, 측정 도구, 실차 — <b>시작 안 함</b>(지시서: WP0·1 결과 확인 후 별도 지시)</td><td>—</td><td>—</td></tr>
 </tbody></table>
 <div class="tnote">pytest 288 통과(can_guard 183 포함 — 복원 기준 136 + 원본 DBC 대조 1 + race_signal 46, 그 위에 이벤트 로그·서버·상태판·변환 시험). colcon 기능 시험 통과. a1_can_bridge 의 flake8·pep257 은 복원 기준에서도 실패하던 항목(기존 파일 10 곳)으로, 새 코드의 지적은 없다.</div></div>
@@ -176,6 +176,8 @@ SIL 입력은 처음부터 0.03 아래로 내려가지 않으므로 전환 0 은
 <table><thead><tr><th>조건</th><th class="r">중앙 ms</th><th class="r">p99 ms</th><th class="r">최대 ms</th><th class="r">유실</th><th class="r">버스 프레임/s</th><th>기타</th></tr></thead><tbody>
 <tr><td>부하 없음</td><td class="r">0.94</td><td class="r">2.21</td><td class="r">2.41</td><td class="r">0/300</td><td class="r">50</td><td>publisher CPU 4.7 %</td></tr>
 <tr><td>실제 버스 부하 + 디코더</td><td class="r">0.55</td><td class="r">1.31</td><td class="r">1.73</td><td class="r">0/500</td><td class="r">795</td><td>publisher 14.5 %, decoder 14.0 %</td></tr>
+<tr><td>vcan0·브리지 별도 프로세스, 부하 없음</td><td class="r">0.97</td><td class="r">1.99</td><td class="r">2.07</td><td class="r">0/300</td><td class="r">50</td><td>publisher 4.3 %</td></tr>
+<tr><td>vcan0·브리지 별도 프로세스, 부하 + 디코더</td><td class="r">0.51</td><td class="r">1.14</td><td class="r">1.68</td><td class="r">0/500</td><td class="r">795</td><td>publisher 14.0 %, decoder 13.7 %</td></tr>
 </tbody></table><div class="tnote">토글 뒤 첫 수신까지 측정. 부하 쪽이 더 빠른 것은 바쁜 CPU 가 잠들지 않기 때문으로 보이며 원인은 확인하지 않았다. 대회 PC(격리 코어 공유) 재측정이 판정이다.</div></div>
 <p><b>부하.</b> 브리지 필터를 약 145 → 약 545 프레임/s 로 넓혀 11-04 의 밀림(580/s, 52 s)이 걱정됐다. 11-05 브리지 수정 이후라 개발 PC 에서는 재현되지 않았다: 세 프로세스를 코어 하나에 묶어도 0x201 → wheel_info 47.6 Hz 유지, 최대 지연 7.9 ms. 대신 디코더+publisher CPU 합이 8.4 % → 22.4 % 로 늘었다. 대회 PC 에서 빠듯하면 해석에 안 쓰는 0x157 부터 뺀다(E-3).</p>
 <p><b>can_guard 무영향.</b> 실제 can_guard 를 대회 신호 있음/없음으로 돌려 0x210 값 집합과 상태 전이가 같음을 시험으로 확인했다(<code>test_race_log_guard.py</code>). 11-05 8개 시나리오도 복원 기준과 같았다.</p>
@@ -195,13 +197,15 @@ SIL 입력은 처음부터 0.03 아래로 내려가지 않으므로 전환 0 은
 <tr><td>E-6</td><td><s>자율 U턴이 조향비 7.5 전제</s> — 11-04 U턴 시험 전체 폐기로 종료. 참고로 새 표 기준 U턴 지름은 약 23 m ★ 였다</td><td>끝(2026-11-06)</td></tr>
 <tr><td>E-7</td><td>원 돌기 계획의 "타이어 ±5/10/15/20°" 는 옛 7.5 기준. 새 표로는 11.5° 에서 포화 → WP3 도구는 핸들각 기준으로 명령해야 함</td><td>WP3 때 반영</td></tr>
 <tr><td>—</td><td>영점 −9° vs 측정 회귀 −13.7°(4.1절)</td><td>11-14 직선 50 m 로 결정</td></tr>
+<tr><td>E-9</td><td><b>10 Hz 입력은 끊김 기준(150 ms)에 여유가 적다.</b> 트랙 리허설 4 회 중 1 회, 10 Hz 입력이 개발 PC 에서 159 ms 벌어져 고장 래치. 주행 중이면 STOPPED 로 이어져 재시작 전까지 못 움직인다. 코드는 설계대로 동작했고 값은 바꾸지 않았다</td><td>모델 팀 발행 주기 확인(11-13). 20 Hz 이상 권장</td></tr>
 <tr><td>E-1</td><td><code>guard_state</code> 를 비워 둠. 모델 팀이 필요하면 별도 작업</td><td>모델 팀 의견(11-09)</td></tr>
 </tbody></table></div>
 
 <h2>7. 남은 일</h2>
 <div class="tbl keep"><div class="tno">TABLE XII</div><div class="ttl">다음 순서</div>
 <table><thead><tr><th style="width:17%">언제</th><th>할 일</th></tr></thead><tbody>
-<tr><td>sudo 필요(개발·대회 PC)</td><td><code>sudo bash sil/vcan/vcan_up.sh</code> + can-utils 설치 뒤 <code>rehearse_lift_guard</code> 31/31, E1~E7·P1·P2, <code>r_race.py --interface socketcan --channel vcan0 --latency 300 --load</code></td></tr>
+<tr><td>[x] 개발 PC vcan0 (11-06, 참고값)</td><td><code>rehearse_lift_guard</code> 31/31, E1~E7·P1·P2, 세션 SIL A·B·C, 트랙 리허설 17/17, <code>r_race</code> socketcan 시나리오 10 개. 결과 <code>bsw_test/00_SAF_estop/results/sil_20261106_222201_junhyeok-960QHA/</code>. 시험 기대값 2 곳을 현재 설계에 맞췄다(STOPPED 브레이크 30 % 고정 → 30~60 %, 타이어 4° → 핸들 33.9°)</td></tr>
+<tr><td>대회 PC</td><td>같은 시험 + <code>--rt auto</code>(격리 코어) — <b>판정은 여기서</b></td></tr>
 <tr><td>별도 지시 후, 11-14 전 필수</td><td>WP2(2차원 표), WP3(원 돌기·표 갱신 도구), 그때 E-7·E-8 반영. <code>speed_ctrl.yaml</code> 은 SIL 가짜 차량 값이라 실차 폐루프 불가 — 직선 계단은 개루프만</td></tr>
 <tr><td>11-14</td><td>① 점검·RTX ② 원 돌기 ③ 조향 최대각 ④ 직선 계단. 직선 횡편차가 +0.33 m 보다 나빠지면 <code>steer_map_v0</code> 로 복귀, 가속 전환 재측정</td></tr>
 <tr><td>11-23</td><td>대회 서버 신호 실물 확인 — 0x124~0x127 은 아직 실물 프레임을 본 적이 없다</td></tr>

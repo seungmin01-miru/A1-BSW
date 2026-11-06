@@ -1,6 +1,6 @@
 # 다음 할 일 — 대회 차량 PC 세션 (2026-11-04 작성, 개발 PC 에서 넘김)
 
-> **2026-11-06: 자율 U턴·v2 하루 순서 폐기.** 실차 절차는 [`docs/2026-11-06_engine_room_dev_plan.md`](../../docs/2026-11-06_engine_room_dev_plan.md) 4절. 아래 0절 표의 U턴 항목과 4절 U턴 한계는 11-04 기록으로만 남긴다. 코드(`uturn`, `until_heading`, `--turn`)는 제거됨.
+> **2026-11-06: 자율 U턴·v2 하루 순서 폐기.** 실차 절차는 [`docs/2026-11-06_engine_room_dev_plan.md`](../../docs/2026-11-06_engine_room_dev_plan.md) 4절. 아래 0절 표의 U턴 항목과 4절 U턴 한계는 11-04 기록으로만 남긴다. 코드(`uturn`, `until_heading`, `--turn`)는 제거됨. 개발 PC vcan 시험은 2026-11-06 통과(`00_SAF_estop/results/sil_20261106_222201_junhyeok-960QHA/`, 참고값) — 판정은 대회 PC `run_sil_check.sh --rt auto --track` + `r_race.py --interface socketcan --channel vcan0 --latency 300 --load`.
 
 > 대회 PC 의 Claude 세션은 **이 파일을 먼저 읽고** 1절부터 차례로 진행한다. 끝난 항목은 지우지 말고 `[x]` + 날짜.
 > 기준: [`CLAUDE.md`](../../CLAUDE.md), 현장 순서 [`FIELD_MANUAL.md` 5-0절](../FIELD_MANUAL.md), 입력 [`FIELD_CHEATSHEET.txt` "★ v2"](../FIELD_CHEATSHEET.txt).

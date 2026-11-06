@@ -1,0 +1,16 @@
+프로파일 LON-ACC-02: 최대 8.5 s, 주기 20 ms, 구간 2개
+  상한  조향 ±15°  브레이크 100%  가속 30%  조향속도 120°/s  차속 15 km/h
+  최대  조향 0.0°  브레이크 0.0%  가속 0.0%
+  대기 {'steer': 0.0, 'brake': 30.0, 'acc': 0.0}  끝내기 브레이크 100% / 2.5 s  vars {'v0': 0.0, 't0': 0.5, 'v': 10.0, 'rate': 0.0, 't': 8.0, 'vmax': 15.0, 'accmax': 30.0, 'course': 50.0}
+  조향 오프셋 +1° (핸들, 모든 조향 명령에 더함)
+  코스 50 m — 이동 + 예측 정지거리(감속 1.5 m/s² 잠정, 지연 0.3 s) ≥ 코스면 끝내기
+    0.00~  0.50 s  seg0 전단          유지 [폐루프 0 km/h]            시작 조향 +0.0 브레이크 0 가속 0
+    0.50~  8.50 s  seg1 계단          유지 [폐루프 0→10 km/h]         시작 조향 +0.0 브레이크 0 가속 0
+세션 2회차: silA_r1 {'v0': 0.0, 't0': 0.5, 'v': 10.0, 'rate': 0.0, 't': 8.0, 'vmax': 15.0, 'accmax': 30.0, 'course': 50.0}, silA_r2 {'v0': 0.0, 't0': 0.5, 'v': 10.0, 'rate': 0.0, 't': 8.0, 'vmax': 15.0, 'accmax': 30.0, 'course': 50.0}
+[gen] 시작 silA: /home/junhyeok/A1-BSW/bsw_test/02_LON_profile/profiles/speed_step.yaml 2회차 → /home/junhyeok/A1-BSW/bsw_test/00_SAF_estop/results/sil_20261106_222201_junhyeok-960QHA/sil_02_session/A  (차속 감시 OFF(SIL), 조향 오프셋 +1°, ctrl /home/junhyeok/A1-BSW/bsw_test/02_LON_profile/ctrl/speed_ctrl.yaml)
+[gen] ▶ silA_r1 실행 시작 (1/2) {'v0': 0.0, 't0': 0.5, 'v': 10.0, 'rate': 0.0, 't': 8.0, 'vmax': 15.0, 'accmax': 30.0, 'course': 50.0}
+[gen] silA_r1 끝내기 단계: 프로파일 완료 — 가속 0, 브레이크 → 100% (2.5 s), 조향 +1.0° 유지. 이동 14.4 m
+[gen] silA_r1 정지 확인 → 다음 회차 silA_r2 대기
+[gen] ▶ silA_r2 실행 시작 (2/2) {'v0': 0.0, 't0': 0.5, 'v': 10.0, 'rate': 0.0, 't': 8.0, 'vmax': 15.0, 'accmax': 30.0, 'course': 50.0}
+[gen] silA_r2 끝내기 단계: 프로파일 완료 — 가속 0, 브레이크 → 100% (2.5 s), 조향 +1.0° 유지. 이동 14.4 m
+[gen] 생성기 종료 (명령 1165 주기, 마지막 회차 silA_r2). can_guard → 50 ms 뒤 HOLDING(브레이크 유지) → 2 s 뒤 STOPPED. 다음: stop.sh (같은 세션 재사용 불가)

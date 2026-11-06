@@ -1,0 +1,12 @@
+scenario,pass,published,checks
+S02_go,1,312,seen_go 전 false=ok; Go 뒤 seen_go·sig_go=ok; last_signal=GO=ok; 약 2 s 에 올라감=ok
+S03_go_pulse_1frame,1,261,seen_go false=ok; sig_go false=ok; last_signal=NONE=ok
+S03b_go_flicker,1,261,seen_go false=ok; sig_go false=ok; last_signal=NONE=ok
+S04_go_pulse_2frames,1,263,seen_go true=ok; sig_go 다시 false=ok; last_signal=GO=ok
+S09_res_then_release,1,814,7 s 에 res_active=ok; 10 s 에 해제=ok; 그 사이 유지=ok; 끝까지 alive 정상=ok
+S09b_res_pulse_1frame,1,414,1 프레임도 발행됨=ok; 곧바로 풀림=ok; 깃발 처리에 영향 없음=ok
+S10_res_alive_stop,1,513,0.5 s 뒤 alive 나쁨=ok; res_age_s 증가=ok; RES 작동 아님=ok
+S10b_res_alive_freeze,1,513,0.5 s 뒤 alive 나쁨=ok; 프레임은 계속 옴(age 작음)=ok
+S11a_race_signal_lost_default,1,512,sig_go 유지=ok; race_signal_age_s 증가=ok; 끊기기 전 age 작음=ok
+X01_pit_repair_record_only,1,414,처음엔 NaN=ok; 좌표 도착=ok
+latency_idle,1,300,median=0.97ms p99=1.99ms max=2.07ms lost=0 bus=50fps pub_cpu=4.3% dec_cpu=nan% wheel=0.0Hz wheel_lag_max=0.0ms

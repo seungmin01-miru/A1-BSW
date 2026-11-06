@@ -1,0 +1,30 @@
+작업 폴더: /tmp/track_rehearsal.TaJ30B (ROS_DOMAIN_ID=73)
+
+[1] 입력 없음 → arm 거부, disarm 중 0x210 침묵
+  ✅ PASS  제어기 입력 없을 때 arm_steer 거부
+
+[2] 10 Hz 제어기(타이어 4°, −1.0 m/s²) — disarm shadow → arm → 변환값 송신
+  ✅ PASS  shadow 상태 토픽: 핸들 33.9°·브레이크 40 % (disarm 중에도 변환값 표시)
+  ✅ PASS  arm_steer·arm_long 수락
+
+[3] 제어기 kill -9 → 고장 래치 → can_guard HOLDING → STOPPED
+  ✅ PASS  고장 래치 중 arm 거부
+  ✅ PASS  disarm 으로 래치 해제
+
+[4] can_guard 재시작 → 어댑터 자동 재연결(disarm → auto 0)
+
+[5] NaN 입력 → 고장 래치
+  ✅ PASS  재시작 후 arm_long 수락
+  ✅ PASS  NaN → 래치(writing false, note=입력 거부)
+  ✅ PASS  0x210 주기 중앙값 20.0 ms, 최대 22.2 ms (재시작 구간 제외)
+  ✅ PASS  disarm(shadow): 0x210 송신 안 함(0프레임) — auto 000 = 페일세이프 브레이크 해제라 침묵(2026-11-04)
+  ✅ PASS  arm 순간 핸들 속도 제한: 첫 값 2.4000000000000004° → 33.9° (120 °/s)
+  ✅ PASS  타이어 4° → 핸들 33.9°(raw 339), −1.0 m/s² → 브레이크 40 %, 가속 0 (85프레임)
+  ✅ PASS  +0.7 m/s² → 가속 100 % (11-04 표: 0.57 이상 포화), 브레이크 0 ([100])
+  ✅ PASS  10 Hz 입력 구간 워치독 미발동(HOLDING 전이는 kill 때 1번뿐: 1회)
+  ✅ PASS  kill 뒤 조향 [33.9]° 고정·가속 0·브레이크 최대 60 %
+  ✅ PASS  can_guard STOPPED 도달
+  ✅ PASS  can_guard 재시작 후 재연결(INIT → ACTIVE)·disarm 침묵 (0프레임)
+  ✅ PASS  NaN 입력 뒤 can_guard HOLDING/STOPPED(가짜 차량 정지 중이라 바로 STOPPED 가능)·가속 0 (브레이크 [58] %)
+
+결과: PASS 17 / FAIL 0   (로그: /tmp/track_rehearsal.TaJ30B)
