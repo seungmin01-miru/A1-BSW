@@ -1,0 +1,93 @@
+{
+ "map": [
+  {
+   "what": "어댑터 출력 = 표 이중선형(차속 사용)",
+   "ok": true,
+   "detail": "표본 487, 1.5 % 넘게 다름 0"
+  },
+  {
+   "what": "같은 요청에 속도별로 다른 %",
+   "ok": true,
+   "detail": "5 km/h 81.0 %, 20 km/h 91.8 %"
+  },
+  {
+   "what": "미측정 칸 쓰면 extrapolated",
+   "ok": true,
+   "detail": "20 km/h 위 101 표본"
+  },
+  {
+   "what": "표 버전 표시",
+   "ok": true,
+   "detail": "sil"
+  },
+  {
+   "what": "가속·브레이크 동시 0건",
+   "ok": true,
+   "detail": "915 표본"
+  },
+  {
+   "what": "0x201 끊기면 speed_stale, 마지막 값 유지",
+   "ok": true,
+   "detail": "끊긴 뒤 26 표본, 차속 0.0 km/h"
+  }
+ ],
+ "fit": [
+  {
+   "what": "adapter_long_check --plan 완주",
+   "ok": true,
+   "detail": "rc 0"
+  },
+  {
+   "what": "v1 표(복사본)는 급변으로 차단(종료 3)",
+   "ok": true,
+   "detail": "⛔ 차단  (0.1 s) → /tmp/claude-1000/-home-junhyeok-A1-BSW/c7fbf"
+  },
+  {
+   "what": "표·그래프 1 분 안에(지시서 현장 목표)",
+   "ok": true,
+   "detail": "0.2 s"
+  },
+  {
+   "what": "측정값을 기존 표로 삼으면 통과·추천 파일",
+   "ok": true,
+   "detail": "통과 — 추천 있음(사람 확인 후 반영)  (0.1 s) → /tmp/claude-1000/-home-jun"
+  },
+  {
+   "what": "추천 표를 어댑터 검사가 받음",
+   "ok": true,
+   "detail": "LongMap2D 통과"
+  }
+ ],
+ "circle": [
+  {
+   "what": "circle_test 완주(회차 4)",
+   "ok": true,
+   "detail": "rc 0"
+  },
+  {
+   "what": "fit_circle 통과",
+   "ok": true,
+   "detail": "회차 4 개 중 4 개 사용. L = 2.36 m, 타이어 = atan(L/R), 좌 +."
+  },
+  {
+   "what": "가짜 차량 조향비 10.7 를 되찾음(±0.5)",
+   "ok": true,
+   "detail": "10.70, 10.70, 10.70, 10.70"
+  },
+  {
+   "what": "좌우 부호(좌 +)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "저속 유지 평균(≤ 8 km/h)",
+   "ok": true,
+   "detail": "5.8, 5.8, 5.8, 5.8"
+  },
+  {
+   "what": "순간 최고도 상한 8 km/h 아래(세션 중단 안 남)",
+   "ok": true,
+   "detail": "6.8 km/h"
+  }
+ ]
+}

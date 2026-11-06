@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A1 BSW 엔진룸 도구</title>
+<style>
+:root { --ink:#000; --gray:#555; --rule:#000; --paper:#fff; }
+@page { size: A4; margin: 17mm 16mm 17mm 16mm; }
+html { background: var(--paper); }
+body { font-family: "Noto Serif CJK KR", "Noto Serif KR", "Times New Roman", serif; color: var(--ink);
+       background: var(--paper); font-size: 9.2pt; line-height: 1.55; margin: 0 auto; max-width: 178mm;
+       text-align: justify; word-break: keep-all; overflow-wrap: anywhere; }
+h1 { font-size: 16pt; text-align: center; margin: 0 0 4pt; line-height: 1.3; font-weight: 700; }
+.subtitle { text-align: center; font-size: 10pt; margin: 0 0 3pt; }
+.byline { text-align: center; font-style: italic; font-size: 9pt; color: #222; margin-bottom: 10pt; }
+.abstract { font-size: 8.8pt; margin: 0 6mm 10pt; line-height: 1.5; }
+.abstract b { font-style: italic; }
+h2 { font-size: 10.5pt; font-weight: 700; margin: 14pt 0 5pt; text-transform: none; letter-spacing: .02em;
+     break-after: avoid; }
+h3 { font-size: 9.6pt; font-weight: 700; font-style: italic; margin: 9pt 0 3pt; break-after: avoid; }
+p { margin: 0 0 5pt; text-indent: 0; }
+code, .mono { font-family: "DejaVu Sans Mono", "Noto Sans Mono CJK KR", monospace; font-size: 7.9pt; }
+ul, ol { margin: 2pt 0 6pt 0; padding-left: 15pt; }
+li { margin: 1pt 0; }
+.tbl { margin: 10pt 0 10pt; }
+.tbl.keep { break-inside: avoid; }
+.tbl .tno, .tbl .ttl { break-after: avoid; }
+tr { break-inside: avoid; }
+.tbl .tno { text-align: center; font-size: 8.2pt; letter-spacing: .06em; }
+.tbl .ttl { text-align: center; font-size: 8.4pt; font-variant: small-caps; margin-bottom: 3pt; }
+table { width: 100%; border-collapse: collapse; font-size: 7.8pt; line-height: 1.38; }
+thead th { border-top: 1.1px solid var(--rule); border-bottom: 0.7px solid var(--rule); font-weight: 600;
+           padding: 3pt 4pt; text-align: left; vertical-align: bottom; }
+tbody td { padding: 2.2pt 4pt; vertical-align: top; text-align: left; }
+tbody tr:last-child td { border-bottom: 1.1px solid var(--rule); }
+td.c, th.c { text-align: center; } td.r, th.r { text-align: right; }
+tr.grp td { font-style: italic; font-weight: 600; padding-top: 4pt; border-top: 0.4px solid #999; }
+.tnote { font-size: 7.2pt; color: #222; margin-top: 3pt; line-height: 1.4; text-align: left; }
+figure { margin: 10pt 0 10pt; break-inside: avoid; }
+figure img { width: 100%; display: block; }
+figure.half img { width: 58%; margin: 0 auto; }
+figcaption { font-size: 7.9pt; line-height: 1.42; margin-top: 4pt; text-align: justify; }
+figcaption b { font-weight: 400; }
+.st-ok { font-weight: 700; } .st-g { } .st-w { font-style: italic; } .st-n { color: var(--gray); }
+.box { border: 0.7px solid #000; padding: 5pt 8pt; margin: 8pt 0; font-size: 8.6pt; break-inside: avoid; }
+.box .bt { font-weight: 700; margin-bottom: 2pt; }
+.pb { break-before: page; }
+figure.sheet img { width: auto; max-width: 100%; max-height: 226mm; margin: 0 auto; }
+figure.fig80 img { width: 86%; margin: 0 auto; }
+.small { font-size: 8pt; }
+sup { font-size: 6.5pt; }
+pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height: 1.35; border-top: .7px solid #000;
+      border-bottom: .7px solid #000; padding: 4pt 2pt; white-space: pre-wrap; margin: 4pt 0 8pt; }
+@media screen { body { padding: 16px; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#fff; } }
+:root[data-theme="dark"] { --paper:#fff; }
+</style>
+</head>
+<body>
+
+<h1>A1 BSW 엔진룸 도구 보고서<br>— 속도별 종방향 표, 측정·갱신 도구, 경기 날 운영, PlotJuggler 데이터시트</h1>
+<p class="subtitle">2026-11-06 엔진룸·경기 신호 보고서의 후속 · 모델·로컬라이제이션 팀과 운용 담당을 위한 기술 보고서</p>
+<p class="byline">A1-BSW 팀 · 2026-11-07 · 기준 커밋 <span class="mono">91567ec</span> · 개발 PC 결과는 참고값(판정은 대회 PC SIL·실차)</p>
+
+<p class="abstract"><b>요약 —</b> 지시서의 남은 개발 항목(WP2·WP3·WP7)을 구현했다. 어댑터는 이제 차속을 받아 속도 구간별 표로 페달 % 를 정하고, 표는 지금 동작과 같은 값(v1)으로 시작한다. 11-14 절차에 필요한 원 돌기 시험, 표 갱신 도구, 원 맞춤 분석, 현장 점검표를 만들었고, 경기 날 시작 점검과 재개 절차를 넣었다. 모델 팀 확인에 따라 <span class="mono">/control/target</span> 은 20 Hz 로 반영했다. 모든 시험은 가짜 차량과 저장된 로그로 했다. <b>실차 표는 아직 하나도 없고, 저속 유지값은 짐작한 잠정값이다.</b> 부록 A 의 그림은 모두 PlotJuggler 화면 캡처다.</p>
+
+<div class="box"><div class="bt">먼저 알아야 할 것 5가지</div>
+<ol>
+<li><b>11-14 첫 원 돌기 회차는 사람이 지켜봐야 한다.</b> 저속 유지값(<code>speed_ctrl_circle.yaml</code>)은 11-04 불감대에서 짐작한 값이고 가짜 차량에서만 돌렸다. SIL 에서도 목표 5 km/h 에 약 5.0~6.8 km/h 로 흔들린다. 6 km/h 로는 상한 8 km/h 에 닿을 뻔해 기본값을 5 km/h 로 내렸다.</li>
+<li><b>GNSS fix 와 피치가 bag 에 없으면 표 갱신이 차단된다.</b> odom 만 있으면 "확인 불가"로 종료 3 이다. 11-14 전에 로컬라이제이션 팀이 INS 토픽(품질·피치)을 녹화하는지 확인해야 한다. 실제 INS 메시지로는 아직 시험하지 못했다.</li>
+<li><b>지금 표는 11-04 기준으로도 ±20 % 를 못 지킨다.</b> 후륜 기반 미리보기에서 10·15 km/h 가속 오차 평균 42·47 % 다(참고값). 속도 상향 관문(지시서 2.4절)을 통과하려면 표를 실제로 재야 한다.</li>
+<li><b>원 돌기에는 공간과 시간이 많이 든다.</b> 지시서 그대로면 약 31 분, 핸들 ±37° 는 지름 약 63~79 m ★ 다. 시험장에 그 공간이 없으면 ±37° 를 빼야 한다.</li>
+<li><b><span class="mono">bsw_up.sh</span> 수정분은 실행 시험을 못 했다.</b> 차량·CAN 명령 보호 규칙으로 제가 실행할 수 없다. 새 점검 스크립트만 따로 시험했다. 대회 PC 에서 <code>--sil</code> 로 한 번 돌려 봐야 한다.</li>
+</ol></div>
+
+<h2>1. 현재 상태</h2>
+<div class="tbl keep"><div class="tno">TABLE I</div><div class="ttl">지시서 WP 진행</div>
+<table><thead><tr><th style="width:9%">WP</th><th style="width:40%">내용</th><th>개발 PC 에서 확인한 것</th><th style="width:27%">남은 것</th></tr></thead><tbody>
+<tr><td>WP-1·0·1</td><td>폐기 설계 제거, 1차 업데이트, <code>/race/state</code></td><td>이전 보고서 + vcan0 재확인(표 II)</td><td>대회 PC 판정, 실물 프레임(11-23)</td></tr>
+<tr><td>WP2</td><td>속도별 표 <code>long_map</code>, 차속 구독, 상태 필드</td><td>단위 42 통과, 회귀(1차원과 같은 출력), 실제 노드 SIL</td><td>실측 표(11-14~)</td></tr>
+<tr><td>WP3</td><td><code>fit_long_map</code>, <code>circle_test</code>, <code>fit_circle</code>, 점검표</td><td>단위 19 통과, 전 과정 SIL, 11-04 로그 시운전</td><td>실제 GNSS bag</td></tr>
+<tr><td>WP7</td><td>시작 점검, 경기 날 절차, 데이터시트</td><td>점검 스크립트 단독 시험</td><td><code>bsw_up --sil</code> 리허설, 데이터시트 v1.0(실차 표 뒤)</td></tr>
+<tr><td>WP4~6</td><td>실차 측정 6일</td><td>—</td><td>11-14 부터, 사람이 실행</td></tr>
+</tbody></table></div>
+
+<div class="tbl keep"><div class="tno">TABLE II</div><div class="ttl">전체 회귀 (vcan0, 개발 PC, 격리 코어 없음, 커밋 후 실행)</div>
+<table><thead><tr><th style="width:38%">시험</th><th>결과</th></tr></thead><tbody>
+<tr><td>pytest(can_guard·서버·상태판·변환·표 도구·생성기)</td><td>360 통과</td></tr>
+<tr><td><code>rehearse_lift_guard</code></td><td>31/31</td></tr>
+<tr><td>비상 정지 E1~E7, P1·P2, 세션 SIL A·B·C</td><td>통과. E1~E3 감지 최대 31.2 ms(기준 ≤ 40), E5 첫 프레임 약 60 ms(기준 ≤ 100)</td></tr>
+<tr><td>트랙 리허설(20 Hz 입력)</td><td>17/17 × 4 회</td></tr>
+<tr><td><code>r_race</code> vcan0·브리지 별도 프로세스</td><td>시나리오 10 개 통과, 지연 중앙 0.92 ms / 부하 시 0.44 ms(기준 ≤ 5)</td></tr>
+<tr><td><code>adapter_cruise_check</code></td><td>히스테리시스 0 회/분, 예전 동작 1,498 회/분(입력 고정, 폐루프 효과는 여전히 미검증)</td></tr>
+<tr><td><code>sil_engine_room</code></td><td>map·fit·circle 전부 통과(3·4장)</td></tr>
+</tbody></table><div class="tnote">결과 원본: <code>bsw_test/00_SAF_estop/results/sil_20261106_234901_junhyeok-960QHA/</code>, <code>data/sil/</code>. 시험 중 잡은 버그 1건: 2차원 표를 쓰면 어댑터 시작 로그가 없는 속성을 읽어 죽었다. 단위 시험은 못 잡았고 SIL 이 잡았다.</div></div>
+
+<h3>모델 입력 20 Hz</h3>
+<p>모델 팀 확인으로 <code>/control/target</code> 은 20 Hz(50 ms)다. 끊김 기준 150 ms 는 3 주기 여유다. 이전 보고서의 위험(10 Hz 에서 4 회 중 1 회 159 ms 래치)은 해소됐고, 트랙 리허설도 20 Hz 로 바꿔 4 회 모두 통과했다. 다만 모델 프로세스가 100 ms 이상 멈추면 여전히 래치가 걸리므로, 연습 주행에서 출력 간격 기록을 요청한다(데이터시트 07 시트 1-2).</p>
+
+<h2>2. 구성</h2>
+<pre>모델 ─/control/target 20 Hz→ cmd_adapter ─공유메모리 50 Hz→ can_guard ─0x210→ 차량
+                               ↑ 조향 표(타이어 → 핸들)
+                               ↑ long_map(가감속·차속 → 페달 %) ← /control/status/wheel_info(0x201 평균)
+측정: circle_test → profile_gen ─공유메모리→ can_guard(핸들각 직접, 어댑터 없음)
+갱신: CAN 로그 + GNSS bag → fit_long_map / fit_circle → 추천 파일 → 사람 확인 → yaml 수정·커밋·이력</pre>
+
+<h2>3. 속도별 종방향 표 (WP2)</h2>
+<p><code>config/long_map.yaml</code> 은 행이 차속, 열이 목표 가감속, 값이 페달 % 다. 지금은 v1 — 기존 1차원 표를 0~20 km/h 행에 복사했고 30 km/h 이상은 미측정이다. <b>그래서 지금 차의 동작은 바뀌지 않는다</b>(회귀 시험으로 확인). 11-14 부터 칸을 채운다.</p>
+<div class="tbl keep"><div class="tno">TABLE III</div><div class="ttl">변환 규칙</div>
+<table><thead><tr><th style="width:26%">상황</th><th>동작</th><th style="width:27%">상태 표시(AdapterStatus)</th></tr></thead><tbody>
+<tr><td>표 안</td><td>이중선형 보간. 가속 쪽·브레이크 쪽을 따로</td><td><code>speed_used_kph</code>, <code>long_map_version</code></td></tr>
+<tr><td>미측정 칸</td><td>같은 쪽 가장 가까운 측정 칸 값</td><td><code>extrapolated</code></td></tr>
+<tr><td>표 밖 속도·가감속</td><td>끝값 고정, 경고 로그(1 초에 1 회)</td><td><code>long_map_clamped</code></td></tr>
+<tr><td>|a| 0.03~0.10</td><td>이전 상태 유지(히스테리시스)</td><td>—</td></tr>
+<tr><td>차속 &lt; 3 km/h, 가속 중</td><td>가속 % 하한 75(출발 불감대)</td><td>—</td></tr>
+<tr><td>차속 끊김 &gt; 0.1 s</td><td>마지막 값 유지. 못 받았으면 0 km/h</td><td><code>speed_stale</code></td></tr>
+<tr><td>표 파일을 못 읽음·형식 틀림</td><td>어댑터가 시작하지 않는다</td><td>—</td></tr>
+</tbody></table></div>
+<div class="tbl keep"><div class="tno">TABLE IV</div><div class="ttl">지시서와 다르게 한 것 (docs/engine_room_open_items.md)</div>
+<table><thead><tr><th style="width:7%">#</th><th style="width:33%">지시서</th><th style="width:30%">구현</th><th>이유</th></tr></thead><tbody>
+<tr><td>E-10</td><td>가속도 칸 14 개</td><td>−0.1·0.1·0.13·0.57 추가</td><td>없으면 "1차원과 같은 출력" 관문을 못 지킨다</td></tr>
+<tr><td>E-11</td><td>raw 0x201 구독</td><td><code>wheel_info</code> 구독</td><td>같은 값인데 raw 는 약 545 프레임/s. 어댑터는 워치독에 직결돼 부담을 피했다</td></tr>
+<tr><td>E-12</td><td><code>track.yaml</code> 안에</td><td>별도 <code>long_map.yaml</code></td><td>ROS 파라미터 배열은 null 을 못 담는다</td></tr>
+<tr><td>E-13</td><td>표본 &lt; 3 이면 차단</td><td>그 칸만 빼고, 쓸 칸이 없을 때 차단</td><td>글자대로면 "각 2회" 계단은 늘 차단. 대신 점검표를 칸당 3회로 적었다</td></tr>
+<tr><td>E-14</td><td>이중선형</td><td>쪽별 보간, 첫 칸 아래 포화</td><td>0 과 75 % 를 이으면 차가 안 움직이는 % 가 나온다</td></tr>
+</tbody></table></div>
+<p>SIL(Fig. A2): 시험용 표를 넣고 +0.3 m/s² 를 고정하면 가속이 5 km/h 에서 81 %, 20 km/h 에서 92 % 로 올라가고, 표본 약 490 개 모두 예측과 1.5 % 안이다. 미측정 구간에서 <code>extrapolated</code> 가 켜지고, 0x201 을 끊으면 <code>speed_stale</code> 이 켜진다.</p>
+
+<h2>4. 측정·갱신 도구 (WP3)</h2>
+<h3>4.1 표 갱신 fit_long_map</h3>
+<p><b>표를 자동으로 바꾸지 않는다.</b> 추천 파일만 쓰고, 사람이 보고 고친 뒤 커밋해 이력에 적는다. 확인할 수 없는 검사는 통과가 아니다. 420 s 로그를 0.6 s 에 처리한다(현장 목표 1 분, 개발 PC).</p>
+<div class="tbl keep"><div class="tno">TABLE V</div><div class="ttl">차단 검사 (지시서 2.3절, 잠정 기준) — 하나라도 걸리면 종료 3</div>
+<table><thead><tr><th style="width:21%">검사</th><th style="width:27%">기준</th><th>재는 법 / 확인 불가</th></tr></thead><tbody>
+<tr><td>GNSS 품질</td><td>fix ≥ 90 %</td><td>INS 상태. <b>odom 만 있으면 확인 불가</b></td></tr>
+<tr><td>다른 조작</td><td>없을 것</td><td>앱 En, RES, 0x210 &gt; 70 프레임/s, ESTOP 이벤트. 이벤트 파일 없으면 확인 불가</td></tr>
+<tr><td>물리 한계</td><td>감속 ≤ 4.5, 가속 ≤ 1.6 m/s²</td><td>구간 평균</td></tr>
+<tr><td>시간 어긋남</td><td>≤ 0.05 s</td><td>후륜·GNSS 가속도 상호상관. 겹침 &lt; 20 s 면 확인 불가</td></tr>
+<tr><td>표본</td><td>칸당 ≥ 3 구간</td><td>E-13</td></tr>
+<tr><td>경사</td><td>|피치| ≤ 2°</td><td><b>피치 없으면 확인 불가</b></td></tr>
+<tr><td>급변</td><td>기존 대비 ≤ 20 %</td><td>걸리면 사람 확인</td></tr>
+<tr><td>표 형식</td><td>단조·부호</td><td>어댑터와 같은 검사</td></tr>
+</tbody></table></div>
+<p>측정 칸만 바꾸면 옛 복사값과 값이 뒤집힐 수 있어, 그런 옛 칸은 미측정으로 되돌린다. SIL 에서 처음 드러난 문제다. 또 v1 표는 값이 대부분 11-04 저속에서 나온 복사본이라, <b>첫 실측에서 급변으로 차단될 가능성이 높다</b>(SIL 도 그랬다, 표 VI). 그때는 <code>report.md</code> 를 보고 사람이 판단해 반영한다. 그것이 설계 의도다.</p>
+<div class="tbl keep"><div class="tno">TABLE VI</div><div class="ttl">시운전</div>
+<table><thead><tr><th style="width:46%">입력</th><th style="width:16%">종료</th><th>내용</th></tr></thead><tbody>
+<tr><td>11-04 bsw5 CAN, 미리보기(t 15~430 s)</td><td class="c">0</td><td>구간·칸 표. 추천 없음</td></tr>
+<tr><td>11-04 bsw4 CAN(앱 조작 섞임), 미리보기</td><td class="c">3</td><td>앱 En=1 t=23 s 로 차단. 지시서의 11-03 로그는 저장소에 원본이 없어 대신했다</td></tr>
+<tr><td>SIL CAN + 가짜 GNSS, 표 v1</td><td class="c">3</td><td>급변으로 차단: −1.5 m/s² −55 → −40 %</td></tr>
+<tr><td>SIL, 측정값을 기존 표로</td><td class="c">0</td><td>추천 파일 생성, 어댑터 검사 통과, 정확도 표 출력</td></tr>
+<tr><td>SIL, odom 만 있는 bag(sqlite3)</td><td class="c">3</td><td>GNSS 품질·경사 확인 불가</td></tr>
+<tr><td>합성 로그 19 개 시험</td><td class="c">—</td><td>앱·송신자 둘·fix·시간차·피치·급변·물리 한계·표본·입력 오류 각각</td></tr>
+</tbody></table><div class="tnote">개발 PC 에는 mcap 저장소 플러그인이 없어 bag 읽기는 sqlite3 로 시험했다. 현장 bag 은 mcap 이다(기존 <code>fit_maps.read_bag</code> 재사용). 대회 PC 에서 확인 필요.</div></div>
+
+<p><b>11-04 실차 미리보기(Fig. A5, 참고값).</b> GNSS 없이 후륜 ÷ 0.958 로 본 값이다. 표 v1 이 약속한 가속도와 비교하면 10·15 km/h 가속 오차 평균 42·47 %, 브레이크 5·10 km/h 29·38 %(구간 1~2 개), 15 km/h 18 % 다. 20 km/h 순항은 약 81 % 에서 +0.1 m/s² 근처로, 코너와 경사가 섞였다. 지시서의 ±20 % 관문을 넘으려면 표를 재야 한다는 뜻으로 읽어야 하며, 이 수치로 표를 바꾸지는 않았다.</p>
+
+<h3>4.2 원 돌기 circle_test · fit_circle</h3>
+<p><code>circle_test</code> 는 <b>핸들각을 직접</b> 명령한다. 조향 표를 재는 시험이라 표를 통과하면 안 되기 때문이다(E-7). 새 코드를 줄이려고 기존 <code>profile_gen</code> 세션을 쓴다 — 회차마다 Enter, 차속 상한, 0x201 끊김, can_guard 개입 시 중단, 끝내기 브레이크 100 % 가 그대로 적용된다. <code>--dry-run</code> 이 공간과 시간을 먼저 보여 준다.</p>
+<div class="tbl keep"><div class="tno">TABLE VII</div><div class="ttl">11-14 원 돌기 계획 ★ (현재 표 기준 예상, 2바퀴, 5 km/h, 여유 1.25 배)</div>
+<table><thead><tr><th>핸들 °</th><th class="r">예상 타이어 °</th><th class="r">지름 m</th><th class="r">회차 s</th></tr></thead><tbody>
+<tr><td>+37 / −37</td><td class="r">4.29 / 3.41</td><td class="r">63 / 79</td><td class="r">358 / 450</td></tr>
+<tr><td>+75 / −75</td><td class="r">7.25 / 6.75</td><td class="r">37 / 40</td><td class="r">212 / 228</td></tr>
+<tr><td>+112 / −112</td><td class="r">9.60 / 9.22</td><td class="r">28 / 29</td><td class="r">160 / 167</td></tr>
+<tr><td>+150 / −150</td><td class="r">11.50</td><td class="r">23</td><td class="r">134</td></tr>
+</tbody></table><div class="tnote">합계 약 31 분(회차 사이 대기 제외). 11-04 측정이 표보다 왼쪽이라 좌우 지름은 달라질 수 있다.</div></div>
+<p><code>fit_circle</code> 은 궤적에 원을 맞춰 R → 타이어 = atan(2.36/R), 영점, 좌우 실효 조향비를 내고 <code>steer_map</code> 을 추천한다(자동 반영 없음). 호 &lt; 270°, 맞춤 RMS &gt; 0.5 m, 최고 &gt; 9 km/h 회차는 뺀다(잠정). SIL 에서 가짜 차량 조향비 10.7 을 좌우 네 회차 모두 10.70 으로 되찾았다 — 가짜 차량에는 슬립·언더스티어가 없으므로 <b>도구 동작 확인일 뿐 정확도 근거는 아니다</b>.</p>
+<p><b>저속 유지 주의(Fig. A7).</b> 불감대 75 % 위에서만 힘이 나오는 차라 PI 가 톱니로 돈다. SIL 에서 목표 5 km/h 에 약 5.0~6.8 km/h(평균 5.8)다. 가짜 차량의 값이고 실차는 다를 수 있다. 상한 8 km/h 를 넘으면 세션이 멈출 뿐 위험하지는 않지만, 불감대·유지 % 를 첫 회차에서 확인해야 한다.</p>
+
+<h2>5. 경기 날 운영 (WP7)</h2>
+<ul>
+<li><b>시작 점검</b> <code>tools/bsw/race_up_check.py</code>: <code>/race/state</code> 발행, 0x202 값(표시만, 0x203 송신 없음), 조향 표·<code>long_map</code> 버전·source. <code>bsw_up</code>·<code>bsw_status</code> 가 부르고, 세션 기록에도 남긴다. 실패해도 BSW 를 끄지는 않고 ❌ 로 알린다 — 매뉴얼은 ❌ 면 출발하지 말라고 적었다.</li>
+<li><b>매뉴얼</b> <code>FIELD_MANUAL</code> 5-1절: 브리핑 확인 6 항목, 중단 → 재개(앱은 차가 선 뒤에만 해제, 원격을 켠 채 자율 불가, 재시작은 KIAPI 허용 답변·브리핑 뒤).</li>
+<li><b>점검표</b> <code>bsw_test/09_ENGINE_ROOM/docs/checklist.md</code>, 이력 <code>docs/engine_room_map_history.md</code>, 메모장 ★ 11-14 절.</li>
+<li><b>데이터시트 v0.6</b>: 20 Hz, 어댑터 필드 5 개. v1.0 은 실차 표가 나온 뒤로 미뤘다(지시서 관문이 리허설·최종본이다).</li>
+</ul>
+
+<h2>6. 팀에 요청할 것</h2>
+<div class="tbl keep"><div class="tno">TABLE VIII</div><div class="ttl">11-14 전 확인</div>
+<table><thead><tr><th style="width:17%">누구</th><th>내용</th></tr></thead><tbody>
+<tr><td>로컬라이제이션</td><td><b>bag 에 INS 토픽(품질·피치) 포함 확인</b> — 없으면 표 갱신이 전부 차단된다. 토픽 이름(TODO-5): 기본 <code>/gsof_client/gsof/ins_solution_49</code>, <code>/gsof_client/odom</code>, 옵션으로 바꿀 수 있다</td></tr>
+<tr><td>모델</td><td>속도별 표가 들어가도 인터페이스는 같다. <code>extrapolated</code>·<code>speed_stale</code> 을 볼 것. 20 Hz 출력 간격 기록</td></tr>
+<tr><td>운용</td><td>원 돌기 공간(지름 최대 약 80 m), 약 31 분. 모자라면 <code>--handles 75,112,150</code></td></tr>
+<tr><td>대회 PC</td><td>아래 7장 명령</td></tr>
+</tbody></table></div>
+
+<h2>7. 남은 일</h2>
+<pre># 대회 PC — 판정. sudo 비밀번호 1 회(vcan0 없으면 먼저 sudo bash sil/vcan/vcan_up.sh)
+bash bsw_test/00_SAF_estop/scripts/run_sil_check.sh --rt auto --track
+python3 safety/can_guard/sil_tests/r_race.py --interface socketcan --channel vcan0 --latency 300 --load
+python3 bsw_test/09_ENGINE_ROOM/scripts/sil_engine_room.py --out &lt;폴더&gt;
+bash tools/bsw/bsw_up.sh --sil --no-rt --no-ui     # 그리고 bsw_down.sh — 시작 점검 출력 확인(이번에 실행 못 함)</pre>
+<ul>
+<li>실제 GNSS bag 으로 <code>fit_long_map</code>·<code>fit_circle</code> 첫 실행(INS 메시지 필드 확인).</li>
+<li>11-14: 점검표 ①~⑥. 영점 −9° vs 측정 회귀 −13.7°, 가속 전환 수(폐루프)를 처음 확인한다.</li>
+</ul>
+
+<h2 class="pb">부록 A. PlotJuggler 데이터시트</h2>
+<p>모두 PlotJuggler 3.17 화면 캡처다. 입력 <code>data/pj/*.csv</code>, 레이아웃 <code>pj_layouts/*.xml</code>. 왼쪽 위 작은 "time" 글자와 세로선은 PlotJuggler 시간 표시로 값이 아니다. <b>A2~A4, A6~A8 은 가짜 차량 값이다.</b></p>
+
+<h3>A1. 표</h3>
+<figure><img src="figs/pj_long_map.png" alt="long_map v1"><figcaption><b>Fig. A1.</b> <code>long_map</code> v1, 차속 10 km/h. 가로 목표 가감속 m/s², 세로 페달 %(+ 가속, − 브레이크). ±0.1 안은 0, +0.1 에서 75 % 로 뛴다(출발 불감대). 지금은 0~20 km/h 행이 같고 30 km/h 이상은 미측정이다.</figcaption></figure>
+<figure><img src="figs/pj_map_speed.png" alt="속도별 표 SIL"><figcaption><b>Fig. A2.</b> 실제 어댑터 SIL(시험용 표). 위: 요청 +0.3 m/s² 고정인데 가속 % 가 차속 따라 78 → 92 % 로 오른다. 11 s 부터 −3 m/s² 제동. 가운데: 차속. 아래: 20 km/h 위 미측정 구간에서 <code>extrapolated</code>, 끝에서 0x201 을 끊어 <code>speed_stale</code>.</figcaption></figure>
+
+<h3 class="pb">A2. 표 측정·갱신</h3>
+<figure><img src="figs/pj_fit_time.png" alt="표 측정 SIL"><figcaption><b>Fig. A3.</b> <code>adapter_long_check --plan</code> SIL. 14 km/h 근처에서 가감속 7 단계를 4 회 반복. 아래 후륜은 가짜 GNSS 의 0.958 배(11-04 비율).</figcaption></figure>
+<figure><img src="figs/pj_fit_scatter.png" alt="측정 대 표"><figcaption><b>Fig. A4.</b> 위 로그의 측정 구간(회색, 구간 사이를 이은 선)과 표 v1(파랑). 가짜 차량이 표와 달라 가속 쪽에서 벌어진다 — 이 차이가 급변 차단을 일으켰다.</figcaption></figure>
+<figure><img src="figs/pj_bsw5_scatter.png" alt="11-04 실차"><figcaption><b>Fig. A5. 실차 로그.</b> 11-04 bsw5 미리보기(후륜 ÷ 0.958, GNSS 없음, 참고값). 80 % 근처가 거의 0 m/s² 에 있고, 표는 +0.13 을 약속한다. 코너·경사가 섞인 값이다.</figcaption></figure>
+
+<h3 class="pb">A3. 원 돌기</h3>
+<figure><img src="figs/pj_circle_time.png" alt="원 돌기 시간"><figcaption><b>Fig. A6–A7.</b> <code>circle_test</code> SIL, 핸들 ±75°·±150°. 위: 핸들 명령·실제. 아래: 목표 5 km/h 후륜 속도 — 약 5.0~6.8 km/h 톱니(4.2절).</figcaption></figure>
+<figure class="fig80"><img src="figs/pj_circle_xy.png" alt="원 돌기 궤적"><figcaption><b>Fig. A8.</b> 같은 시험의 궤적(가짜 GNSS, x–y m). 좌·우 큰 원 2 개, 작은 원 2 개.</figcaption></figure>
+
+<h3 class="pb">A4. 경기 신호 지연</h3>
+<figure><img src="figs/pj_latency.png" alt="지연"><figcaption><b>Fig. A9.</b> 0x127 프레임 → <code>/race/state</code> 수신, vcan0·브리지 별도 프로세스. 파랑 부하 없음(중앙 0.92 ms), 빨강 실제 버스 부하 + 디코더(중앙 0.44 ms). 가로축은 토글 순번, 기준 5 ms. 이전 보고서의 virtual 버스 값과 비슷하다.</figcaption></figure>
+
+<div class="tbl keep"><div class="tno">SHEET A</div><div class="ttl">이번에 정한 값 (전부 잠정)</div>
+<table><thead><tr><th style="width:36%">항목</th><th style="width:24%">값</th><th>근거</th></tr></thead><tbody>
+<tr><td><code>/control/target</code> 주기</td><td>20 Hz</td><td>모델 팀 확인</td></tr>
+<tr><td>끊김 기준 / 차속 나이</td><td>150 ms / 0.1 s</td><td><code>track.yaml</code>, 지시서 2.2</td></tr>
+<tr><td>출발 하한</td><td>75 %, 3 km/h 아래</td><td>11-04 불감대 70~80 %</td></tr>
+<tr><td>표 갱신 표본 / 급변</td><td>칸당 3 구간 / 20 %</td><td>지시서 2.3</td></tr>
+<tr><td>구간에서 버리는 앞부분</td><td>가속 0.7 s, 브레이크 0.4 s</td><td>11-04 지연</td></tr>
+<tr><td>원 돌기 속도 / 상한</td><td>5 / 8 km/h</td><td>지시서 ≤ 8, SIL 흔들림</td></tr>
+<tr><td>저속 유지 % (차속 5·10)</td><td>76·78 %, 출발 80 %</td><td>11-04 에서 짐작, 미검증</td></tr>
+</tbody></table></div>
+
+<h2>부록 B. 다시 만들기</h2>
+<pre>python3 -m pytest -q tools/engine_room/test_fit_tools.py ros2_ws/src/a1_control_adapter/test/test_conversion.py
+source /opt/ros/humble/setup.bash &amp;&amp; source ros2_ws/install/setup.bash
+python3 bsw_test/09_ENGINE_ROOM/scripts/sil_engine_room.py --out &lt;SIL&gt;
+python3 safety/can_guard/sil_tests/r_race.py --interface socketcan --channel vcan0 --out &lt;L0&gt; --latency 300
+python3 safety/can_guard/sil_tests/r_race.py --interface socketcan --channel vcan0 --no-scenarios --latency 500 --load --out &lt;L1&gt;
+python3 make_data.py ../.. . &lt;SIL&gt; &lt;L0&gt; &lt;L1&gt;       # CSV. fit_long_map 미리보기 포함
+XTOOLS_ROOT=&lt;풀어 둔 폴더&gt; python3 pj_capture.py .   # PlotJuggler + Xvfb 캡처
+google-chrome --headless --no-pdf-header-footer --print-to-pdf=report.pdf report.html</pre>
+
+</body>
+</html>

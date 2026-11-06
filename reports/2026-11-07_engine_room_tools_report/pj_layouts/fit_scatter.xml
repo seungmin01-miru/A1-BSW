@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+ <tabbed_widget name="Main Window" parent="main_window">
+  <Tab containers="1" tab_name="fit_scatter">
+   <Container><DockSplitter orientation="-" sizes="1.0000" count="1"><DockArea name="표 측정 SIL — 가로 측정 가속도 m/s², 세로 페달 %: 측정 구간(회색) · 표 v1(파랑)"><plot style="LinesAndDots" flip_y="false" flip_x="false" mode="TimeSeries"><range bottom="-105" top="105" left="-4" right="1.392"/><limitY min="-105" max="105"/><curve name="measured_pedal_pct" color="#7f7f7f"/><curve name="table_v1_pedal_pct" color="#1f77b4"/></plot><transform/></DockArea></DockSplitter></Container>
+  </Tab>
+  <currentTabIndex index="0"/>
+ </tabbed_widget>
+ <use_relative_time_offset enabled="0"/>
+ <Plugins/>
+ <customMathEquations/>
+ <snippets/>
+</root>

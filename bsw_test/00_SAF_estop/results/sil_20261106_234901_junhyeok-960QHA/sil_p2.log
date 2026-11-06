@@ -1,0 +1,10 @@
+[P-2] shm=p2_cmd_0ff5c42d/p2_hb_0ff5c42d period=20ms perception_timeout=500ms
+[P-2] 정상 구간 관찰(0.5s)...
+[P-2] 인지 프로세스 kill...
+[P-2] kill 이후 관찰(1.00s)...
+[P-2] can_guard 로그 중 DEGRADED 전이: ['[can_guard] ACTIVE → DEGRADED (cmd_age=0.012281840001378441, perception_age=0.5196619679991272, vehicle_speed_kph=None, 차량 0x200=None)']
+[P-2] 0x210 간격: kill 전 평균/최대 20.01/20.38ms, kill 후 평균/최대 20.01/20.44ms (목표 주기 20ms)
+[P-2] 0x210 송신 연속 여부: True (주기 2.5배 넘은 간격 0개)
+[P-2] dmesg BUG류: kill 전 0 → kill 후 0
+
+[P-2] PASS (주기 유지=True, 송신 연속=True, 새 BUG 없음=True, DEGRADED 전이=True)

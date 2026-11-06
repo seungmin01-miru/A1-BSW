@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+ <tabbed_widget name="Main Window" parent="main_window">
+  <Tab containers="1" tab_name="latency">
+   <Container><DockSplitter orientation="-" sizes="1.0000" count="1"><DockArea name="0x127 프레임 → /race/state 수신 [ms], vcan0·브리지 별도 프로세스(토글 순번)"><plot style="Lines" flip_y="false" flip_x="false" mode="TimeSeries"><range bottom="0" top="5.5" left="0" right="299.0"/><limitY min="0" max="5.5"/><curve name="latency_idle_ms" color="#1f77b4"/><curve name="latency_load_ms" color="#d62728"/></plot><transform/></DockArea></DockSplitter></Container>
+  </Tab>
+  <currentTabIndex index="0"/>
+ </tabbed_widget>
+ <use_relative_time_offset enabled="0"/>
+ <Plugins/>
+ <customMathEquations/>
+ <snippets/>
+</root>

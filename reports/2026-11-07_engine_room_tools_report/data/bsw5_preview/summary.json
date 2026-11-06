@@ -1,0 +1,65 @@
+{
+ "verdict": "미리보기(추천 없음, GNSS 없음 — 값은 참고)",
+ "checks": [
+  {
+   "name": "다른 조작(CAN)",
+   "status": "통과",
+   "detail": "앱·RES·다른 송신자 없음"
+  },
+  {
+   "name": "다른 조작(ESTOP)",
+   "status": "확인 불가",
+   "detail": "can_guard 이벤트 로그 없음(--events)"
+  },
+  {
+   "name": "물리 한계",
+   "status": "통과",
+   "detail": "감속 > 4.5, 가속 > 1.6 m/s² 구간 0 개"
+  }
+ ],
+ "pieces": 20,
+ "cells": 13,
+ "skipped": 1,
+ "accuracy": [
+  {
+   "speed_kph": 5.0,
+   "axis": "brake",
+   "n": 1,
+   "err_mean": 0.2903886562458884,
+   "err_max": 0.2903886562458884,
+   "ok": false
+  },
+  {
+   "speed_kph": 10.0,
+   "axis": "acc",
+   "n": 5,
+   "err_mean": 0.4240622779610481,
+   "err_max": 1.3382470380471096,
+   "ok": false
+  },
+  {
+   "speed_kph": 10.0,
+   "axis": "brake",
+   "n": 2,
+   "err_mean": 0.3802801902582321,
+   "err_max": 0.491023620374276,
+   "ok": false
+  },
+  {
+   "speed_kph": 15.0,
+   "axis": "acc",
+   "n": 5,
+   "err_mean": 0.47321001619767167,
+   "err_max": 0.877087548238553,
+   "ok": false
+  },
+  {
+   "speed_kph": 15.0,
+   "axis": "brake",
+   "n": 3,
+   "err_mean": 0.183781192719742,
+   "err_max": 0.2853886665067364,
+   "ok": true
+  }
+ ]
+}

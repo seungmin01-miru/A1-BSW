@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+ <tabbed_widget name="Main Window" parent="main_window">
+  <Tab containers="1" tab_name="circle_xy">
+   <Container><DockSplitter orientation="-" sizes="1.0000" count="1"><DockArea name="원 돌기 SIL 궤적 x–y [m] — 핸들 ±75°, ±150°, 가짜 조향비 10.7"><plot style="Lines" flip_y="false" flip_x="false" mode="XYPlot"><range bottom="-60" top="60" left="-60" right="60"/><limitY/><curve name="y_m" curve_x="x_m" curve_y="y_m" color="#1f77b4"/></plot><transform/></DockArea></DockSplitter></Container>
+  </Tab>
+  <currentTabIndex index="0"/>
+ </tabbed_widget>
+ <use_relative_time_offset enabled="0"/>
+ <Plugins/>
+ <customMathEquations/>
+ <snippets/>
+</root>

@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+ <tabbed_widget name="Main Window" parent="main_window">
+  <Tab containers="1" tab_name="map_speed">
+   <Container><DockSplitter orientation="-" sizes="0.3333;0.3333;0.3333" count="3"><DockArea name="어댑터 출력 %: 요청 +0.3 m/s² 고정 뒤 −3 m/s²"><plot style="Lines" flip_y="false" flip_x="false" mode="TimeSeries"><range bottom="-5" top="105" left="0" right="18.172"/><limitY min="-5" max="105"/><curve name="out_acc_pct" color="#1f77b4"/><curve name="out_brake_pct" color="#d62728"/></plot><transform/></DockArea><DockArea name="변환에 쓴 차속 [km/h]"><plot style="Lines" flip_y="false" flip_x="false" mode="TimeSeries"><range bottom="-1" top="32" left="0" right="18.172"/><limitY min="-1" max="32"/><curve name="speed_used_kph" color="#2ca02c"/></plot><transform/></DockArea><DockArea name="extrapolated(미측정 칸) · speed_stale(차속 끊김)"><plot style="Lines" flip_y="false" flip_x="false" mode="TimeSeries"><range bottom="-0.1" top="1.1" left="0" right="18.172"/><limitY min="-0.1" max="1.1"/><curve name="extrapolated" color="#ff7f0e"/><curve name="speed_stale" color="#9467bd"/></plot><transform/></DockArea></DockSplitter></Container>
+  </Tab>
+  <currentTabIndex index="0"/>
+ </tabbed_widget>
+ <use_relative_time_offset enabled="0"/>
+ <Plugins/>
+ <customMathEquations/>
+ <snippets/>
+</root>

@@ -1,0 +1,2 @@
+scenario,pass,published,checks
+latency_load,1,500,median=0.44ms p99=1.00ms max=2.03ms lost=0 bus=795fps pub_cpu=13.1% dec_cpu=13.5% wheel=47.6Hz wheel_lag_max=5.5ms

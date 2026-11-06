@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+ <tabbed_widget name="Main Window" parent="main_window">
+  <Tab containers="1" tab_name="long_map">
+   <Container><DockSplitter orientation="-" sizes="1.0000" count="1"><DockArea name="long_map v1, 차속 10 km/h — 가로 목표 가감속 m/s², 세로 페달 %(+ 가속, − 브레이크)"><plot style="LinesAndDots" flip_y="false" flip_x="false" mode="TimeSeries"><range bottom="-105" top="105" left="-4" right="1.3"/><limitY min="-105" max="105"/><curve name="pedal_pct_v1" color="#1f77b4"/></plot><transform/></DockArea></DockSplitter></Container>
+  </Tab>
+  <currentTabIndex index="0"/>
+ </tabbed_widget>
+ <use_relative_time_offset enabled="0"/>
+ <Plugins/>
+ <customMathEquations/>
+ <snippets/>
+</root>

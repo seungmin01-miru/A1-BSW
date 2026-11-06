@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+ <tabbed_widget name="Main Window" parent="main_window">
+  <Tab containers="1" tab_name="fit_time">
+   <Container><DockSplitter orientation="-" sizes="0.5000;0.5000" count="2"><DockArea name="표 측정 SIL: 페달 명령 [%]"><plot style="Lines" flip_y="false" flip_x="false" mode="TimeSeries"><range bottom="-5" top="105" left="0" right="112.75"/><limitY min="-5" max="105"/><curve name="cmd_acc_pct" color="#1f77b4"/><curve name="cmd_brake_pct" color="#d62728"/></plot><transform/></DockArea><DockArea name="차속 [km/h]: 가짜 GNSS(회색)·후륜(초록, 0.958 배)"><plot style="Lines" flip_y="false" flip_x="false" mode="TimeSeries"><range bottom="-1" top="26" left="0" right="112.75"/><limitY min="-1" max="26"/><curve name="gnss_kph" color="#7f7f7f"/><curve name="wheel_kph" color="#2ca02c"/></plot><transform/></DockArea></DockSplitter></Container>
+  </Tab>
+  <currentTabIndex index="0"/>
+ </tabbed_widget>
+ <use_relative_time_offset enabled="0"/>
+ <Plugins/>
+ <customMathEquations/>
+ <snippets/>
+</root>

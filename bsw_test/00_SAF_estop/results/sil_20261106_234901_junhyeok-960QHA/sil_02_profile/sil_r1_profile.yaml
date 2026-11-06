@@ -1,0 +1,30 @@
+# sil_r1 — 2026-11-06 23:50:10 계획 (원본: /home/junhyeok/A1-BSW/bsw_test/02_LON_profile/profiles/gen_check.yaml, 조향 오프셋 +0°, ctrl 기본값(잠정))
+name: LON-PROF-01
+vars:
+  acc: 6.0
+limits:
+  steer_deg: 15
+  brake_pct: 100
+  acc_pct: 10
+  max_speed_kph: 10
+start:
+  steer: 0
+  brake: 30
+  acc: 0
+segments:
+- type: set
+  brake: 0
+  t: 0.5
+  label: 브레이크풀기
+- type: trap
+  axis: acc
+  peak: $acc
+  up: 2
+  hold: 4
+  down: 2
+  label: 사다리꼴
+- type: hold
+  t: 1
+end:
+  brake: 100
+  ramp_s: 2.5
