@@ -22,6 +22,10 @@ STEER_MIN, STEER_MAX = -150, 150   # deg, DBC 범위
 STEER_RAW_PER_DEG = 10            # 0.1 deg/raw
 PCT_MIN, PCT_MAX = 0, 100
 
+FRAME_ID_SERVICE_COMMAND = 0x203
+SPEED_LIMIT_KPH_MIN, SPEED_LIMIT_KPH_MAX = 0, 100   # DBC 범위
+SPEED_LIMIT_RAW_PER_KPH = 10                        # 0.1 km/h/raw
+
 
 def _clip_int(v, lo, hi):
     return max(lo, min(hi, int(round(v))))
@@ -39,3 +43,11 @@ def encode_0x210(cmd):
     d[4] = a
     d[5] = (1 if cmd.steer_auto else 0) | (2 if cmd.brake_auto else 0) | (4 if cmd.acc_auto else 0)
     return bytes(d)
+
+
+def encode_speed_limit_command(kph):
+    """USER_service_command(0x203) → 8바이트. `speed_limit` bit 0-9, 0.1 km/h/raw, 0~100 km/h 로 자른다.
+    송신 여부·값은 speed_limit 관리자의 몫이고 여기는 인코딩만 한다(계획서 9절)."""
+    raw = _clip_int(kph * SPEED_LIMIT_RAW_PER_KPH, SPEED_LIMIT_KPH_MIN * SPEED_LIMIT_RAW_PER_KPH,
+                    SPEED_LIMIT_KPH_MAX * SPEED_LIMIT_RAW_PER_KPH)
+    return raw.to_bytes(2, 'little') + bytes(6)
