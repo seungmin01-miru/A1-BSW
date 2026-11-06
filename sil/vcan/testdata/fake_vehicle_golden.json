@@ -1,0 +1,121 @@
+{
+ "cases": {
+  "default": {
+   "args": {
+    "bitrate": 500000,
+    "channel": "vcan0",
+    "cmd_timeout_s": 0.0,
+    "interface": "socketcan",
+    "period_ms": 21.0,
+    "physics": false,
+    "steer_ratio": 7.5
+   },
+   "bus_kw": {
+    "channel": "vcan0",
+    "interface": "socketcan"
+   },
+   "frames_sha256": "cbbc16f35a98d5407262daee30b8ea118131ea712a6b9f95db2542146acb9075",
+   "last_frames": [
+    "200 6200310005c7c7c7",
+    "201 64e00564e005c7c7"
+   ],
+   "n_frames": 400,
+   "pose_lines": 0,
+   "pose_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "physics_pose": {
+   "args": {
+    "bitrate": 500000,
+    "channel": "vcan0",
+    "cmd_timeout_s": 0.0,
+    "interface": "socketcan",
+    "period_ms": 21.0,
+    "physics": true,
+    "steer_ratio": 7.5
+   },
+   "bus_kw": {
+    "channel": "vcan0",
+    "interface": "socketcan"
+   },
+   "frames_sha256": "6d21c07597bb2dc23f50ebd0519b0a15e6dd5cd9ae4835b84c43ee1a07c29ba9",
+   "last_frames": [
+    "200 0000000007f3f3f3",
+    "201 6ca1156ca115f3f3"
+   ],
+   "n_frames": 1000,
+   "pose_lines": 501,
+   "pose_sha256": "1849de971b6629c4ed41be107d1fb628a916f367f338a1026e2baeb6311c19ab"
+  },
+  "physics_ratio_timeout": {
+   "args": {
+    "bitrate": 500000,
+    "channel": "vcan0",
+    "cmd_timeout_s": 0.3,
+    "interface": "socketcan",
+    "period_ms": 21.0,
+    "physics": true,
+    "steer_ratio": 9.0
+   },
+   "bus_kw": {
+    "channel": "vcan0",
+    "interface": "socketcan"
+   },
+   "frames_sha256": "df33ac31c704aca37d09871db6e30ae4a0e45c510419c84f4cd52df0fbaaaad6",
+   "last_frames": [
+    "200 2b03000000c7c7c7",
+    "201 000000000000c7c7"
+   ],
+   "n_frames": 400,
+   "pose_lines": 0,
+   "pose_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "timeout_period": {
+   "args": {
+    "bitrate": 500000,
+    "channel": "vcan0",
+    "cmd_timeout_s": 0.5,
+    "interface": "socketcan",
+    "period_ms": 10.0,
+    "physics": false,
+    "steer_ratio": 7.5
+   },
+   "bus_kw": {
+    "channel": "vcan0",
+    "interface": "socketcan"
+   },
+   "frames_sha256": "afc43c7ecb5a05ebefa780190722d07a292e2c737ba9d569bf249376c4fa2659",
+   "last_frames": [
+    "200 b400090000c7c7c7",
+    "201 0dc0000dc000c7c7"
+   ],
+   "n_frames": 400,
+   "pose_lines": 0,
+   "pose_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "virtual_channel_args": {
+   "args": {
+    "bitrate": 250000,
+    "channel": "1",
+    "cmd_timeout_s": 0.0,
+    "interface": "kvaser",
+    "period_ms": 21.0,
+    "physics": false,
+    "steer_ratio": 7.5
+   },
+   "bus_kw": {
+    "bitrate": 250000,
+    "channel": "1",
+    "interface": "kvaser"
+   },
+   "frames_sha256": "3d2c982dc89e3a8b68cf3e948411ee9f26aa355604036cc5d6b8f0cce917d0b1",
+   "last_frames": [
+    "200 0000000000131313",
+    "201 0000000000001313"
+   ],
+   "n_frames": 40,
+   "pose_lines": 0,
+   "pose_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+ },
+ "source": "main() of fake_a1_vehicle.py before race-flag extension (commit d702f63)"
+}

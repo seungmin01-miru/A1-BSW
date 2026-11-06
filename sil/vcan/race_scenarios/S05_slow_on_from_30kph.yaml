@@ -1,0 +1,11 @@
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+name: S05_slow_on_from_30kph
+desc: Go 뒤 모델이 30 km/h 까지 가속, 12 s 에 Slow On(r_race.py 는 그때 차속이 30 km/h 근처인지 먼저 확인할 것)
+duration_s: 30.0
+events:
+  - {t: 1.0, flag: go, mode: level}
+  - {t: 12.0, flag: slow_on, mode: level}
+harness:
+  vehicle: {physics: true}
+  model: {note: 30 km/h 를 유지하는 가속 명령, 서행 중에도 계속 발행}
+  expect: 9.3 이하 도달 시간 기록, 이후 10 초과 0회

@@ -1,0 +1,11 @@
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+name: S08_finish_model_stop
+desc: Finish 뒤 모델이 스스로 정차
+duration_s: 25.0
+events:
+  - {t: 1.0, flag: go, mode: level}
+  - {t: 8.0, flag: finish, mode: level}
+harness:
+  vehicle: {physics: true}
+  model: {note: 8 s 전까지 가속, 그 뒤 정차 명령}
+  expect: 5 s 뒤 PARKED, auto 000 없음

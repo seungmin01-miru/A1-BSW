@@ -1,0 +1,10 @@
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+name: S02_go
+desc: 2 s 에 Go 가 올라가 끝까지 켜짐(level)
+duration_s: 6.0
+events:
+  - {t: 2.0, flag: go, mode: level}
+harness:
+  vehicle: {physics: true}
+  model: {note: 계속 가속 명령}
+  expect: Go 확인 후 다음 주기에 모델 명령 전달

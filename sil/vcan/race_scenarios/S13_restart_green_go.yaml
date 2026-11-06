@@ -1,0 +1,13 @@
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+name: S13_restart_green_go
+desc: 주행 → STOP 으로 중단 → can_guard 재시작 → 녹기 + Go 재개. 재시작 시각은 harness.restart_guard_at_s
+duration_s: 22.0
+events:
+  - {t: 1.0, flag: go, mode: level, until: 3.0}
+  - {t: 5.0, flag: stop, mode: level, until: 10.0}
+  - {t: 16.0, flag: go, mode: level}
+harness:
+  vehicle: {physics: true}
+  restart_guard_at_s: 12.0
+  model: {note: 계속 가속 명령}
+  expect: 재시작 뒤 PRE_GO → RACING

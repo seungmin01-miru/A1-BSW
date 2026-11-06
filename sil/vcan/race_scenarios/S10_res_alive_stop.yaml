@@ -1,0 +1,11 @@
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+name: S10_res_alive_stop
+desc: 0x127 을 본 뒤 프레임이 끊김
+duration_s: 10.0
+events:
+  - {t: 1.0, flag: go, mode: level}
+  - {t: 5.0, stream: res, action: stop}
+harness:
+  vehicle: {physics: true}
+  model: {note: 계속 가속 명령}
+  expect: 0.5 s 뒤 SUSPENDED

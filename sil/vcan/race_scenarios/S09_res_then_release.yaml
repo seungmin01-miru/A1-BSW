@@ -1,0 +1,11 @@
+# 형식: sil/vcan/fake_race_server.py 머리말. harness 는 r_race.py 용(재생기는 읽지 않음), vehicle = FakeVehicle 인자.
+name: S09_res_then_release
+desc: 주행 중 RES_START 3 s(차량은 0x210 무시·자체 감속·0x128), 해제 뒤에도 모델은 가속 명령
+duration_s: 16.0
+events:
+  - {t: 1.0, flag: go, mode: level}
+  - {t: 7.0, flag: res, mode: level, until: 10.0}
+harness:
+  vehicle: {physics: true}
+  model: {note: 계속 가속 명령}
+  expect: ESTOP 래치, 해제 후에도 브레이크 유지
