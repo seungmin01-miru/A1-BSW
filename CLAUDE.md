@@ -2,7 +2,7 @@
 
 작성 2026-11-04. 기준 계획서: [`bsw_test/docs/test_plan.md`](bsw_test/docs/test_plan.md). 진행 현황: [`bsw_test/docs/test_summary.md`](bsw_test/docs/test_summary.md).
 **주행 날 BSW 띄우기는 `tools/bsw/bsw_up.sh` 하나로**(2026-11-05) — can_guard·브리지·어댑터(자동 arm)·CAN 로그 녹화·상태판 창(읽기 전용, 대회 본 주행은 `--no-ui`)을 한 번에, 끄기는 `bsw_down.sh`. 개별 도구를 손으로 하나씩 띄우지 않는다.
-**지금 할 일(대회 PC 세션은 먼저 읽기): [`bsw_test/docs/NEXT_competition_pc.md`](bsw_test/docs/NEXT_competition_pc.md)**. **실차 절차 기준 = [`docs/2026-11-06_engine_room_dev_plan.md`](docs/2026-11-06_engine_room_dev_plan.md) 4절**(2026-11-06, 11-04 자율 U턴 시험 폐기).
+**지금 할 일(대회 PC 세션은 먼저 읽기): [`bsw_test/docs/NEXT_competition_pc.md`](bsw_test/docs/NEXT_competition_pc.md)** — 첫 일은 판정 묶음 `bash bsw_test/09_ENGINE_ROOM/run_verify.sh`(사용자가 `!` 로 실행). **실차 절차 기준 = [`docs/2026-11-06_engine_room_dev_plan.md`](docs/2026-11-06_engine_room_dev_plan.md) 4절**(2026-11-06, 11-04 자율 U턴 시험 폐기).
 이 파일은 **규칙과 확정된 사실**만 둔다. 숫자 근거는 아래 문서에 있고, 바뀌면 이 파일도 같이 고친다.
 
 | 근거 문서 | 내용 |

@@ -186,11 +186,8 @@ pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height:
 </tbody></table></div>
 
 <h2>7. 남은 일</h2>
-<pre># 대회 PC — 판정. sudo 비밀번호 1 회(vcan0 없으면 먼저 sudo bash sil/vcan/vcan_up.sh)
-bash bsw_test/00_SAF_estop/scripts/run_sil_check.sh --rt auto --track
-python3 safety/can_guard/sil_tests/r_race.py --interface socketcan --channel vcan0 --latency 300 --load
-python3 bsw_test/09_ENGINE_ROOM/scripts/sil_engine_room.py --out &lt;폴더&gt;
-bash tools/bsw/bsw_up.sh --sil --no-rt --no-ui     # 그리고 bsw_down.sh — 시작 점검 출력 확인(개발 PC 는 통과)</pre>
+<pre># 대회 PC — 판정 묶음 하나(약 30~40분, sudo 1 회, 차량·실제 CAN 에 안 닿음)
+bash bsw_test/09_ENGINE_ROOM/run_verify.sh     # → bsw_test/09_ENGINE_ROOM/results/verify_*/VERDICT.md</pre>
 <ul>
 <li>실제 GNSS bag 으로 <code>fit_long_map</code>·<code>fit_circle</code> 첫 실행(INS 메시지 필드 확인).</li>
 <li>11-14: 점검표 ①~⑥. 영점 −9° vs 측정 회귀 −13.7°, 가속 전환 수(폐루프)를 처음 확인한다.</li>

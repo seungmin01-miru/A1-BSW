@@ -79,6 +79,8 @@
 ## 3. 준비
 
 ### 3-1. 전날 (대회 PC)
+
+**차 없이 판정 한 번에:** `bash bsw_test/09_ENGINE_ROOM/run_verify.sh`(약 30~40분, sudo 1회) → `VERDICT.md`. 설명은 [`09_ENGINE_ROOM/README.md`](09_ENGINE_ROOM/README.md).
 ```bash
 cd ~/git/A1-BSW && git fetch && git checkout claude/ecstatic-keller-uhtbhe && git pull
 bash bsw_test/00_SAF_estop/scripts/setup_env.sh --build-ws        # vcan0·python-can·cantools·pytest·ros2_ws

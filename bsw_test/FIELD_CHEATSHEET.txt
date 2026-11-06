@@ -25,6 +25,7 @@ A1 BSW 실차 시험 — 입력 순서 메모 (대회 차량 PC 전용)         
 =============================================================================================
 0. 전날 — 대회 PC (한 번)
 =============================================================================================
+  ★ 판정 묶음(약 30~40분, sudo 1회, 차량 안 닿음):  bash ~/git/A1-BSW/bsw_test/09_ENGINE_ROOM/run_verify.sh  → results/verify_*/VERDICT.md
   cd ~/git/A1-BSW && git pull                                          # 최신 코드
   bash bsw_test/00_SAF_estop/scripts/setup_env.sh --check              # 점검만 → "✅ 준비됨" 이면 다음 줄 건너뜀
   bash bsw_test/00_SAF_estop/scripts/setup_env.sh --build-ws           # 빠진 것 설치(vcan0 는 sudo)

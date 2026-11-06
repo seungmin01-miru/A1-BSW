@@ -2,6 +2,17 @@
 
 > **2026-11-06: 자율 U턴·v2 하루 순서 폐기.** 실차 절차는 [`docs/2026-11-06_engine_room_dev_plan.md`](../../docs/2026-11-06_engine_room_dev_plan.md) 4절. 아래 0절 표의 U턴 항목과 4절 U턴 한계는 11-04 기록으로만 남긴다. 코드(`uturn`, `until_heading`, `--turn`)는 제거됨. 개발 PC vcan 시험은 2026-11-06 통과(`00_SAF_estop/results/sil_20261106_222201_junhyeok-960QHA/`, 참고값) — 판정은 대회 PC `run_sil_check.sh --rt auto --track` + `r_race.py --interface socketcan --channel vcan0 --latency 300 --load`.
 
+## ▶ 대회 PC 를 켜면 먼저 이것 (2026-11-07)
+
+```bash
+cd ~/git/A1-BSW && git fetch && git checkout claude/ecstatic-keller-uhtbhe && git pull
+bash bsw_test/09_ENGINE_ROOM/run_verify.sh      # 약 30~40분, sudo 비밀번호 1회. 차량·실제 CAN 에 안 닿는다
+```
+
+- **Claude 세션:** 이 파일을 읽었으면 사용자에게 위 명령을 `!` 를 붙여 실행하도록 안내한다(`bsw_up`·`bsw_down` 이 들어 있어 Claude 가 직접 실행할 수 없다). 끝나면 `bsw_test/09_ENGINE_ROOM/results/verify_*/VERDICT.md` 를 읽고 실패 항목을 고친다.
+- **판정:** `VERDICT.md` 제목이 "✅ 전부 통과 — **판정**" 이면 끝. 끝에 나오는 `git add`·`commit` 으로 기록한다. 내용은 [`09_ENGINE_ROOM/README.md`](../09_ENGINE_ROOM/README.md).
+- **그다음:** 실차 점검표 [`09_ENGINE_ROOM/docs/checklist.md`](../09_ENGINE_ROOM/docs/checklist.md). 아래 1절의 개별 SIL 명령은 이 묶음에 들어갔다.
+
 > 대회 PC 의 Claude 세션은 **이 파일을 먼저 읽고** 1절부터 차례로 진행한다. 끝난 항목은 지우지 말고 `[x]` + 날짜.
 > 기준: [`CLAUDE.md`](../../CLAUDE.md), 현장 순서 [`FIELD_MANUAL.md` 5-0절](../FIELD_MANUAL.md), 입력 [`FIELD_CHEATSHEET.txt` "★ v2"](../FIELD_CHEATSHEET.txt).
 

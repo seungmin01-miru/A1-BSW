@@ -4,8 +4,7 @@
 합격 기준은 지시서 값을 옮겼다. **속도 상향 관문: 직전 구간 정확도 ±20 % 통과 후에만 다음 속도.** 판정은 대회 차량 PC 와 실차 결과로만 한다.
 
 ## 전날
-- [ ] 대회 PC: `run_sil_check.sh --rt auto --track` 통과, `r_race.py --interface socketcan --channel vcan0 --latency 300 --load` 중앙 ≤ 5 ms
-- [ ] 대회 PC: `sil_engine_room.py --out <폴더>` 통과
+- [ ] 대회 PC: `bash bsw_test/09_ENGINE_ROOM/run_verify.sh` → `VERDICT.md` 가 "✅ 전부 통과 — **판정**" (약 30~40분, [`README`](../README.md))
 - [ ] 모델 팀: 서킷 주행 가능 여부(없으면 BSW 단독 항목만), `/race/state` 구독 확인
 - [ ] 로컬라이제이션 팀: bag 토픽(요레이트·피치·RTX 상태) 확인
 
