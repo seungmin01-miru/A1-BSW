@@ -1,0 +1,30 @@
+# 경기 깃발 대응 가감속 프로파일 — can_guard 가 시작할 때 읽는다.
+# ⚠ 이 값들은 대회 성적에 직결된다. 손으로 고치지 말고 아래 절차를 따른다.
+# 갱신 절차:
+#   1) 주행 로그(CAN + GNSS bag)가 생길 때마다 실행:
+#        python3 tools/race_flag/fit_long_profiles.py --can <로그> --bag <bag> --out reports/race_flag/<날짜>_profile_fit
+#   2) 종료 코드 3(⛔ 갱신 중단)이면 UPDATE_BLOCKED.md 를 보고 원인을 해결하기 전까지 값을 바꾸지 않는다.
+#   3) 추천값과 근거 그래프를 사람이 확인·승인한 뒤에만 이 파일을 고친다.
+#   4) 고친 뒤 docs/race_flag_profile_history.md 에 날짜·로그·이전값→새값·승인자를 적는다.
+
+# 아래 값은 전부 잠정(2026-11-06 초기값, 서행 실차 데이터로 승인된 갱신 없음). 근거: 계획서 6·7·10절.
+
+# 서행 진입 목표 감속도 [m/s²] — 잠정
+a_slow: 2.0
+
+# Slow Off 복귀 때 가속 상한을 올리는 속도 [%/s] — 잠정(2 s 에 100 %)
+slow_off_ramp_pct_s: 50.0
+
+# 변환표 — 잠정, ros2_ws/src/a1_control_adapter/config/track.yaml 값 복사(can_guard 는 track.yaml 을 읽지 않는다)
+accel_map:
+  accel_mps2: [0.1, 0.13, 0.57]
+  acc_pct:    [75.0, 80.0, 100.0]
+brake_map:
+  decel_mps2: [0.1, 1.0, 2.0, 3.0, 4.0]
+  brake_pct:  [0.0, 40.0, 70.0, 90.0, 100.0]
+
+# 서행 PI — 잠정(11-04 실차 6 km/h 추종에 쓴 값). ff 단위 m/s²
+slow_pi:
+  kp: 0.8
+  ki: 0.2
+  ff: 0.2
