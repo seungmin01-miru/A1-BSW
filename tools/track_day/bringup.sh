@@ -44,6 +44,10 @@ pgrep -f "^(/usr/bin/)?python3 .*safety/can_guard/can_guard.py" >/dev/null && di
 pgrep -f "^(/usr/bin/)?python3 .*lift_(cmd|tx)\.py" >/dev/null && die "lift_tx/lift_cmd 실행 중 — 0x210 송신자가 둘이 된다"
 pgrep -f "^(/usr/bin/)?python3 .*profile_gen\.py run" >/dev/null && die "profile_gen 실행 중 — 명령 쓰는 쪽이 둘이 된다"
 cp "$PARAMS" "$D/track_params.yaml"
+# 저장소 위치를 이 체크아웃 기준으로(대회 PC 는 ~/git/A1-BSW 라 그대로, 개발 PC 는 다른 경로 — 2026-11-07)
+sed -i "s#^\( *can_guard_dir:\).*#\1 $REPO/safety/can_guard#" "$D/track_params.yaml"
+export A1_BSW_ROOT="$REPO"      # race_state_publisher 의 can_guard_dir 기본값
+cp "$WS/src/a1_control_adapter/config/long_map.yaml" "$D/long_map.yaml" 2>/dev/null || true   # 이 세션의 표 사본(기록용)
 say "세션 폴더 $D, 모드 $MODE, 어댑터 표 $PARAMS (사본 저장)"
 
 # ── 1. CAN 장치 ─────────────────────────────────────────

@@ -57,8 +57,8 @@ case $MODE in kvaser) ARGS+=(--kvaser "$BSW_KV_CH");; peak) ARGS+=(--peak "$PEAK
 [ "$BSW_AUTO_ARM" = 1 ] && ARGS+=(--auto-arm)
 [ "$BSW_APP_REQUIRED" = 1 ] && [ "$MODE" != sil ] && ARGS+=(--estop-required)
 [ "$BSW_RT" = 1 ] || ARGS+=(--no-rt)
+ln -sfn "$D" "$BSW_CAPTURE/bsw_latest"     # bringup 전에: 실패해도 bsw_down --force 로 정리할 수 있게(2026-11-07)
 bash "$REPO/tools/track_day/bringup.sh" "${ARGS[@]}" || { echo "❌ bringup 실패 — $D/bringup.log, 정리: bash $HERE/bsw_down.sh --force"; exit 1; }
-ln -sfn "$D" "$BSW_CAPTURE/bsw_latest"
 
 # ── 2. 세션 기록(results.md 에 필요한 값 — CLAUDE.md 7절) ──
 {
