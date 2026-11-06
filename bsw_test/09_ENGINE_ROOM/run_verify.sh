@@ -156,6 +156,7 @@ pick() { grep -hE "$1" "$2" 2>/dev/null | sort -u | cut -c1-150 | sed 's/^/    /
   pick '지연 (idle|load)' "$OUT/race.log"
   pick '^(PASS|참고).*(hysteresis|old)' "$OUT/cruise.log"
   pick '^ *(PASS|FAIL)' "$OUT/er.log"
+  pick '^(PASS|FAIL) ' "$OUT/bsw.log"
   echo '```'
   echo; echo "실패가 있으면 해당 로그부터 본다. 11-14 전 할 일: \`bsw_test/09_ENGINE_ROOM/docs/checklist.md\`. 차량에는 아무것도 하지 않았다."
 } > "$V"
