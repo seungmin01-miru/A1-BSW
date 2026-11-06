@@ -61,7 +61,7 @@ pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height:
 
 <h1>A1 BSW 엔진룸 도구 보고서<br>— 속도별 종방향 표, 측정·갱신 도구, 경기 날 운영, PlotJuggler 데이터시트</h1>
 <p class="subtitle">2026-11-06 엔진룸·경기 신호 보고서의 후속 · 모델·로컬라이제이션 팀과 운용 담당을 위한 기술 보고서</p>
-<p class="byline">A1-BSW 팀 · 2026-11-07 · 기준 커밋 <span class="mono">91567ec</span> · 개발 PC 결과는 참고값(판정은 대회 PC SIL·실차)</p>
+<p class="byline">A1-BSW 팀 · 2026-11-07 · 기준 커밋 <span class="mono">a2eb061</span> · 개발 PC 결과는 참고값(판정은 대회 PC SIL·실차)</p>
 
 <p class="abstract"><b>요약 —</b> 지시서의 남은 개발 항목(WP2·WP3·WP7)을 구현했다. 어댑터는 이제 차속을 받아 속도 구간별 표로 페달 % 를 정하고, 표는 지금 동작과 같은 값(v1)으로 시작한다. 11-14 절차에 필요한 원 돌기 시험, 표 갱신 도구, 원 맞춤 분석, 현장 점검표를 만들었고, 경기 날 시작 점검과 재개 절차를 넣었다. 모델 팀 확인에 따라 <span class="mono">/control/target</span> 은 20 Hz 로 반영했다. 모든 시험은 가짜 차량과 저장된 로그로 했다. <b>실차 표는 아직 하나도 없고, 저속 유지값은 짐작한 잠정값이다.</b> 부록 A 의 그림은 모두 PlotJuggler 화면 캡처다.</p>
 
@@ -71,7 +71,7 @@ pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height:
 <li><b>GNSS fix 와 피치가 bag 에 없으면 표 갱신이 차단된다.</b> odom 만 있으면 "확인 불가"로 종료 3 이다. 11-14 전에 로컬라이제이션 팀이 INS 토픽(품질·피치)을 녹화하는지 확인해야 한다. 실제 INS 메시지로는 아직 시험하지 못했다.</li>
 <li><b>지금 표는 11-04 기준으로도 ±20 % 를 못 지킨다.</b> 후륜 기반 미리보기에서 10·15 km/h 가속 오차 평균 42·47 % 다(참고값). 속도 상향 관문(지시서 2.4절)을 통과하려면 표를 실제로 재야 한다.</li>
 <li><b>원 돌기에는 공간과 시간이 많이 든다.</b> 지시서 그대로면 약 31 분, 핸들 ±37° 는 지름 약 63~79 m ★ 다. 시험장에 그 공간이 없으면 ±37° 를 빼야 한다.</li>
-<li><b><span class="mono">bsw_up.sh</span> 수정분은 실행 시험을 못 했다.</b> 차량·CAN 명령 보호 규칙으로 제가 실행할 수 없다. 새 점검 스크립트만 따로 시험했다. 대회 PC 에서 <code>--sil</code> 로 한 번 돌려 봐야 한다.</li>
+<li><b>BSW 시작·종료 전체 경로는 SIL 로 확인했고, 그 과정에서 결함 2건을 고쳤다(5장).</b> <span class="mono">bsw_up --sil</span> 은 사람이 직접 실행했다. 대회 PC 에서 한 번 더 돌려야 한다.</li>
 </ol></div>
 
 <h2>1. 현재 상태</h2>
@@ -80,7 +80,7 @@ pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height:
 <tr><td>WP-1·0·1</td><td>폐기 설계 제거, 1차 업데이트, <code>/race/state</code></td><td>이전 보고서 + vcan0 재확인(표 II)</td><td>대회 PC 판정, 실물 프레임(11-23)</td></tr>
 <tr><td>WP2</td><td>속도별 표 <code>long_map</code>, 차속 구독, 상태 필드</td><td>단위 42 통과, 회귀(1차원과 같은 출력), 실제 노드 SIL</td><td>실측 표(11-14~)</td></tr>
 <tr><td>WP3</td><td><code>fit_long_map</code>, <code>circle_test</code>, <code>fit_circle</code>, 점검표</td><td>단위 19 통과, 전 과정 SIL, 11-04 로그 시운전</td><td>실제 GNSS bag</td></tr>
-<tr><td>WP7</td><td>시작 점검, 경기 날 절차, 데이터시트</td><td>점검 스크립트 단독 시험</td><td><code>bsw_up --sil</code> 리허설, 데이터시트 v1.0(실차 표 뒤)</td></tr>
+<tr><td>WP7</td><td>시작 점검, 경기 날 절차, 데이터시트</td><td><code>bsw_up --sil</code> ~ <code>bsw_down</code> 전체 실행(5장)</td><td>대회 PC 리허설, 데이터시트 v1.0(실차 표 뒤)</td></tr>
 <tr><td>WP4~6</td><td>실차 측정 6일</td><td>—</td><td>11-14 부터, 사람이 실행</td></tr>
 </tbody></table></div>
 
@@ -171,6 +171,8 @@ pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height:
 <li><b>시작 점검</b> <code>tools/bsw/race_up_check.py</code>: <code>/race/state</code> 발행, 0x202 값(표시만, 0x203 송신 없음), 조향 표·<code>long_map</code> 버전·source. <code>bsw_up</code>·<code>bsw_status</code> 가 부르고, 세션 기록에도 남긴다. 실패해도 BSW 를 끄지는 않고 ❌ 로 알린다 — 매뉴얼은 ❌ 면 출발하지 말라고 적었다.</li>
 <li><b>매뉴얼</b> <code>FIELD_MANUAL</code> 5-1절: 브리핑 확인 6 항목, 중단 → 재개(앱은 차가 선 뒤에만 해제, 원격을 켠 채 자율 불가, 재시작은 KIAPI 허용 답변·브리핑 뒤).</li>
 <li><b>점검표</b> <code>bsw_test/09_ENGINE_ROOM/docs/checklist.md</code>, 이력 <code>docs/engine_room_map_history.md</code>, 메모장 ★ 11-14 절.</li>
+<li><b>시작·종료 SIL(11-07, 사람이 실행, 개발 PC).</b> <code>bsw_up --sil --no-rt --no-ui</code> → 시작 점검 전부 ✅ → 20 Hz 입력으로 자동 arm(입력 나이 1~35 ms), 타이어 0° = 핸들 −9°, +0.3 m/s² → 가속 87.7 %, −3 m/s² → 브레이크 90 %, 깃발 S02 → <code>seen_go</code>·GO, 입력 끊김 → 고장 래치 → STOPPED(브레이크 유지) → <code>bsw_down</code> ESTOP 브레이크 뒤 정리·압축. 이 시험의 가짜 차량은 물리 모델이 없어 차속 표시가 216 km/h 까지 올라갔다 — 실제 응답이 아니다. BSW 는 차속을 제한하지 않으니 상한은 모델 몫이다.</li>
+<li><b>이 시험에서 고친 결함 2건.</b> ① <code>~/git/A1-BSW</code> 가 아닌 체크아웃에서 어댑터·<code>race_state_publisher</code> 가 시작하다 죽었다 → 세션 설정의 경로를 실제 저장소로 바꾼다(대회 PC 는 값이 같다). ② bringup 이 실패하면 세션 링크가 없어 안내된 <code>bsw_down --force</code> 가 동작하지 않았다 → 링크를 먼저 만든다. ③ 이 개발 PC 는 시스템 python 에 python-can 이 없어 임시 경로를 지정했다(대회 PC 는 설치돼 있음, 코드 문제 아님).</li>
 <li><b>데이터시트 v0.6</b>: 20 Hz, 어댑터 필드 5 개. v1.0 은 실차 표가 나온 뒤로 미뤘다(지시서 관문이 리허설·최종본이다).</li>
 </ul>
 
@@ -188,7 +190,7 @@ pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height:
 bash bsw_test/00_SAF_estop/scripts/run_sil_check.sh --rt auto --track
 python3 safety/can_guard/sil_tests/r_race.py --interface socketcan --channel vcan0 --latency 300 --load
 python3 bsw_test/09_ENGINE_ROOM/scripts/sil_engine_room.py --out &lt;폴더&gt;
-bash tools/bsw/bsw_up.sh --sil --no-rt --no-ui     # 그리고 bsw_down.sh — 시작 점검 출력 확인(이번에 실행 못 함)</pre>
+bash tools/bsw/bsw_up.sh --sil --no-rt --no-ui     # 그리고 bsw_down.sh — 시작 점검 출력 확인(개발 PC 는 통과)</pre>
 <ul>
 <li>실제 GNSS bag 으로 <code>fit_long_map</code>·<code>fit_circle</code> 첫 실행(INS 메시지 필드 확인).</li>
 <li>11-14: 점검표 ①~⑥. 영점 −9° vs 측정 회귀 −13.7°, 가속 전환 수(폐루프)를 처음 확인한다.</li>

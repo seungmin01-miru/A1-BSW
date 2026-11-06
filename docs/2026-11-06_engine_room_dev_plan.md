@@ -318,7 +318,7 @@ steer_map:                      # 2026-11-04 bsw5 GNSS 요레이트 역산 (★ 
 | 2026-11-06 | WP0 | 조향 7점 표, 히스테리시스, 데이터시트 v0.5. 고정 입력 0 회/분 | 2dd0d9b | 폐루프 효과는 11-14, `rehearse_lift_guard` |
 | 2026-11-06 | WP1 | `/race/state`, 이벤트 로그, 상태판, r_race. 시나리오 10개 3회 통과, 지연 중앙 0.94 ms(개발 PC) | e7a64b5, 47cf377 | E1~E7·P1·P2, 대회 PC 지연 |
 | 2026-11-06 | vcan 관문 | 개발 PC 참고값: rehearse_lift_guard 31/31, E1~E7·P1·P2, 세션 SIL, 트랙 17/17, r_race socketcan 통과 | 이 줄의 커밋 | 대회 PC `--rt auto` 재실행 |
-| 2026-11-07 | WP2·3·7 | 속도별 표, 측정·갱신 도구, 시작 점검, 데이터시트 v0.6, 모델 20 Hz. 개발 PC SIL 통과 | `git log --grep engine-room` | 실제 GNSS bag, `bsw_up --sil`, 대회 PC 판정 |
+| 2026-11-07 | WP2·3·7 | 속도별 표, 측정·갱신 도구, 시작 점검, 데이터시트 v0.6, 모델 20 Hz. 개발 PC SIL 통과 | `git log --grep engine-room` | 실제 GNSS bag, 대회 PC 판정. 시작·종료 SIL 은 개발 PC 통과 |
 | 2026-11-06 | 보고 | `reports/2026-11-06_engine_room_report/`, `reports/race_flag` 삭제 | 이 표의 커밋 | — |
 
 ## 9. 변경 이력
