@@ -27,6 +27,13 @@ def maps_from_yaml():
     return s, lm
 
 
+def hyst_map():
+    p = track_params()
+    return LongMap(p['accel_map']['accel_mps2'], p['accel_map']['acc_pct'], p['brake_map']['decel_mps2'],
+                   p['brake_map']['brake_pct'], p['long_deadband_mps2'], p['acc_max_pct'], p['brake_max_pct'],
+                   deadband_off_mps2=p['long_deadband_off_mps2'])
+
+
 def test_interp_basic_and_saturation():
     xs, ys = [0.0, 1.0, 3.0], [0.0, 10.0, 30.0]
     assert interp(0.5, xs, ys) == pytest.approx(5.0)
@@ -115,3 +122,81 @@ def test_slew_limiter():
 
 def test_track_yaml_loads():
     maps_from_yaml()
+
+
+# ── 2026-11-06 엔진룸 1차 업데이트(지시서 2.6.2) ────────────────────────────
+def test_track_steer_map_v1_monotonic_and_ends():
+    s, _ = maps_from_yaml()
+    assert s.to_wheel(0.0) == pytest.approx(-9.0)            # 영점 보정
+    assert s.to_wheel(11.5) == 150.0 and s.to_wheel(-11.5) == -150.0
+    assert s.to_wheel(20.0) == 150.0 and s.to_wheel(-20.0) == -150.0   # 표 밖 포화
+
+
+def test_track_steer_map_v1_round_trip():
+    s, _ = maps_from_yaml()
+    for i in range(-115, 116):
+        t = i / 10
+        assert s.to_tire(s.to_wheel(t)) == pytest.approx(t, abs=0.1)
+
+
+def test_hysteresis_alternating_input_switches_at_most_once():
+    """0.05 ↔ 0.15 를 20 ms 마다 번갈아 넣으면 전환 ≤ 1 회(지시서 단위 시험)."""
+    lm = hyst_map()
+    out = [lm.to_pedals(0.05 if i % 2 else 0.15)[0] for i in range(500)]
+    assert sum(1 for a, b in zip(out, out[1:]) if (a > 0) != (b > 0)) <= 1
+    assert out[0] > 0 and out[-1] >= 75.0
+
+
+def test_old_map_toggles_on_same_input():
+    _, lm = maps_from_yaml()                                 # deadband_off 없음 = 예전 동작
+    out = [lm.to_pedals(0.05 if i % 2 else 0.15)[0] for i in range(100)]
+    assert sum(1 for a, b in zip(out, out[1:]) if (a > 0) != (b > 0)) == 99
+
+
+def test_hysteresis_entry_and_exit():
+    lm = hyst_map()
+    assert lm.to_pedals(0.05) == (0.0, 0.0)                  # 0 에서 0.05 는 아직 안 켜짐
+    assert lm.to_pedals(0.11)[0] > 0
+    assert lm.to_pedals(0.04)[0] == pytest.approx(75.0)      # 유지: 표 끝값
+    assert lm.to_pedals(0.029) == (0.0, 0.0)                 # 이탈
+    assert lm.to_pedals(0.05) == (0.0, 0.0)                  # 재진입은 0.10 을 넘어야
+
+
+def test_hysteresis_brake_side():
+    lm = hyst_map()
+    assert lm.to_pedals(-0.05) == (0.0, 0.0)
+    assert lm.to_pedals(-1.0)[1] == pytest.approx(40.0)
+    assert lm.to_pedals(-0.05) == (0.0, 0.0)                 # 브레이크 표 0.1 → 0 %: 유지 중에도 0
+    assert lm.to_pedals(-1.0)[1] == pytest.approx(40.0)
+    assert lm.to_pedals(-0.02) == (0.0, 0.0)
+
+
+def test_hysteresis_never_both_and_direct_flip():
+    lm = hyst_map()
+    assert lm.to_pedals(0.5)[1] == 0.0
+    assert lm.to_pedals(-0.5)[0] == 0.0                      # 가속 모드에서 바로 브레이크
+    assert lm.to_pedals(0.5)[1] == 0.0
+    assert lm.to_pedals(-0.05) == (0.0, 0.0)                 # 가속 모드에서 반대쪽 값 → 0
+    for a in [x / 100 for x in range(-300, 200, 7)]:
+        acc, brake = lm.to_pedals(a)
+        assert not (acc > 0 and brake > 0)
+
+
+def test_hysteresis_reset_on_arm():
+    lm = hyst_map()
+    lm.to_pedals(0.5)
+    lm.reset()
+    assert lm.to_pedals(0.05) == (0.0, 0.0)
+
+
+def test_step_inputs_same_with_or_without_hysteresis_outside_band():
+    """기존 계단 입력 회귀: 0.03~0.10 밖의 값은 두 표가 같은 출력."""
+    _, old = maps_from_yaml()
+    new = hyst_map()
+    for a in (0.0, 0.3, 0.6, 0.0, -1.0, -3.0, 0.0, 1.5, -4.0, 0.0):
+        assert new.to_pedals(a) == old.to_pedals(a)
+
+
+def test_bad_off_value_rejected():
+    with pytest.raises(ValueError):
+        LongMap([0.1, 1.0], [75.0, 100.0], [0.1, 4.0], [0.0, 100.0], deadband_mps2=0.1, deadband_off_mps2=0.2)

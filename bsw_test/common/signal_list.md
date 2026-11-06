@@ -14,4 +14,4 @@
 | 상태 | heartbeat, 상태 전이, 비상 정지 | can_guard 로그 | 우리 쪽 기준 |
 | 기록만 | 0x128 | RES 응답(`RES_END`, `RES_ERROR`) — 차량 송신, 우리는 기록만 | 제어에 안 씀 |
 | 관제용 | 0x710~0x712 | 축 모드, `*_USER_CAN_ERR`, `VS`, 휠속 | 제어에 안 씀, `*_USER_CAN_ERR` 은 TODO-2 확인에 활용 |
-| 표시 | 0x202 | `speed_limit_info` — 현재 차량 속도 제한 표시. 11-04 전 세션 30.0(원격 조종 제한값, 자율에는 적용 안 됨 — 사용자 확인) | 업체 확인: `docs/race_flag_open_items.md` |
+| 표시 | 0x202 | `speed_limit_info` — 현재 차량 속도 제한 표시. 11-04 전 세션 30.0(원격 조종 제한값, 자율에는 적용 안 됨 — 사용자 확인) | 업체 확인: `docs/engine_room_open_items.md` |

@@ -29,6 +29,9 @@
 - `archive/dbc_2026-09/`(EAIT) DBC 사용, 0x156/0x157 을 원격 경로로 가정
 - 합격 기준 숫자를 임의로 바꾸기 (기준은 각 테스트의 `docs/goal.md` 에서만 가져온다)
 
+### 1.1a 역할 분담 (2026-11-06 회의)
+BSW = ① 모델 가감속 → 페달 % 변환 ② 모델 입력 끊김 → 정지 ③ 깃발·RES·0x202·앱 → `/race/state` 전달 ④ 휠 엔코더 전달 ⑤ 물리 한계 측정. 반응(Go 잠금·서행·Finish·RES 뒤 정지 유지)과 조향 보정은 **모델 담당**. 0x203 은 보내지 않는다. 근거 [`docs/2026-11-06_engine_room_dev_plan.md`](docs/2026-11-06_engine_room_dev_plan.md).
+
 ### 1.2 승인 받고 하는 것
 - 테스트 코드·현장 스크립트 실행, `track.yaml`·can_guard 한계값 변경, 기존 도구 파일 이동(통합 작업)
 
@@ -64,13 +67,13 @@
 | 상태 0x200 | `steer_postion`(핸들각 °), `break_postion`(0~100 %, = 명령 %) | 브레이크는 **82 % 포화**(11-03; 11-04 는 100 % 명령에 61~68 %, 세션별). ROS `ControlInfo.brake_position` 만 0~10 유지(D13) |
 | 바퀴 0x201 | `left/right_speed`(km/h), `rpm` | **후륜 엔코더만**, 전륜은 프리롤링(엔코더 없음). **부호 없음** |
 | 주기 | 0x200/0x201 21.0 ms(47.6 Hz), can_guard 20 ms | — |
-| 대회 신호 0x124~0x127 | `KIAPI_Race_Signal`(깃발), `KIAPI_PIT_ZONE`, `KIAPI_REPAIR`, `KIAPI_RES`(원격비상제동) — 대회 서버 송신. **차량 제어 CAN 과 같은 버스** | 11-04 버스에는 없었음. 근거 `docs/2026-11-06_race_flag_dev_plan.md` 1.2·1.3절 |
-| 0x128 | `KIAPI_RES_FB` — RES 응답(`RES_END`, `RES_ERROR`) | **기록만**(우리 조치 없음) |
+| 대회 신호 0x124~0x127 | `KIAPI_Race_Signal`(깃발), `KIAPI_PIT_ZONE`, `KIAPI_REPAIR`, `KIAPI_RES`(원격비상제동) — 대회 서버 송신. **차량 제어 CAN 과 같은 버스** | 11-04 버스에는 없었음. 근거 `docs/2026-11-06_engine_room_dev_plan.md` 1.3절. `/race/state` 로 전달만 |
+| 0x128 | `KIAPI_RES_FB` — RES 응답(`RES_END`, `RES_ERROR`) | **기록·전달만**(우리 조치 없음) |
 | 0x710~0x712 | `KIAPI_FB_*` — 관제용 피드백(축 모드, `*_USER_CAN_ERR`, `VS`, 휠속) | 제어에 안 씀. `*_USER_CAN_ERR` 은 TODO-2 확인에 활용 |
-| 0x202 | `speed_limit_info`(×0.1 km/h) — 현재 차량 속도 제한 표시 | 11-04 전 세션 30.0(원격 조종 제한값, 자율에는 적용 안 됨 — 사용자 확인). 자율 세션에서도 30.0 으로 보이는 이유와 0x203 과의 관계는 업체 확인 항목(`docs/race_flag_open_items.md`) |
-| 0x203 | `speed_limit`(×0.1 km/h, 0~100) — 차량 속도 제한 설정, 우리 송신 | **송신 기본 꺼짐**(KIAPI 허용 전), can_guard 단독. 계획서 9절 |
+| 0x202 | `speed_limit_info`(×0.1 km/h) — 현재 차량 속도 제한 표시 | 11-04 전 세션 30.0(원격 조종 제한값, 자율에는 적용 안 됨 — 사용자 확인). 자율 세션에서도 30.0 으로 보이는 이유와 0x203 과의 관계는 업체 확인 항목(`docs/engine_room_open_items.md`) |
+| 0x203 | `speed_limit`(×0.1 km/h, 0~100) — 차량 속도 제한 설정 | **BSW 는 보내지 않음**(회의 결정, 코드 없음. 예전 구현은 태그 `race-flag-full-3309cd1`) |
 | 휠베이스 L | **2.360 m** | 확정 |
-| 조향비 | 약 7.5 (핸들 150° ≈ 타이어 20°) | **잠정** — 변환표 작성 대상(TODO-4) |
+| 조향비 | 핸들 ±150° ≈ 타이어 ±11.5° ★, 실효 9~13(평균 10.7), 영점: 핸들 0° 에서 타이어 +1.2°(좌). `track.yaml` 7점 표 | **잠정**(11-04 bsw5 GNSS 역산, 그래프 판독) — 11-14 원 돌기로 교체(TODO-4). 이전 7.5 폐기 |
 | 조향 불감대 | 핸들각 0 근처 ±1.5° | 10-07 리프트 |
 | 지연 | 조향 무반응 약 175 ms, 브레이크 56~112 ms | 리프트 값, 주행으로 재확인 |
 | 차량 heartbeat | 없음(축별 `live_counter` 만) | heartbeat 는 우리 쪽(제어기→can_guard `HeartbeatChannel`) 기준 |

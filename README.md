@@ -93,7 +93,7 @@ A1-BSW/
 
 | 디렉터리 | 내용 | 안내 |
 |---|---|---|
-| `DBC/` | `A1_dbc.dbc`(10-06 업체 원본), `A1_dbc_2_fixed.dbc`(기준 — 대회 배포본의 오타 수정, 고친 곳은 파일 안 `CM_`) | 근거: `docs/2026-11-06_race_flag_dev_plan.md` WP0 |
+| `DBC/` | `A1_dbc.dbc`(10-06 업체 원본), `A1_dbc_2_fixed.dbc`(기준 — 대회 배포본의 오타 수정, 고친 곳은 파일 안 `CM_`) | 근거: `docs/2026-11-06_engine_room_dev_plan.md` WP0 |
 | `safety/can_guard/` | 차량 명령(0x210)의 유일한 송신자, `lift_cmd.py` | `safety/can_guard/README.md` |
 | `ros2_ws/` | ROS2 상태 브리지·제어기 출력 어댑터(`a1_control_adapter`) | `ros2_ws/README.md` |
 | `sil/vcan/` | 가상 버스 SIL(가짜 실차 `fake_a1_vehicle.py`) | `sil/vcan/README.md` |

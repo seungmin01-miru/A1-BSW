@@ -5,12 +5,13 @@
 
   조향:   타이어각 → (steer_sign) → 표 보간 → 핸들각 → ±한계 클램프 → 속도 제한
   종방향: a > +불감대 → 가속 % 표, a < −불감대 → 브레이크 % 표(감속 크기 기준), 그 사이 → 둘 다 0
+          deadband_off_mps2 를 주면 히스테리시스: 켜진 모드는 |a| < 이탈값 이 될 때까지 유지(표 보간은 끝값 포화)
           가속·브레이크는 동시에 0 이 아닐 수 없다(표 구조상 보장 + can_guard 정책과 같음)
 표 밖 입력은 표 끝값으로 포화한다(외삽 안 함).
 """
 import math
 from bisect import bisect_right
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 def interp(x, xs, ys):
@@ -59,7 +60,12 @@ class SteerMap:
 
 @dataclass
 class LongMap:
-    """목표 가감속 → (가속 %, 브레이크 %). 감속 표는 감속 **크기**(양수 m/s²)로 쓴다."""
+    """목표 가감속 → (가속 %, 브레이크 %). 감속 표는 감속 **크기**(양수 m/s²)로 쓴다.
+
+    deadband_off_mps2 를 주면 to_pedals 가 상태를 가진다(히스테리시스, 2026-11-04 bsw5 on/off 전환 분당 161회 해소):
+      진입 |a| > deadband_mps2, 이탈 |a| < deadband_off_mps2, 그 사이는 이전 모드 유지.
+    None 이면 상태 없는 예전 동작(|a| ≤ deadband → 0).
+    """
     accel_mps2: list
     acc_pct: list
     decel_mps2: list
@@ -67,8 +73,13 @@ class LongMap:
     deadband_mps2: float = 0.1
     acc_max_pct: float = 30.0
     brake_max_pct: float = 100.0
+    deadband_off_mps2: float = None
+    _mode: int = field(default=0, init=False, repr=False)   # +1 가속, −1 브레이크, 0 없음
 
     def __post_init__(self):
+        off = self.deadband_off_mps2
+        if off is not None and not 0 <= off <= self.deadband_mps2:
+            raise ValueError(f'deadband_off_mps2 는 0~deadband_mps2: {off}')
         _check_table('accel_map', self.accel_mps2, self.acc_pct)
         _check_table('brake_map', self.decel_mps2, self.brake_pct)
         for name, ys in (('acc_pct', self.acc_pct), ('brake_pct', self.brake_pct)):
@@ -77,10 +88,22 @@ class LongMap:
         if not (0 <= self.acc_max_pct <= 100 and 0 <= self.brake_max_pct <= 100):
             raise ValueError('acc_max_pct/brake_max_pct 는 0~100')
 
+    def reset(self):
+        """히스테리시스 모드를 지운다(종방향 arm 순간 — 옛 입력의 모드로 출발하지 않게)."""
+        self._mode = 0
+
     def to_pedals(self, accel_mps2):
-        if accel_mps2 > self.deadband_mps2:
+        on = self.deadband_mps2
+        off = on if self.deadband_off_mps2 is None else self.deadband_off_mps2
+        if accel_mps2 > on:
+            self._mode = 1
+        elif accel_mps2 < -on:
+            self._mode = -1
+        elif self.deadband_off_mps2 is None or abs(accel_mps2) < off or accel_mps2 * self._mode < 0:
+            self._mode = 0                  # 이탈값 안쪽, 또는 모드 반대쪽 값
+        if self._mode > 0:
             return min(interp(accel_mps2, self.accel_mps2, self.acc_pct), self.acc_max_pct), 0.0
-        if accel_mps2 < -self.deadband_mps2:
+        if self._mode < 0:
             return 0.0, min(interp(-accel_mps2, self.decel_mps2, self.brake_pct), self.brake_max_pct)
         return 0.0, 0.0
 

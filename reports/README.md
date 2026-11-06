@@ -6,4 +6,6 @@
 | 11-05 | [`2026-11-05_lowlevel_control_report/`](2026-11-05_lowlevel_control_report/) | 하위 제어(BSW) 시스템·인터페이스 변환표 보고서 — 팀 공유용 |
 | 11-05 | [`2026-11-05_bsw_update_report/`](2026-11-05_bsw_update_report/) | BSW 개선 보고 — 앱 비상정지 재정의, 자동 arm·disarm 동작, 주행 날 패키지 `tools/bsw`, Kvaser 채널 공유·수신, 도구 정비 |
 
+| 11-04 트랙 분석 | [`../reports(log)/20261104_track/`](../reports(log)/20261104_track/) | bsw4·bsw5 주행 분석(그래프·CSV, 사용자 반입, git 밖). PDF `docs/reference/2026-11-04_track_drive_analysis.pdf` |
+
 그림·표는 `measurements/<날짜>/` 결과와 `tools/` 스크립트로 다시 만들 수 있어야 한다(손으로 고친 숫자 없음).

@@ -10,4 +10,4 @@ float64 out_steer_wheel_deg   # can_guard 로 넘긴 핸들각(표 변환·클�
 float64 out_brake_pct
 float64 out_acc_pct
 uint32 rejected_count         # NaN·범위 밖이라 버린 입력 누적 개수
-string note                   # 마지막 이상 사유(없으면 빈 문자열)
+string note                   # 마지막 이상 사유. 없으면 표 버전("map <track.yaml map_version>")

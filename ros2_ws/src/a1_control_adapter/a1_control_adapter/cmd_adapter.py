@@ -73,7 +73,9 @@ class CmdAdapter(Node):
             list(p('brake_map.brake_pct', [0.0, 100.0]).value),
             deadband_mps2=p('long_deadband_mps2', 0.1).value,
             acc_max_pct=p('acc_max_pct', 30.0).value,
-            brake_max_pct=p('brake_max_pct', 100.0).value)
+            brake_max_pct=p('brake_max_pct', 100.0).value,
+            deadband_off_mps2=p('long_deadband_off_mps2', 0.03).value)
+        self.map_version = str(p('map_version', '').value)
         self.lim = InputLimits(p('input_accel_abs_mps2', 15.0).value, p('input_steer_tire_abs_deg', 45.0).value)
         self.slew = SlewLimiter(p('steer_rate_limit_deg_s', 120.0).value)
         self.auto_arm = bool(p('auto_arm', False).value)
@@ -154,6 +156,8 @@ class CmdAdapter(Node):
     def _do_arm(self, axis):
         if axis == 'steer' and not self.steer_armed:
             self.slew.reset(self.meas_wheel_deg)   # 지금 핸들 위치에서 목표까지 속도 제한으로 이동
+        if axis == 'long' and not self.long_armed:
+            self.long.reset()                      # disarm 중 입력으로 쌓인 가감속 모드로 출발하지 않게
         setattr(self, f'{axis}_armed', True)
 
     def on_arm(self, axis, req, res):
@@ -293,7 +297,7 @@ class CmdAdapter(Node):
         st.in_accel_mps2, st.in_steer_tire_deg = float(accel), float(tire)
         st.out_steer_wheel_deg, st.out_brake_pct, st.out_acc_pct = float(wheel), float(brake), float(acc)
         st.rejected_count = self.rejected
-        st.note = self.fault or self.note
+        st.note = self.fault or self.note or (f'map {self.map_version}' if self.map_version else '')
         self.pub.publish(st)
 
     def _close(self):
