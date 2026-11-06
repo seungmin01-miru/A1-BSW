@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+ <tabbed_widget name="Main Window" parent="main_window">
+  <Tab containers="1" tab_name="steer_map">
+   <Container><DockSplitter orientation="-" sizes="1.0000" count="1"><DockArea name="가로 핸들 ° / 세로 타이어 ° — 측정(회색, 11-04 GNSS 요레이트 역산) · 새 표(파랑) · 옛 표 7.5(빨강)"><plot style="LinesAndDots" flip_y="false" flip_x="false" mode="TimeSeries"><range bottom="-21" top="21" left="-150" right="150.0"/><limitY min="-21" max="21"/><curve name="measured_tire_deg" color="#7f7f7f"/><curve name="new_map_tire_deg" color="#1f77b4"/><curve name="old_map_tire_deg" color="#d62728"/></plot><transform/></DockArea></DockSplitter></Container>
+  </Tab>
+  <currentTabIndex index="0"/>
+ </tabbed_widget>
+ <use_relative_time_offset enabled="0"/>
+ <Plugins/>
+ <customMathEquations/>
+ <snippets/>
+</root>

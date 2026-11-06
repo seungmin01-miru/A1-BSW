@@ -1,0 +1,3 @@
+label,switch_per_min,switches,seconds
+hysteresis,0.0,0,60.0
+old,1497.5,1498,60.0

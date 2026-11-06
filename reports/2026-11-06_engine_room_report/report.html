@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A1 BSW 엔진룸 보고서</title>
+<style>
+:root { --ink:#000; --gray:#555; --rule:#000; --paper:#fff; }
+@page { size: A4; margin: 17mm 16mm 17mm 16mm; }
+html { background: var(--paper); }
+body { font-family: "Noto Serif CJK KR", "Noto Serif KR", "Times New Roman", serif; color: var(--ink);
+       background: var(--paper); font-size: 9.2pt; line-height: 1.55; margin: 0 auto; max-width: 178mm;
+       text-align: justify; word-break: keep-all; overflow-wrap: anywhere; }
+h1 { font-size: 16pt; text-align: center; margin: 0 0 4pt; line-height: 1.3; font-weight: 700; }
+.subtitle { text-align: center; font-size: 10pt; margin: 0 0 3pt; }
+.byline { text-align: center; font-style: italic; font-size: 9pt; color: #222; margin-bottom: 10pt; }
+.abstract { font-size: 8.8pt; margin: 0 6mm 10pt; line-height: 1.5; }
+.abstract b { font-style: italic; }
+h2 { font-size: 10.5pt; font-weight: 700; margin: 14pt 0 5pt; text-transform: none; letter-spacing: .02em;
+     break-after: avoid; }
+h3 { font-size: 9.6pt; font-weight: 700; font-style: italic; margin: 9pt 0 3pt; break-after: avoid; }
+p { margin: 0 0 5pt; text-indent: 0; }
+code, .mono { font-family: "DejaVu Sans Mono", "Noto Sans Mono CJK KR", monospace; font-size: 7.9pt; }
+ul, ol { margin: 2pt 0 6pt 0; padding-left: 15pt; }
+li { margin: 1pt 0; }
+.tbl { margin: 10pt 0 10pt; }
+.tbl.keep { break-inside: avoid; }
+.tbl .tno, .tbl .ttl { break-after: avoid; }
+tr { break-inside: avoid; }
+.tbl .tno { text-align: center; font-size: 8.2pt; letter-spacing: .06em; }
+.tbl .ttl { text-align: center; font-size: 8.4pt; font-variant: small-caps; margin-bottom: 3pt; }
+table { width: 100%; border-collapse: collapse; font-size: 7.8pt; line-height: 1.38; }
+thead th { border-top: 1.1px solid var(--rule); border-bottom: 0.7px solid var(--rule); font-weight: 600;
+           padding: 3pt 4pt; text-align: left; vertical-align: bottom; }
+tbody td { padding: 2.2pt 4pt; vertical-align: top; text-align: left; }
+tbody tr:last-child td { border-bottom: 1.1px solid var(--rule); }
+td.c, th.c { text-align: center; } td.r, th.r { text-align: right; }
+tr.grp td { font-style: italic; font-weight: 600; padding-top: 4pt; border-top: 0.4px solid #999; }
+.tnote { font-size: 7.2pt; color: #222; margin-top: 3pt; line-height: 1.4; text-align: left; }
+figure { margin: 10pt 0 10pt; break-inside: avoid; }
+figure img { width: 100%; display: block; }
+figure.half img { width: 58%; margin: 0 auto; }
+figcaption { font-size: 7.9pt; line-height: 1.42; margin-top: 4pt; text-align: justify; }
+figcaption b { font-weight: 400; }
+.st-ok { font-weight: 700; } .st-g { } .st-w { font-style: italic; } .st-n { color: var(--gray); }
+.box { border: 0.7px solid #000; padding: 5pt 8pt; margin: 8pt 0; font-size: 8.6pt; break-inside: avoid; }
+.box .bt { font-weight: 700; margin-bottom: 2pt; }
+.pb { break-before: page; }
+figure.sheet img { width: auto; max-width: 100%; max-height: 226mm; margin: 0 auto; }
+figure.fig80 img { width: 86%; margin: 0 auto; }
+.small { font-size: 8pt; }
+sup { font-size: 6.5pt; }
+pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height: 1.35; border-top: .7px solid #000;
+      border-bottom: .7px solid #000; padding: 4pt 2pt; white-space: pre-wrap; margin: 4pt 0 8pt; }
+@media screen { body { padding: 16px; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#fff; } }
+:root[data-theme="dark"] { --paper:#fff; }
+</style>
+</head>
+<body>
+
+<h1>A1 BSW 엔진룸·경기 신호 전달 보고서<br>— 역할 재정의 후 구현, 11-04 트랙 분석 반영, PlotJuggler 데이터시트</h1>
+<p class="subtitle">11-05 하위 제어·개선 보고서의 후속 · 모델·로컬라이제이션 팀과 운용 담당을 위한 기술 보고서</p>
+<p class="byline">A1-BSW 팀 · 2026-11-06 · 기준 커밋 <span class="mono">47cf377</span> · 개발 PC 결과는 참고값(판정은 대회 PC SIL·실차)</p>
+
+<p class="abstract"><b>요약 —</b> 2026-11-06 회의에서 BSW 의 역할을 ① 모델 가감속 → 페달 % 변환, ② 모델 입력 끊김 → 정지, ③ 경기 신호를 ROS 로 전달, ④ 휠 엔코더 전달, ⑤ 물리 한계 측정으로 좁혔다. 깃발 반응과 조향 보정은 모델 담당이다. 이에 따라 같은 날 먼저 구현된 경기 상태 기계·서행 제어·0x203 송신을 걷어내고(WP-1), 11-04 트랙 분석에서 나온 엔진룸 결함 2가지를 고쳤으며(WP0), 경기 신호 전달 <span class="mono">/race/state</span> 를 새로 구현했다(WP1). 부록 A 의 데이터시트는 모두 CAN 원본·SIL 결과를 PlotJuggler 로 열어 캡처한 화면이다. <b>이 보고서의 어떤 값도 실차 검증을 거치지 않았다</b> — 표 숫자는 그래프 판독 잠정값이고, 첫 실차 확인은 11-14 이다.</p>
+
+<div class="box"><div class="bt">먼저 알아야 할 것 5가지</div>
+<ol>
+<li><b>모델이 요청할 수 있는 최대 타이어각은 이제 ±11.5°</b>(이전 ±20°). 그 이상은 끝값 포화다. 경로 계획 최소 반경을 다시 봐야 한다(모델 팀).</li>
+<li><b>Go 전에 가속을 내면 차가 움직인다.</b> BSW 는 전달만 한다. Go 잠금·서행·Finish 정차·RES 뒤 정지 유지는 전부 모델 책임이다(데이터시트 v0.5, 06 시트).</li>
+<li><b>가속 히스테리시스의 실제 효과는 아직 모른다.</b> 고정 입력 시험은 통과했지만(전환 0 회/분), 11-04 목표 가속도는 약 1.8 s 주기로 이탈값(0.03) 근처까지 내려간다. 실차에서는 전환이 남을 수 있다(4.2절).</li>
+<li><b>11-14 U턴 시험 전에 결정이 필요하다.</b> 자율 U턴 도구와 현장 매뉴얼이 아직 조향비 7.5 전제다. 새 표 기준 지름은 13 m 가 아니라 약 23 m ★이고, 방위 추정은 실제 약 100° ★에서 180° 라고 판단한다(6장 E-6).</li>
+<li><b>vcan0 시험을 아직 못 돌렸다.</b> 이 PC 에 vcan0·can-utils 가 없고 sudo 가 필요해서 <span class="mono">rehearse_lift_guard</span>(31 항목)·E1~E7·P1·P2·브리지 프로세스 분리 지연 측정은 미실행이다(7장).</li>
+</ol></div>
+
+<h2>1. 역할과 현재 상태</h2>
+<div class="tbl keep"><div class="tno">TABLE I</div><div class="ttl">역할 분담 (2026-11-06 회의, 지시서 1.1절)</div>
+<table><thead><tr><th style="width:50%">BSW 가 하는 것</th><th>BSW 가 하지 않는 것 (모델·플래닝·로컬라이제이션)</th></tr></thead><tbody>
+<tr><td>① 가감속 명령 → 페달 % 변환</td><td>속도 제어, 램프, 필터, 예측 보정</td></tr>
+<tr><td>② 입력 끊김 → 정지 (기존 HOLDING → STOPPED 그대로)</td><td>짧은 끊김 복구, Go 잠금, 서행 강제, RES 반응, 정차 유지</td></tr>
+<tr><td>③ 깃발·RES·0x202·앱 상태 → <code>/race/state</code> 전달</td><td>깃발 해석(phase), 0x203 송신</td></tr>
+<tr><td>④ 휠 엔코더 → <code>/control/status/wheel_info</code></td><td>위치·속도 추정</td></tr>
+<tr><td>⑤ 차량 물리 한계 측정·전달</td><td>조향비·불감대·고속 보정의 코드 반영(표 숫자만 BSW 가 측정해 넣음)</td></tr>
+</tbody></table></div>
+
+<div class="tbl keep"><div class="tno">TABLE II</div><div class="ttl">오늘 작업 결과와 검증 수준</div>
+<table><thead><tr><th style="width:9%">WP</th><th style="width:43%">내용</th><th style="width:30%">확인한 것</th><th>못 한 것</th></tr></thead><tbody>
+<tr><td>WP-1</td><td>폐기 설계 제거, d702f63 기준 복원. 삭제 전 상태는 태그 <code>race-flag-full-3309cd1</code></td><td>11-05 8개 시나리오가 복원 기준과 같음, can_guard 30,925 byte</td><td class="st-w">rehearse_lift_guard 31/31</td></tr>
+<tr><td>WP0</td><td>조향 7점 표·영점, 가속 히스테리시스, 데이터시트 v0.5</td><td>단위 시험 23 통과, 실제 어댑터 고정 입력 0 회/분</td><td class="st-w">폐루프·실차 효과</td></tr>
+<tr><td>WP1</td><td><code>/race/state</code>, can_guard 이벤트 로그, 상태판 칸, 자동 판정</td><td>시나리오 10 개 ×3 회 통과, 지연 중앙 0.94 ms, 대회 신호 유무로 0x210 동일</td><td class="st-w">E1~E7·P1·P2, 대회 PC 지연, 실물 프레임(11-23)</td></tr>
+<tr><td>WP2 이후</td><td>2차원 표, 측정 도구, 실차 — <b>시작 안 함</b>(지시서: WP0·1 결과 확인 후 별도 지시)</td><td>—</td><td>—</td></tr>
+</tbody></table>
+<div class="tnote">pytest 288 통과(can_guard 183 포함 — 복원 기준 136 + 원본 DBC 대조 1 + race_signal 46, 그 위에 이벤트 로그·서버·상태판·변환 시험). colcon 기능 시험 통과. a1_can_bridge 의 flake8·pep257 은 복원 기준에서도 실패하던 항목(기존 파일 10 곳)으로, 새 코드의 지적은 없다.</div></div>
+
+<h2>2. 구성</h2>
+<pre>명령   모델 ─/control/target→ a1_control_adapter(표 변환·히스테리시스·arm) ─공유메모리→ can_guard ─0x210 20 ms→ 차량
+상태   차량 ─0x200/0x201→ can_raw_bridge ─/interface/can/read/raw→ a1_status_decoder ─/control/status/*→ 모델·로컬라이제이션
+경기   대회 서버·차량 ─0x124~0x128·0x202·0x156→ can_raw_bridge ─raw→ race_state_publisher ─/race/state→ 모델
+                                             └→ can_guard: 이벤트 로그만(상태·명령에 안 씀)</pre>
+<p>차량으로 보내는 주체는 여전히 can_guard 하나다. <code>race_state_publisher</code> 는 아무것도 송신하지 않고, 해석 코드(<code>safety/can_guard/race_signal.py</code>)를 can_guard 와 공유한다.</p>
+
+<h2>3. 폐기 설계 정리 (WP-1)</h2>
+<p>첫 지시서대로 오후에 구현된 경기 상태 기계·서행 제어·0x203·복구·StatusChannel 을 회의 결정에 따라 걷어냈다. 삭제 전 전체는 로컬 태그에 있어 모델 팀이 다시 요청하면 꺼낼 수 있다.</p>
+<div class="box"><div class="bt">지시서와 다르게 한 것: 복원 기준 커밋</div>
+지시서는 "913e2bf 기준으로 checkout" 이라고 적었지만 913e2bf 는 지시서를 추가한 커밋이고 WP0 는 그다음 <span class="mono">d702f63</span> 이다. 913e2bf 로 되돌리면 지시서가 "유지"하라는 DBC 전환·브레이크 % 통일이 사라지므로 d702f63 으로 복원했다(<code>docs/engine_room_open_items.md</code> E-0). 또 지시서는 <code>reports/race_flag/</code> 를 archive 로 옮기라 했으나 사용자 지시에 따라 삭제했다(태그에는 남음).</div>
+<div class="tbl keep"><div class="tno">TABLE III</div><div class="ttl">정리 결과</div>
+<table><thead><tr><th style="width:12%">구분</th><th>대상</th></tr></thead><tbody>
+<tr><td>복원</td><td>can_guard 핵심(can_guard·state_machine·command_policy·protocol·tx_encode), cmd_adapter, track.yaml, 브리지 launch·setup, 가짜 차량, <code>tools/bsw</code>, <code>tools/track_day</code>, 현장 매뉴얼·메모장</td></tr>
+<tr><td>삭제</td><td>race_state·race_runtime·race_policy·speed_ctrl·speed_limit·recovery, race_flag.yaml, race_rules, race_status, <code>tools/race_flag</code>, 시나리오 17 개와 그 시험, 데이터시트 v0.3, 실차 시험 계획</td></tr>
+<tr><td>재사용</td><td>race_signal(해석만), RaceState.msg(필드 교체), race_state_publisher(raw 구독으로 교체), fake_race_server, 시나리오 10 개</td></tr>
+<tr><td>옮김</td><td>요구사항 → <code>docs/engine_room_requirements.md</code>(담당 = 모델), 미결 → <code>docs/engine_room_open_items.md</code>, 첫 지시서 → <code>docs/archive/</code></td></tr>
+</tbody></table></div>
+
+<h2>4. 엔진룸 1차 업데이트 (WP0)</h2>
+<h3>4.1 조향 표 — 숫자만 교체</h3>
+<p>11-04 bsw5 분석에서 핸들 ±150° 가 타이어 ±10~11° 밖에 안 돌고, 핸들 0° 에서 타이어가 왼쪽으로 약 +1.2° 돈다는 것이 드러났다. 직선에서 늘 왼쪽 +0.33 m, 코너 바깥으로 밀린 원인이고 bsw4 연석 직전 비상정지로 이어졌다. 조향 변환 코드(<code>SteerMap</code>, <code>SlewLimiter</code>, <code>steer_sign</code>)는 건드리지 않았고 <code>track.yaml</code> 숫자만 지시서 값으로 바꿨다. 되돌리기용 옛 표는 <code>config/steer_map_v0_20261104.yaml</code>.</p>
+<div class="tbl keep"><div class="tno">TABLE IV</div><div class="ttl">조향 표 (타이어 ° ↔ 핸들 °, 잠정 ★)</div>
+<table><thead><tr><th>타이어 °</th><th class="c">−11.5</th><th class="c">−8.5</th><th class="c">−5.0</th><th class="c">0.0</th><th class="c">5.5</th><th class="c">9.0</th><th class="c">11.5</th></tr></thead><tbody>
+<tr><td>핸들 °</td><td class="c">−150</td><td class="c">−100</td><td class="c">−50</td><td class="c">−9</td><td class="c">50</td><td class="c">100</td><td class="c">150</td></tr>
+</tbody></table></div>
+<p><b>표를 11-04 측정 점과 비교했다.</b> 저장소의 측정 점(<code>measurements/2026-11-04_drive_log/tables/steer_ratio_points.csv</code>, 2,449 점)으로 오차를 계산하면 전체 RMS 는 옛 표 2.41° → 새 표 0.75° 로 줄어든다. 다만 대부분 구간에서 측정값이 새 표보다 약 0.6° 왼쪽이다. 같은 측정의 회귀로는 직진 핸들각이 −13.7° 이고, 지시서가 과보정을 막으려고 고른 −9° 는 그 작은 쪽이다. 즉 <b>직진에서 타이어 약 +0.5° 가 남을 수 있다</b>. 11-14 직선 횡편차로 판단할 값이며, 지금은 지시서 값을 유지했다.</p>
+<div class="tbl keep"><div class="tno">TABLE V</div><div class="ttl">표 − 측정 오차 (타이어 °, 같은 핸들각에서, 그래프 근거 Fig. A2)</div>
+<table><thead><tr><th>핸들 구간 °</th><th class="r">점 수</th><th class="r">측정 평균</th><th class="r">새 표 오차</th><th class="r">옛 표 오차</th></tr></thead><tbody>
+<tr><td>−150 ~ −120</td><td class="r">22</td><td class="r">−10.58</td><td class="r">−0.65</td><td class="r">−8.81</td></tr>
+<tr><td>−120 ~ −80</td><td class="r">86</td><td class="r">−6.62</td><td class="r">−1.06</td><td class="r">−5.16</td></tr>
+<tr><td>−80 ~ −40</td><td class="r">213</td><td class="r">−4.21</td><td class="r">−1.21</td><td class="r">−3.41</td></tr>
+<tr><td>−40 ~ −5</td><td class="r">1,872</td><td class="r">−0.15</td><td class="r">−0.60</td><td class="r">−1.86</td></tr>
+<tr><td>−5 ~ 20</td><td class="r">174</td><td class="r">1.62</td><td class="r">−0.60</td><td class="r">−1.36</td></tr>
+<tr><td>20 ~ 60</td><td class="r">44</td><td class="r">5.60</td><td class="r">−0.57</td><td class="r">+0.41</td></tr>
+<tr><td>60 ~ 110</td><td class="r">38</td><td class="r">7.80</td><td class="r">+0.39</td><td class="r">+3.98</td></tr>
+<tr><td><b>전체 RMS</b></td><td class="r">2,449</td><td></td><td class="r"><b>0.75</b></td><td class="r"><b>2.41</b></td></tr>
+</tbody></table><div class="tnote">측정 = GNSS 요레이트 역산, 준정상·저횡가속 표본. 좌측(+) 큰 각 표본이 적고 +100° 이상은 없다. <code>data/steer_map_error.csv</code>.</div></div>
+
+<h3>4.2 가속 히스테리시스</h3>
+<p>예전 표는 목표 0.1 m/s² 를 넘는 순간 가속 75 % 로 뛰고 아래면 0 이어서, 순항 목표 0.03~0.18 m/s² 가 경계를 넘나들 때마다 페달이 켜졌다 꺼졌다. <code>LongMap.to_pedals()</code> 에 상태를 두었다: <b>|a| &gt; 0.10 켜짐, |a| &lt; 0.03 꺼짐, 사이는 이전 상태 유지</b>(브레이크 쪽도 같음). 분석 보고서의 "주행 중 75 % 바닥값" 제안은 지시서대로 채택하지 않았다. 지시서에 없어 더한 것 하나: 종방향 arm 순간 상태를 지운다. disarm 중 입력이 0.05 였다가 arm 될 때 가속 75 % 로 시작하지 않게 하려는 것으로, 차가 덜 움직이는 쪽이다(E-4).</p>
+<div class="tbl keep"><div class="tno">TABLE VI</div><div class="ttl">가속 on/off 전환 수</div>
+<table><thead><tr><th style="width:44%">조건</th><th class="r">전환 / 분</th><th>출처·방식</th></tr></thead><tbody>
+<tr><td>11-04 bsw5 전 구간(420 s)</td><td class="r">202 ★</td><td>CAN 원본 0x210 acc 0 ↔ &gt;0 직접 계수. 분석 보고서 161 은 다른 집계(bag 기반)</td></tr>
+<tr><td>11-04 bsw5 직선 순항(t 105~135 s)</td><td class="r">328 ★</td><td>같은 원본. Fig. A4</td></tr>
+<tr><td>SIL 고정 입력 0.03~0.18 난수, <b>예전 표</b></td><td class="r">1,498</td><td>실제 cmd_adapter, 60 s, 개발 PC</td></tr>
+<tr><td>SIL 고정 입력 0.03~0.18 난수, <b>히스테리시스</b></td><td class="r"><b>0</b></td><td>같은 조건. 합격 ≤ 5 (지시서 WP0)</td></tr>
+</tbody></table></div>
+<div class="box"><div class="bt">한계 — 이 시험이 말해 주지 않는 것</div>
+SIL 입력은 처음부터 0.03 아래로 내려가지 않으므로 전환 0 은 정의상 당연하다. 실제 주행에서는 속도 PI 가 출력에 반응한다. 11-04 그림(<code>reports(log)/20261104_track/2_가속/PJ_2…PJ110s.png</code>)을 보면 목표 가속도가 약 1.8 s 주기로 0.02~0.15 를 오간다. 경계 잡음은 사라져도, 골이 0.03 아래로 내려가면 주기마다 2 회, 즉 <b>약 65 회/분 ★(그래프 판독 추정)</b>이 남을 수 있다. 단순 폐루프 시뮬레이션도 만들어 봤지만 11-04 on/off 를 재현하지 못해 근거로 쓰지 않고 지웠다. 줄어드는 정도는 11-14 에 잰다. 남으면 지시서대로 모델 팀에 속도 PI 재조정을 요청한다.</div>
+
+<h2>5. 경기 신호 전달 (WP1)</h2>
+<p>신호를 해석하지 않고 비트 원본과 래치만 올린다. 대회 측 답변 전이라 신호 유지 방식이 미정이어서 <code>seen_*</code> 래치를 함께 준다 — 짧게 한 번만 켜져도 모델이 놓치지 않게 하기 위해서다. 전체 필드는 데이터시트 v0.5 05 시트에 있다.</p>
+<div class="tbl keep"><div class="tno">TABLE VII</div><div class="ttl">/race/state 규칙 (RELIABLE + TRANSIENT_LOCAL, depth 1, 바뀌면 즉시 + 50 Hz)</div>
+<table><thead><tr><th style="width:23%">필드</th><th style="width:16%">원본</th><th>규칙</th></tr></thead><tbody>
+<tr><td><code>sig_go/slow_on/slow_off/finish/stop</code></td><td>0x124</td><td>2 프레임 연속 확인(약 20 ms 지연). 1 프레임 깜빡임은 무시 + 기록</td></tr>
+<tr><td><code>seen_*</code></td><td>0x124</td><td>한 번 확인되면 BSW 재시작 전까지 유지. 재시작 후 옛 Go 가 계속 켜져 있어도 비트대로 올린다(구분은 모델 M-09)</td></tr>
+<tr><td><code>last_signal(_stamp)</code></td><td>0x124</td><td>마지막으로 0→1 확인된 깃발, 그 첫 프레임 시각</td></tr>
+<tr><td><code>res_active</code></td><td>0x127</td><td><b>1 프레임 즉시</b>, 켜짐·꺼짐 모두. 작동 중 차량은 0x210 무시, 풀리면 즉시 따름</td></tr>
+<tr><td><code>res_alive_ok, res_age_s</code></td><td>0x127</td><td>0.5 s(잠정) 안에 프레임·alive 변화가 있으면 true. 못 받았으면 false / −1</td></tr>
+<tr><td><code>res_end, res_error</code></td><td>0x128</td><td>전달만</td></tr>
+<tr><td><code>remote_app_active</code></td><td>0x156</td><td>En 중 하나라도 1</td></tr>
+<tr><td><code>vehicle_speed_limit_kph</code></td><td>0x202</td><td>전달만, −1 = 없음. 30.0 은 원격 제한(자율 상한 아님)</td></tr>
+<tr><td><code>pit_lat/lon_deg</code></td><td>0x125</td><td>NaN = 없음, 끊겨도 마지막 값 유지</td></tr>
+<tr><td><code>guard_state</code></td><td>—</td><td class="st-w">예약. 항상 빈 문자열(can_guard 상태가 ROS 로 나오지 않음, E-1)</td></tr>
+</tbody></table></div>
+
+<div class="tbl keep"><div class="tno">TABLE VIII</div><div class="ttl">자동 판정 결과 (실제 브리지 코드·실제 노드, virtual 버스, 개발 PC 참고값)</div>
+<table><thead><tr><th style="width:27%">시나리오</th><th>확인 내용</th><th class="c">3회</th></tr></thead><tbody>
+<tr><td>S02 계속 켜짐</td><td>2 s 에 seen_go·sig_go, last_signal=GO</td><td class="c">통과</td></tr>
+<tr><td>S04 2 프레임</td><td>seen_go 남고 sig_go 다시 false</td><td class="c">통과</td></tr>
+<tr><td>S03 1 프레임 / S03b 깜빡임</td><td>깃발 무시, seen_go=false, NONE</td><td class="c">통과</td></tr>
+<tr><td>S09 RES 3 s</td><td>7 s·10 s 에 정확히 켜지고 꺼짐</td><td class="c">통과</td></tr>
+<tr><td>S09b RES 1 프레임</td><td>1 프레임도 발행됨</td><td class="c">통과</td></tr>
+<tr><td>S10 끊김 / S10b alive 멈춤</td><td>0.5 s 뒤 res_alive_ok=false, 나이로 둘을 구분</td><td class="c">통과</td></tr>
+<tr><td>S11a 0x124 끊김</td><td>값 유지, race_signal_age_s 증가</td><td class="c">통과</td></tr>
+<tr><td>X01 피트존</td><td>NaN → 좌표, 끊겨도 유지</td><td class="c">통과</td></tr>
+</tbody></table></div>
+
+<div class="tbl keep"><div class="tno">TABLE IX</div><div class="ttl">0x127 프레임 → /race/state 수신 지연 (합격: 중앙 ≤ 5 ms, 지시서 3절)</div>
+<table><thead><tr><th>조건</th><th class="r">중앙 ms</th><th class="r">p99 ms</th><th class="r">최대 ms</th><th class="r">유실</th><th class="r">버스 프레임/s</th><th>기타</th></tr></thead><tbody>
+<tr><td>부하 없음</td><td class="r">0.94</td><td class="r">2.21</td><td class="r">2.41</td><td class="r">0/300</td><td class="r">50</td><td>publisher CPU 4.7 %</td></tr>
+<tr><td>실제 버스 부하 + 디코더</td><td class="r">0.55</td><td class="r">1.31</td><td class="r">1.73</td><td class="r">0/500</td><td class="r">795</td><td>publisher 14.5 %, decoder 14.0 %</td></tr>
+</tbody></table><div class="tnote">토글 뒤 첫 수신까지 측정. 부하 쪽이 더 빠른 것은 바쁜 CPU 가 잠들지 않기 때문으로 보이며 원인은 확인하지 않았다. 대회 PC(격리 코어 공유) 재측정이 판정이다.</div></div>
+<p><b>부하.</b> 브리지 필터를 약 145 → 약 545 프레임/s 로 넓혀 11-04 의 밀림(580/s, 52 s)이 걱정됐다. 11-05 브리지 수정 이후라 개발 PC 에서는 재현되지 않았다: 세 프로세스를 코어 하나에 묶어도 0x201 → wheel_info 47.6 Hz 유지, 최대 지연 7.9 ms. 대신 디코더+publisher CPU 합이 8.4 % → 22.4 % 로 늘었다. 대회 PC 에서 빠듯하면 해석에 안 쓰는 0x157 부터 뺀다(E-3).</p>
+<p><b>can_guard 무영향.</b> 실제 can_guard 를 대회 신호 있음/없음으로 돌려 0x210 값 집합과 상태 전이가 같음을 시험으로 확인했다(<code>test_race_log_guard.py</code>). 11-05 8개 시나리오도 복원 기준과 같았다.</p>
+
+<h2>6. 모델·로컬라이제이션 팀에 전달할 것, 미결</h2>
+<p>데이터시트 <code>docs/A1_BSW_토픽_데이터시트_v0.5.xlsx</code> 에 모두 반영했다(M-12 추가, 05 시트 확정).</p>
+<div class="tbl"><div class="tno">TABLE X</div><div class="ttl">통지 사항</div>
+<table><thead><tr><th style="width:22%">대상</th><th>내용</th></tr></thead><tbody>
+<tr><td>모델 — 조향</td><td>최대 타이어 ±11.5°, 타이어 0 = 핸들 −9°. 헤어핀 요레이트 필요값의 70 %. 스틱슬립: 5~8° 계단 추종, 직선 요레이트 ±3~4 °/s, 명령 대비 RMS 3.5°</td></tr>
+<tr><td>모델 — 종방향</td><td>히스테리시스: 0.03 &lt; a &lt; 0.10 은 이전 상태 유지(켜져 있으면 75 %). 브레이크 데드타임 밟기 0.15 s / 떼기 0.4 s. 감속 지속 3.0, 순간 4.1 m/s²</td></tr>
+<tr><td>모델 — 경기 규정</td><td><code>/race/state</code> 구독 필수. M-01~M-12 전부 모델 구현</td></tr>
+<tr><td>모델 — 제안</td><td>횡오차 적분항(직선 +0.33 m 잔류), 위치 점프 방어, 자동 정지 한계(사람보다 1.5 s 늦음)</td></tr>
+<tr><td>로컬라이제이션</td><td>종방향 점프 0.3 m 이상 21 회/최대 1.1 m → 목표 핸들 8~12° 계단. GNSS bag 에 요레이트·피치, RTX 상태 토픽 요청</td></tr>
+</tbody></table></div>
+<div class="tbl"><div class="tno">TABLE XI</div><div class="ttl">결정이 필요한 미결 (전체는 docs/engine_room_open_items.md)</div>
+<table><thead><tr><th style="width:7%">#</th><th>내용</th><th style="width:28%">결정·기한</th></tr></thead><tbody>
+<tr><td>E-6</td><td><b>자율 U턴·레인 간격이 조향비 7.5 전제.</b> <code>profile_lib.py</code> 방위 추정과 FIELD_MANUAL 13 m. 타이어 11.5° 면 지름 ≈ 23 m ★, 방위 추정은 실제 약 100° ★에서 180° 로 판단. 범위 밖이라 코드는 안 고치고 매뉴얼에 경고만 넣음</td><td>11-14 전: <code>steer_ratio</code>·레인 간격 수정 여부(사용자)</td></tr>
+<tr><td>E-7</td><td>원 돌기 계획의 "타이어 ±5/10/15/20°" 는 옛 7.5 기준. 새 표로는 11.5° 에서 포화 → WP3 도구는 핸들각 기준으로 명령해야 함</td><td>WP3 때 반영</td></tr>
+<tr><td>—</td><td>영점 −9° vs 측정 회귀 −13.7°(4.1절)</td><td>11-14 직선 50 m 로 결정</td></tr>
+<tr><td>E-1</td><td><code>guard_state</code> 를 비워 둠. 모델 팀이 필요하면 별도 작업</td><td>모델 팀 의견(11-09)</td></tr>
+</tbody></table></div>
+
+<h2>7. 남은 일</h2>
+<div class="tbl keep"><div class="tno">TABLE XII</div><div class="ttl">다음 순서</div>
+<table><thead><tr><th style="width:17%">언제</th><th>할 일</th></tr></thead><tbody>
+<tr><td>sudo 필요(개발·대회 PC)</td><td><code>sudo bash sil/vcan/vcan_up.sh</code> + can-utils 설치 뒤 <code>rehearse_lift_guard</code> 31/31, E1~E7·P1·P2, <code>r_race.py --interface socketcan --channel vcan0 --latency 300 --load</code></td></tr>
+<tr><td>별도 지시 후</td><td>WP2(2차원 표), WP3(측정·갱신 도구), 그때 E-7 반영</td></tr>
+<tr><td>11-14</td><td>① 점검·RTX ② 원 돌기 ③ 조향 최대각 ④ 직선 계단. 직선 횡편차가 +0.33 m 보다 나빠지면 <code>steer_map_v0</code> 로 복귀, 가속 전환 재측정</td></tr>
+<tr><td>11-23</td><td>대회 서버 신호 실물 확인 — 0x124~0x127 은 아직 실물 프레임을 본 적이 없다</td></tr>
+</tbody></table></div>
+
+<h2 class="pb">부록 A. PlotJuggler 데이터시트</h2>
+<p>아래 그림은 모두 PlotJuggler 3.17 화면 캡처다. 입력은 <code>data/pj/*.csv</code>(11-04 CAN 원본을 DBC 로 푼 값, SIL 결과), 레이아웃은 <code>pj_layouts/*.xml</code> 이라 같은 화면을 직접 열어 볼 수 있다. 가로축은 별도 표시가 없으면 구간 시작 기준 초다. 속도는 0x201 후륜 평균 원값이다(실제보다 약 4 % 낮음, 11-04).</p>
+
+<h3>A1. 한 바퀴 전체 — bsw5</h3>
+<figure><img src="figs/pj_lap.png" alt="한 바퀴 전체"><figcaption><b>Fig. A1.</b> 2026-11-04 bsw5, 420 s, 0.2 s 격자. 위: 핸들각 명령·실제. 가운데: 가속·브레이크 명령 — 직선마다 on/off 가 빽빽하다. 아래: 후륜 속도, 순항 약 19 km/h. 옛 표·can_guard 기준 데이터.</figcaption></figure>
+
+<h3>A2. 조향</h3>
+<figure><img src="figs/pj_steer_map.png" alt="조향 표 비교"><figcaption><b>Fig. A2.</b> 조향 표 비교. 가로 핸들 °, 세로 타이어 °. 회색 = 11-04 GNSS 요레이트 역산(5° 구간 평균, 표본 3 개 이상), 파랑 = 새 7점 표, 빨강 = 옛 표(비 7.5). 새 표가 큰 각의 포화를 따라가지만 회색이 약 0.6° 위에 있다(4.1절). 가운데 세로선은 PlotJuggler 시간 표시로 값이 아니다.</figcaption></figure>
+<figure><img src="figs/pj_steer_hairpin.png" alt="헤어핀"><figcaption><b>Fig. A3.</b> 헤어핀(bsw5 t 150~165 s). 핸들 −150° 부근 포화, 실제 위치는 명령을 계단처럼 따라간다(스틱슬립). 5~10 km/h 구간. 조향은 옛 표 기준 명령.</figcaption></figure>
+
+<div class="tbl keep"><div class="tno">SHEET A</div><div class="ttl">조향 수치</div>
+<table><thead><tr><th style="width:30%">항목</th><th style="width:27%">값</th><th>출처</th></tr></thead><tbody>
+<tr><td>최대 타이어각 / 핸들각</td><td>±11.5° ★ / ±150°</td><td>11-04 bsw5 역산, 그래프 판독, 잠정</td></tr>
+<tr><td>직진 핸들각</td><td>표 −9°, 측정 회귀 −13.7°</td><td><code>track.yaml</code>, <code>steer_ratio_fit.csv</code></td></tr>
+<tr><td>유효 조향비</td><td>우 10.9 / 좌 13.6, 평균 10.7</td><td><code>steer_ratio_fit.csv</code>, 분석 보고서</td></tr>
+<tr><td>핸들 속도</td><td>어댑터 제한 120 °/s</td><td><code>track.yaml</code></td></tr>
+<tr><td>무반응</td><td>167~190 ms(중앙 174)</td><td>10-07 리프트</td></tr>
+</tbody></table></div>
+
+<h3 class="pb">A3. 가속</h3>
+<figure><img src="figs/pj_accel_straight.png" alt="직선 순항"><figcaption><b>Fig. A4.</b> 직선 순항(bsw5 t 105~120 s). 위: 가속 % 가 0 ↔ 약 80 % 로 묶음처럼 켜진다, 묶음 가장자리의 잔 전환이 경계 잡음이다. 아래: 속도 약 18.5~19.7 km/h.</figcaption></figure>
+<figure><img src="figs/pj_accel_sil.png" alt="히스테리시스 SIL"><figcaption><b>Fig. A5.</b> 실제 cmd_adapter SIL(첫 10 s). 위: 입력 0.03~0.18 m/s² 난수. 가운데: 예전 동작(이탈값 0.1) — 끊임없이 전환. 아래: 히스테리시스 — 75~81 % 로 연속, 전환 0 회. 표 VI 의 한계를 함께 볼 것.</figcaption></figure>
+<figure><img src="figs/pj_launch.png" alt="출발"><figcaption><b>Fig. A6.</b> 빠른 시험 QUICK-LON s5. 60 % 에서는 출발 못 하고 80 % 에서 약 1.4 km/h 까지 움직인다(불감대 70~80 %). 브레이크 100 % 명령에서 위치는 약 75 %(세션별).</figcaption></figure>
+
+<h3 class="pb">A4. 브레이크·타이밍</h3>
+<figure><img src="figs/pj_brake.png" alt="브레이크"><figcaption><b>Fig. A7.</b> 곡선 진입(bsw5 t 135~150 s). 브레이크 명령과 위치, 가속 펄스, 속도. 위치가 명령을 약 0.1~0.2 s 늦게 따라간다.</figcaption></figure>
+<figure><img src="figs/pj_period.png" alt="주기"><figcaption><b>Fig. A8.</b> 주행 중 프레임 간격(bsw5 t 100~130 s). 평균 0x200·0x201 21.0 ms, 0x210 20.0 ms. 최대 23.6 / 23.8 / 22.9 ms, p1~p99 는 0x210 18.0~21.9 ms.</figcaption></figure>
+<div class="tbl keep"><div class="tno">SHEET B</div><div class="ttl">종방향 수치</div>
+<table><thead><tr><th style="width:30%">항목</th><th style="width:27%">값</th><th>출처</th></tr></thead><tbody>
+<tr><td>가속 표</td><td>0.1→75 %, 0.13→80 %, 0.57→100 %</td><td><code>track.yaml</code>, 11-04 저속, 잠정</td></tr>
+<tr><td>브레이크 표</td><td>0.1·1·2·3·4 m/s² → 0·40·70·90·100 %</td><td><code>track.yaml</code>, 잠정(11-14 계단 측정 후 변경)</td></tr>
+<tr><td>히스테리시스</td><td>켜짐 0.10, 꺼짐 0.03 m/s²</td><td><code>track.yaml</code></td></tr>
+<tr><td>가속 최대</td><td>1.29 / 1.43 m/s²</td><td>10-08 GNSS 지속</td></tr>
+<tr><td>감속 최대</td><td>지속 1.88 / 3.03, 순간 3.97 / 4.11 m/s²</td><td>10-08 GNSS / 이미지</td></tr>
+<tr><td>브레이크 풀림·출발 지연</td><td>100→0 % 약 1.4 s, 0.64~0.74 s</td><td>11-04</td></tr>
+</tbody></table></div>
+
+<h3 class="pb">A5. 경기 신호 (SIL)</h3>
+<figure><img src="figs/pj_race_flags.png" alt="깃발 3방식"><figcaption><b>Fig. A9.</b> 깃발 3방식. 파랑 sig_go, 빨강 seen_go. 위 계속 켜짐, 가운데 2 프레임(seen 만 남음), 아래 1 프레임(무시). 값은 r_race.py 가 /race/state 에서 받은 그대로.</figcaption></figure>
+<figure><img src="figs/pj_race_res.png" alt="RES"><figcaption><b>Fig. A10.</b> RES 3 s(S09). 위: res_active 7~10 s, seen_go 1 s 부터 유지 — 풀려도 Go 는 다시 내려가지 않으므로 재출발 판단은 모델 몫이다. 아래: alive 정상, 끝의 상승은 시나리오 재생이 끝나서다.</figcaption></figure>
+<figure><img src="figs/pj_race_alive.png" alt="alive"><figcaption><b>Fig. A11.</b> 0x127 끊김(S10). 5 s 에 끊기면 res_age_s 가 늘고 0.5 s 뒤 res_alive_ok=false. 보라 race_signal_age_s 는 0x124 가 계속 와서 작다.</figcaption></figure>
+<figure><img src="figs/pj_latency.png" alt="지연"><figcaption><b>Fig. A12.</b> 지연 표본. 파랑 부하 없음, 빨강 실제 버스 부하. 가로축은 토글 순번(시간 아님), 합격 5 ms. 개발 PC 참고값.</figcaption></figure>
+
+<h2 class="pb">부록 B. CAN 신호</h2>
+<div class="tbl keep"><div class="tno">SHEET C</div><div class="ttl">대회 신호 (DBC/A1_dbc_2_fixed.dbc)</div>
+<table><thead><tr><th style="width:10%">ID</th><th style="width:22%">이름</th><th>신호</th><th style="width:27%">BSW 처리</th></tr></thead><tbody>
+<tr><td>0x124</td><td>KIAPI_Race_Signal</td><td>byte0: GO 0x80, STOP 0x40, FINISH 0x20, SLOW_ON 0x10, SLOW_OFF 0x08. alive 없음, 주기 20 ms(엑셀), 개요 시트는 TBD</td><td>전달 + 이벤트 로그</td></tr>
+<tr><td>0x125</td><td>KIAPI_PIT_ZONE</td><td>위도 0/32, 경도 32/32, ×1e-7 °. 용도 미정</td><td>전달 + 이벤트 로그</td></tr>
+<tr><td>0x126</td><td>KIAPI_REPAIR</td><td>SIG_REPAIR 0/8. 뜻 미정</td><td>이벤트 로그만</td></tr>
+<tr><td>0x127</td><td>KIAPI_RES</td><td>RES_START bit7, alive_count byte7. 차량이 스스로 제동, 그동안 0x210 무시</td><td>전달 + 이벤트 로그</td></tr>
+<tr><td>0x128</td><td>KIAPI_RES_FB</td><td>RES_END bit7, RES_ERROR 0/3</td><td>전달 + 이벤트 로그</td></tr>
+<tr><td>0x202</td><td>USER_service_info</td><td>speed_limit_info 0/10, ×0.1 km/h</td><td>전달 + 이벤트 로그</td></tr>
+<tr><td>0x203</td><td>USER_service_command</td><td>speed_limit. 실제 제한됨</td><td><b>보내지 않음</b></td></tr>
+<tr><td>0x156/157</td><td>KIAPI_Control_01/02</td><td>대회 원격 앱</td><td>기존 RemoteEstopDetector + En 전달</td></tr>
+</tbody></table></div>
+
+<h2>부록 C. 다시 만들기</h2>
+<pre># 시험
+python3 -m pytest -q safety/can_guard/test tools/race_day/test_lift_tx.py sil/vcan/test_fake_race_server.py \
+    tools/bsw/test_bsw_monitor_race.py ros2_ws/src/a1_control_adapter/test/test_conversion.py
+source /opt/ros/humble/setup.bash &amp;&amp; source ros2_ws/install/setup.bash
+python3 safety/can_guard/sil_tests/r_race.py --out &lt;폴더&gt; --latency 300       # 시나리오 + 지연
+python3 safety/can_guard/sil_tests/r_race.py --no-scenarios --latency 500 --load --out &lt;폴더&gt;
+python3 bsw_test/common/scripts/adapter_cruise_check.py --out &lt;폴더&gt;          # 히스테리시스
+
+# 데이터시트
+python3 make_data.py ../.. .                 # CAN 원본 → data/pj/*.csv
+python3 pj_capture.py .                      # PlotJuggler + Xvfb 캡처 → figs/pj_*.png, pj_layouts/*.xml
+google-chrome --headless --no-pdf-header-footer --print-to-pdf=report.pdf report.html</pre>
+<p class="small">캡처 환경: Xvfb·xdotool 을 sudo 없이 <code>apt-get download</code> + <code>dpkg -x</code> 로 풀어 <code>XTOOLS_ROOT</code> 로 지정할 수 있다. 사용자 화면·PlotJuggler 설정은 건드리지 않는다.</p>
+
+</body>
+</html>

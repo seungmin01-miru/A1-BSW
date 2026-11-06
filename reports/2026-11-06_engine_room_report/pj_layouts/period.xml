@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+ <tabbed_widget name="Main Window" parent="main_window">
+  <Tab containers="1" tab_name="period">
+   <Container><DockSplitter orientation="-" sizes="1.0000" count="1"><DockArea name="프레임 간격 [ms], 주행 중 30 s"><plot style="Lines" flip_y="false" flip_x="false" mode="TimeSeries"><range bottom="15" top="28" left="0" right="29.98"/><limitY min="15" max="28"/><curve name="dt_0x200_ms" color="#1f77b4"/><curve name="dt_0x201_ms" color="#2ca02c"/><curve name="dt_0x210_ms" color="#d62728"/></plot><transform/></DockArea></DockSplitter></Container>
+  </Tab>
+  <currentTabIndex index="0"/>
+ </tabbed_widget>
+ <use_relative_time_offset enabled="0"/>
+ <Plugins/>
+ <customMathEquations/>
+ <snippets/>
+</root>

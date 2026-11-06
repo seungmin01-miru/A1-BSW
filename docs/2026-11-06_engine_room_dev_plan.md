@@ -1,6 +1,6 @@
 # 엔진룸(모델 ↔ CAN 인터페이스) + 경기 신호 전달 — BSW 개발 지시서
 
-작성 2026-11-06 · 상태: **설계 확정, 구현 전** · 이 문서는 같은 날 작성된 `2026-11-06_race_flag_dev_plan.md` 를 **대체**한다(그 문서는 `docs/archive/` 로 이동, 설계 대부분 폐기).
+작성 2026-11-06 · 상태: **WP-1·WP0·WP1 구현(2026-11-06), vcan 시험·WP2 이후 남음** · 이 문서는 같은 날 작성된 `2026-11-06_race_flag_dev_plan.md` 를 **대체**한다(그 문서는 `docs/archive/` 로 이동, 설계 대부분 폐기).
 
 > 표기: **잠정** = 실측으로 바뀔 값 / ★ = 계산값 / `[ ]` 미착수 · `[x]` 완료(날짜)
 > 실측 숫자는 반드시 **출처 파일 + 측정 방식**(GNSS 지속 / 이미지 순간 / 저속 실차)을 함께 적는다.
@@ -231,37 +231,39 @@ steer_map:                      # 2026-11-04 bsw5 GNSS 요레이트 역산 (★ 
 
 ### WP-1. 폐기 설계 코드 정리 (11-07, WP0 보다 먼저) — **반드시 이 WP 부터**
 
+**복원 기준 정정(2026-11-06):** 아래 "913e2bf" 는 지시서 추가 커밋이고 실제 WP0 는 `d702f63` → `d702f63` 으로 복원했다(`engine_room_open_items.md` E-0).
+
 **배경:** 2026-11-06 오후, 폐기된 첫 지시서(`race_flag_dev_plan`)대로 WP0~WP7 이 이미 구현·커밋됐다(`913e2bf` WP0 → 에이전트 merge 여러 개 → HEAD `3309cd1`, SIL 86/86). 회의 결정(1.1절)으로 그중 **WP0 의 기준 정리만 유지**하고 나머지(경기 상태 기계·서행 제어·0x203·복구·StatusChannel)는 걷어낸다.
 
-- [ ] **보관:** `git tag race-flag-full-3309cd1 HEAD` (삭제 전 상태. 모델 팀이 서행 제어·0x203 을 BSW 에 다시 요청하면 여기서 꺼낸다). `reports/race_flag/` → `reports/archive/race_flag_2026-11-06/` 로 이동, README 첫 줄에 "폐기 설계(첫 지시서) SIL 결과, 참고용".
-- [ ] **되돌리기(913e2bf 기준으로 checkout):** `safety/can_guard/{can_guard.py, state_machine.py, command_policy.py, protocol.py, tx_encode.py, plausibility.py}`, `ros2_ws/src/a1_control_adapter/{a1_control_adapter/cmd_adapter.py, config/track.yaml, README.md}`, `ros2_ws/src/a1_can_bridge/launch/a1_bridge.launch.py`, `ros2_ws/src/a1_can_bridge/setup.py`, `ros2_ws/src/a1_can_msgs/CMakeLists.txt`, `sil/vcan/fake_a1_vehicle.py`, `tools/bsw/{bsw_up.sh, bsw_monitor.py, README.md}`, `safety/can_guard/README.md`, `bsw_test/FIELD_MANUAL.md`. **되돌린 뒤 913e2bf 이후의 유지 대상(아래)이 빠지지 않았는지 diff 로 확인.**
-- [ ] **삭제:** `safety/can_guard/{race_state.py, race_runtime.py, race_policy.py, speed_ctrl.py, speed_limit.py, recovery.py, race_flag.yaml}`, `safety/can_guard/test/` 의 해당 시험, `safety/can_guard/sil_tests/r_race.py` 의 상태기계·서행·0x203·복구 시나리오(S01·S04~S08·S10~S17·W5r·S14), `sil/vcan/race_scenarios/` 중 같은 것, `tools/race_flag/`, `ros2_ws/src/a1_control_adapter/{a1_control_adapter/race_rules.py, test/test_race_rules.py, test/e2e_race_nodes.py}`, `ros2_ws/src/a1_can_bridge/{a1_can_bridge/race_status.py, test/test_race_status.py}`, `docs/race_flag_profile_history.md`, `docs/race_flag_open_items.md`(내용은 `docs/engine_room_open_items.md` 로 옮김).
-- [ ] **유지·재사용(새 지시서 3절에 맞게 고침):**
+- [x] (2026-11-06) **보관:** `git tag race-flag-full-3309cd1 HEAD` (삭제 전 상태. 모델 팀이 서행 제어·0x203 을 BSW 에 다시 요청하면 여기서 꺼낸다). `reports/race_flag/` → `reports/archive/race_flag_2026-11-06/` 로 이동, README 첫 줄에 "폐기 설계(첫 지시서) SIL 결과, 참고용".
+- [x] (2026-11-06) **되돌리기(913e2bf 기준으로 checkout):** `safety/can_guard/{can_guard.py, state_machine.py, command_policy.py, protocol.py, tx_encode.py, plausibility.py}`, `ros2_ws/src/a1_control_adapter/{a1_control_adapter/cmd_adapter.py, config/track.yaml, README.md}`, `ros2_ws/src/a1_can_bridge/launch/a1_bridge.launch.py`, `ros2_ws/src/a1_can_bridge/setup.py`, `ros2_ws/src/a1_can_msgs/CMakeLists.txt`, `sil/vcan/fake_a1_vehicle.py`, `tools/bsw/{bsw_up.sh, bsw_monitor.py, README.md}`, `safety/can_guard/README.md`, `bsw_test/FIELD_MANUAL.md`. **되돌린 뒤 913e2bf 이후의 유지 대상(아래)이 빠지지 않았는지 diff 로 확인.**
+- [x] (2026-11-06) **삭제:** `safety/can_guard/{race_state.py, race_runtime.py, race_policy.py, speed_ctrl.py, speed_limit.py, recovery.py, race_flag.yaml}`, `safety/can_guard/test/` 의 해당 시험, `safety/can_guard/sil_tests/r_race.py` 의 상태기계·서행·0x203·복구 시나리오(S01·S04~S08·S10~S17·W5r·S14), `sil/vcan/race_scenarios/` 중 같은 것, `tools/race_flag/`, `ros2_ws/src/a1_control_adapter/{a1_control_adapter/race_rules.py, test/test_race_rules.py, test/e2e_race_nodes.py}`, `ros2_ws/src/a1_can_bridge/{a1_can_bridge/race_status.py, test/test_race_status.py}`, `docs/race_flag_profile_history.md`, `docs/race_flag_open_items.md`(내용은 `docs/engine_room_open_items.md` 로 옮김).
+- [x] (2026-11-06) **유지·재사용(새 지시서 3절에 맞게 고침):**
   - `safety/can_guard/race_signal.py` — 해석 함수·`RaceSignalDecoder`·`ResMonitor` 만 남기고 상태기계 의존 제거. **브리지와 공유.**
   - `ros2_ws/src/a1_can_msgs/msg/RaceState.msg` — 3절 필드로 교체(`phase`·`long_override`·`speed_cap_kph` 등 삭제, `seen_*`·`last_signal`·`res_end/error`·`remote_app_active` 추가).
   - `ros2_ws/src/a1_can_bridge/a1_can_bridge/race_state_publisher.py` — StatusChannel 읽기 → **`/interface/can/read/raw` 구독 + `race_signal.py` 직접 해석**으로 교체. `guard_state` 는 can_guard 이벤트 로그 대신 기존 `/diagnostics` 또는 생략(미결 → `engine_room_open_items.md`).
   - `sil/vcan/fake_race_server.py`, `r_race.py` 의 전달 검증 시나리오(S02·S03·S03b·S09·S09b·S11a·X01) — WP1 관문용으로 이름만 유지.
   - 913e2bf 의 WP0 결과: `DBC/A1_dbc_2_fixed.dbc`, `rx_decode.py` 브레이크 %, `CLAUDE.md` 표, `docs/race_flag_requirements.md`(→ `docs/engine_room_requirements.md` 로 이름 변경, 담당 열을 "모델"로).
-- [ ] can_guard 에 `--race` 옵션·경기 상태·StatusChannel 이 **남아 있지 않은지** grep 으로 확인(`race_`, `StatusChannel`, `speed_limit`, `recover`).
+- [x] (2026-11-06) can_guard 에 `--race` 옵션·경기 상태·StatusChannel 이 **남아 있지 않은지** grep 으로 확인(`race_`, `StatusChannel`, `speed_limit`, `recover`).
 
 **관문:** `pytest safety/can_guard/test tools/race_day/test_lift_tx.py` 통과 수가 913e2bf 시점과 같음(그 시점 수를 먼저 기록), `rehearse_lift_guard.sh` 31/31, ros2_ws `colcon test` 통과, 11-05 보고서 8개 시나리오(`reports/2026-11-05_bsw_update_report/scenarios.py`) 결과 동일, `can_guard.py` 크기가 913e2bf 수준(약 31 KB). 커밋 `[engine-room WP-1] 폐기 설계 제거, 913e2bf 기준 복원`.
 
 ### WP0. 기준 정리 (11-07, WP-1 뒤)
 - [x] (913e2bf 에서 완료, WP-1 뒤 유지 확인만) `DBC/A1_dbc_2_fixed.dbc`: `A1_dbc_2.dbc` 에서 0x200 `steer_is_auto` 배율 0.1→1·범위 [0|1], Alive_Cnt·live_counter 범위 [0|255], `SIG_GO` VAL_ 추가, 깨진 단위 "��"→"deg". 고친 줄마다 `CM_` 주석. 저장소의 `A1_dbc_fixed.dbc` 참조를 교체, 옛 파일은 `archive/dbc_2026-10/`.
 - [x] (913e2bf 에서 완료, 유지 확인만) 브레이크 단위 % 통일: `rx_decode.decode_control_info()` ×0.1 → ×1(`brake_pos_pct`), can_guard·문서 "÷10"·"8.2 포화" → "82 % 포화". **ROS `ControlInfo.brake_position`(0~10)은 유지.**
-- [ ] `CLAUDE.md` 2절 표: 0x124~0x128·0x202·0x203 추가, 0x128 = RES 응답(기록만), 0x710~0x712 = 관제용, 0x202 = 속도 제한(TODO-1 종료), 기준 DBC 경로. 1.1절 역할 분담 한 줄 추가.
-- [ ] 데이터시트 v0.5: 04 시트 감속 "약 4.1" → "지속 최대 3.0(GNSS), 순간 4.1(이미지)", 06 M-10·02 `accel_mps2` 주의 "+1.3/−3.0(순간 −4.1)". 변경이력 추가.
-- [ ] 기존 지시서 → `docs/archive/2026-11-06_race_flag_dev_plan.md`(머리에 "폐기, 대체 문서" 한 줄).
-- [ ] **엔진룸 1차 업데이트(2.6절):** ① `track.yaml` `steer_map` 7점 + 영점 −9° 로 교체, 옛 표는 `config/steer_map_v0_20261104.yaml` 보관 ② `conversion.LongMap` 가속·브레이크 히스테리시스(`long_deadband_off_mps2: 0.03`) + 단위 시험(0.05↔0.15 교번 → 전환 ≤ 1회) ③ `AdapterStatus.note` 에 표 버전 ④ 분석 원본은 `reports(log)/20261104_track/` 에 이미 있음 — 옮기지 말고 `reports/README.md` 에 한 줄 추가(위치·내용·PDF 링크). 폴더 이름의 괄호는 그대로 둔다 ⑤ `docs/a1_vehicle_characteristics.md` 조향 절 갱신(최대 타이어각 ±11.5°, 영점, 스틱슬립) ⑥ 데이터시트 v0.5 에 2.6.2(d) 반영.
+- [x] (2026-11-06) `CLAUDE.md` 2절 표: 0x124~0x128·0x202·0x203 추가, 0x128 = RES 응답(기록만), 0x710~0x712 = 관제용, 0x202 = 속도 제한(TODO-1 종료), 기준 DBC 경로. 1.1절 역할 분담 한 줄 추가.
+- [x] (2026-11-06) 데이터시트 v0.5: 04 시트 감속 "약 4.1" → "지속 최대 3.0(GNSS), 순간 4.1(이미지)", 06 M-10·02 `accel_mps2` 주의 "+1.3/−3.0(순간 −4.1)". 변경이력 추가.
+- [x] (2026-11-06) 기존 지시서 → `docs/archive/2026-11-06_race_flag_dev_plan.md`(머리에 "폐기, 대체 문서" 한 줄).
+- [x] (2026-11-06) **엔진룸 1차 업데이트(2.6절):** ① `track.yaml` `steer_map` 7점 + 영점 −9° 로 교체, 옛 표는 `config/steer_map_v0_20261104.yaml` 보관 ② `conversion.LongMap` 가속·브레이크 히스테리시스(`long_deadband_off_mps2: 0.03`) + 단위 시험(0.05↔0.15 교번 → 전환 ≤ 1회) ③ `AdapterStatus.note` 에 표 버전 ④ 분석 원본은 `reports(log)/20261104_track/` 에 이미 있음 — 옮기지 말고 `reports/README.md` 에 한 줄 추가(위치·내용·PDF 링크). 폴더 이름의 괄호는 그대로 둔다 ⑤ `docs/a1_vehicle_characteristics.md` 조향 절 갱신(최대 타이어각 ±11.5°, 영점, 스틱슬립) ⑥ 데이터시트 v0.5 에 2.6.2(d) 반영.
 
 **관문:** `pytest safety/can_guard/test tools/race_day/test_lift_tx.py`, ros2_ws 시험(히스테리시스 포함), `rehearse_lift_guard.sh` 31/31 통과. 새 DBC cantools 대조 통과. `adapter_long_check.py` SIL 에서 20 km/h 순항 흉내(목표 0.03~0.18 잡음) 시 가속 전환 ≤ 5회/분.
 
 ### WP1. 경기 신호 전달 (11-07~09)
-- [ ] `safety/can_guard/race_signal.py`: `decode_race_signal`(0x124), `RaceSignalDecoder`(2프레임 확인, seen 래치, last_signal, age), `ResMonitor`(RES_START 1프레임, alive 정지·건너뜀, age), `decode_pit_zone`, `decode_repair`, `decode_res_fb`, `decode_speed_limit_info`. 단위 시험: 1.3절 byte0 예시, cantools 대조, alive 255→0.
-- [ ] `RaceState.msg`(3절) + `race_state_publisher.py` + launch + 브리지 `ids` 확장.
-- [ ] can_guard: 새 프레임 수신 시 이벤트 로그만(`race_signal`, `res`, `res_alive_lost`, `speed_limit_info`, `race_signal_unknown`). 동작 변경 없음.
-- [ ] `bsw_monitor.py`: 깃발 5비트·seen·RES·0x202·앱 표시.
-- [ ] `sil/vcan/fake_race_server.py`(yaml 시나리오: 비트·방식 level/pulse2/pulse1·RES·alive 정지) + `sil_tests/r_race.py` 자동 판정 + 지연 측정.
+- [x] (2026-11-06) `safety/can_guard/race_signal.py`: `decode_race_signal`(0x124), `RaceSignalDecoder`(2프레임 확인, seen 래치, last_signal, age), `ResMonitor`(RES_START 1프레임, alive 정지·건너뜀, age), `decode_pit_zone`, `decode_repair`, `decode_res_fb`, `decode_speed_limit_info`. 단위 시험: 1.3절 byte0 예시, cantools 대조, alive 255→0.
+- [x] (2026-11-06) `RaceState.msg`(3절) + `race_state_publisher.py` + launch + 브리지 `ids` 확장.
+- [x] (2026-11-06) can_guard: 새 프레임 수신 시 이벤트 로그만(`race_signal`, `res`, `res_alive_lost`, `speed_limit_info`, `race_signal_unknown`). 동작 변경 없음.
+- [x] (2026-11-06) `bsw_monitor.py`: 깃발 5비트·seen·RES·0x202·앱 표시.
+- [x] (2026-11-06) `sil/vcan/fake_race_server.py`(yaml 시나리오: 비트·방식 level/pulse2/pulse1·RES·alive 정지) + `sil_tests/r_race.py` 자동 판정 + 지연 측정.
 
 **관문:** 지연 ≤ 5 ms, 3방식 시나리오 통과, 기존 시험 전부 통과, `--race` 옵션 없이 can_guard 동작 변화 없음(E1~E7·P1·P2 동일).
 
@@ -312,6 +314,10 @@ steer_map:                      # 2026-11-04 bsw5 GNSS 요레이트 역산 (★ 
 ## 8. 작업 기록
 | 날짜 | WP | 결과 | 커밋 | 남은 일 |
 |---|---|---|---|---|
+| 2026-11-06 | WP-1 | 폐기 설계 제거. pytest 기준 일치, 8개 시나리오 동일 | b8fb1d1 | `rehearse_lift_guard` 31/31(vcan0·sudo) |
+| 2026-11-06 | WP0 | 조향 7점 표, 히스테리시스, 데이터시트 v0.5. 고정 입력 0 회/분 | 2dd0d9b | 폐루프 효과는 11-14, `rehearse_lift_guard` |
+| 2026-11-06 | WP1 | `/race/state`, 이벤트 로그, 상태판, r_race. 시나리오 10개 3회 통과, 지연 중앙 0.94 ms(개발 PC) | e7a64b5, 47cf377 | E1~E7·P1·P2, 대회 PC 지연 |
+| 2026-11-06 | 보고 | `reports/2026-11-06_engine_room_report/`, `reports/race_flag` 삭제 | 이 표의 커밋 | — |
 
 ## 9. 변경 이력
 | 날짜 | 내용 |
